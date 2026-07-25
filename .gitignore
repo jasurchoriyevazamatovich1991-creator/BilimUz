@@ -1,0 +1,22 @@
+# Backend
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+
+# Frontend
+node_modules/
+dist/
+.vite/
+
+# Database
+database/backups/*
+!database/backups/.gitkeep
+
+# Uploads (dev only)
+uploads/*
+!uploads/*/.gitkeep
+
+.DS_Store
+*.log
