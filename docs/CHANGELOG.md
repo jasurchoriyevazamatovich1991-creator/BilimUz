@@ -4,6 +4,16 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 6 — Test Engine (Tests, Questions, Attempts)
+- `app/modules/tests/` — Test definitions: CRUD, publish-readiness state machine (draft→published→archived), 10 test cases
+- `app/modules/questions/` — Question + QuestionOption + QuestionMedia (3 entities, 1 module, `permissions`-pattern grouping): CRUD, answer-key validation (single/multiple/true-false rules), 15 test cases. One bug found and fixed during development: a silently-swallowed `try/except: pass` in `add_option()` was replaced with a real, always-enforceable single-correct-answer check.
+- `app/modules/attempts/` — the stateful test-taking engine: start/resume/answer/submit/result, server-authoritative timer, persisted question randomization, lazy auto-finish (no background worker needed), 22 test cases including an explicit "unanswered questions score zero" test
+- Alembic migration `0002_add_attempt_expiry_and_question_order.py` — adds `expires_at` and `question_order` to `test_attempts` (architecture decision: persist, don't recompute, for full attempt reproducibility)
+- One additive method to the existing `questions` module (`QuestionRepository.list_all_for_test()`) — required by `attempts` for unpaginated question snapshotting; no existing behavior changed
+- Full architecture design document: `docs/Sprint6_TestEngine_Architecture.md` (written and approved before any code)
+- Removed 7 more stray empty scaffold folders (`app/permissions/`, `app/tests/`, `app/questions/`, `app/attempts/`, `app/options/`, `app/database/`, `app/middleware/` — the last two superseded since Sprint 1's `app/db/`/`app/core/middleware/` split, only now actually deleted)
+- Total Sprint 6 tests: 47
+
 ### Sprint 5 — Education Core (Grades, Topics, Lessons)
 - `app/modules/grades/` — full CRUD module: pagination, search, sort, filter, soft delete, UUID, 7 test cases
 - `app/modules/topics/` — full CRUD module, cross-module referential validation against `subjects` and `grades` (422 on invalid references instead of a raw DB error), 8 test cases
