@@ -3,9 +3,10 @@
 Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun.
 
 ## Arxitektura
-- **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`) + Layered Architecture (Router → Dependencies → Service → Repository → Database), Clean Architecture tamoyillari bilan
+- **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`) + Layered Architecture (Router → Service → Repository → Database), Clean Architecture tamoyillari bilan
 - **Frontend**: React + TypeScript (Pages → Components → Services → API → Backend) — hali qurilmagan
 - **Database**: PostgreSQL, 54 jadval, 25 modul, Alembic migratsiyalari bilan boshqariladi
+- **Xavfsizlik**: Argon2 (parol xeshlash), JWT (`nbf` claim bilan) — `backend/app/core/security/`da markazlashgan yagona amalga oshirish (Sprint 4 Auth Cutover)
 
 Batafsil: [`docs/00_Folder_Architecture.md`](docs/00_Folder_Architecture.md)
 
@@ -32,9 +33,12 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Bosqich | Qamrov | Holat |
 |---|---|---|
 | Sprint 1 — Foundation | FastAPI skeleti, `core/`, `db/`, Docker, Alembic, health/version endpointlar | ✅ Yakunlandi |
-| Sprint 2 — Enterprise modul arxitekturasi | `auth`, `users`, `roles`, `permissions`, `subjects` — barchasi `backend/app/modules/` ostida, bir xil qatlamli naqsh bilan | ✅ Yakunlandi |
-| Sprint 3 — Izolyatsiyalangan Argon2/JWT autentifikatsiya | `PasswordService` (Argon2), `JWTService`, Register/Login/Refresh/Me API'lari — mavjud tizimga parallel, alohida yo'llarda (`/auth/registration`, `/auth/login-v2` va h.k.) | ✅ Yakunlandi |
+| Sprint 2 — Enterprise modul arxitekturasi | `auth`, `users`, `roles`, `permissions`, `subjects` — barchasi `backend/app/modules/` ostida | ✅ Yakunlandi |
+| Sprint 3 — Argon2/JWT (izolyatsiyalangan sinov) | `PasswordService`, `JWTService`, Register/Login/Refresh/Me — alohida `-v2` yo'llarda qurildi va sinaldi | ✅ Yakunlandi, keyin birlashtirildi ↓ |
+| Sprint 4 — Auth Cutover | Sprint 3'dagi Argon2/JWT `core/security/`ga ko'chirildi, `auth` moduli shu asosda qayta yozildi, `-v2` papkalar o'chirildi. **Endi faqat bitta auth tizimi bor.** | ✅ Yakunlandi |
 
-**Muhim, ochiq eslatma**: Sprint 3 mavjud (bcrypt asosidagi) autentifikatsiya tizimini **almashtirmadi** — ikkalasi hozircha parallel mavjud. Qaysi birini asosiy qilish (yoki ikkalasini saqlab qolish) — hali qabul qilinmagan mahsulot qarori (batafsil: har bir `backend/app/modules/auth/{security,jwt,registration,login,refresh,me}/README.md`). Shuningdek, test to'plami (100+ unit test) hali **haqiqiy Postgres muhitida ishga tushirilmagan** — faqat sintaksis va qo'lda tekshirilgan.
+To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
+
+**Ochiq eslatma**: test to'plami (100+ unit test) hali **haqiqiy Postgres muhitida ishga tushirilmagan** — faqat sintaksis va qo'lda tekshirilgan.
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)

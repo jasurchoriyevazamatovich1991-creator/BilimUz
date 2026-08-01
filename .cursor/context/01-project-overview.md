@@ -30,7 +30,7 @@ Platforma millionlab foydalanuvchini qo'llab-quvvatlashi kerak — bu talab har 
 
 ## Texnologiyalar
 
-**Backend**: Python 3.13+, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL, Redis, JWT+Refresh Token, bcrypt.
+**Backend**: Python 3.13+, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL, Redis, JWT+Refresh Token, Argon2 (parol xeshlash — Sprint 4'da bcrypt'dan almashtirildi, `docs/ADR/ADR-009-Auth-Cutover.md`).
 **Frontend**: React 19+, TypeScript, Vite, Tailwind CSS, shadcn/ui, Redux Toolkit, TanStack Query.
 **Infratuzilma**: Docker, Nginx, GitHub (+ GitHub Actions CI/CD).
 
@@ -46,9 +46,10 @@ To'liq qarorlar va sabablar: `04-tech-stack.md`.
 ## Hozirgi holat (2026-yil, loyihaning boshlang'ich bosqichi)
 
 - Database schema v2.0 — 54 jadval, to'liq audit trail, tayyor.
-- Backend: `auth` (JWT + xavfsizlik kuchaytirilgan) va `subjects` modullari to'liq qurilgan va QA/Review'dan o'tgan (`CHANGES REQUIRED` — kritik ishlar: Alembic, test suite ijrosi).
+- Backend: `auth`, `users`, `roles`, `permissions`, `subjects` — 5 modul to'liq qurilgan (`backend/app/modules/`). Auth — Argon2 + JWT (`nbf` claim), yagona tizim (Sprint 4 Auth Cutover, `docs/ADR/ADR-009-Auth-Cutover.md`).
 - Frontend: hali qurilmagan (skelet papkalar bor).
-- Umumiy baho (oxirgi Senior Review): **64/100 — CHANGES REQUIRED**.
+- Test suite (100+ unit test) yozilgan, lekin haqiqiy Postgres muhitida hali ishga tushirilmagan.
+- Umumiy loyiha tayyorligi: ~18-22% (backend 5/25 modul, frontend 0%) — batafsil: `05-system-modules.md`.
 
 ## Kelajakdagi reja
 

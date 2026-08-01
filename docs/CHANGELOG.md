@@ -4,6 +4,18 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 4 — Auth Cutover
+- Merged the isolated Sprint 3 Argon2/JWT track into the single production `auth` module — see `docs/ADR/ADR-009-Auth-Cutover.md`
+- `PasswordService` (Argon2) and `JWTService` (typed payloads, `nbf` claim) promoted to shared infrastructure: `app/core/security/`
+- Password policy resolved to **12 characters** (final)
+- Removed: `app/modules/auth/{security,jwt,registration,login,refresh,me}/` and their `-v2` endpoints — no client-facing path changes, `/auth/register` `/auth/login` `/auth/refresh` `/auth/me` etc. now run the upgraded implementation
+- Fixed permanently (carried over from Sprint 3): `get_current_user()` now catches `pydantic.ValidationError` in addition to `jwt.PyJWTError` when decoding tokens, closing an unhandled-500 risk
+
+### Sprint 3 — Isolated Argon2/JWT authentication track (superseded by Sprint 4 cutover above)
+- Built `PasswordService`, `JWTService`, and Register/Login/Refresh/Me APIs as a self-contained parallel implementation, per explicit "do not modify existing endpoints" scope on each step
+- 36 unit tests written across the 6 isolated modules
+- Found and fixed a real compatibility gap (old-system tokens missing the `nbf` claim causing an unhandled `pydantic.ValidationError`) — the fix was carried forward into the Sprint 4 cutover
+
 ### Added — Sprint 1: Foundation
 - `app/db/` — split from the old combined `core/database.py` into `database.py` (engine), `base.py` (declarative Base), `session.py` (SessionLocal + `get_db()`) — single-responsibility per file
 - `app/core/logging.py` — structured logging, wired into `main.py` startup

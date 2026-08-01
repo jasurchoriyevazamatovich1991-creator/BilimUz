@@ -6,6 +6,11 @@ verify) carry a Redis-backed rate limit per Security Engineer policy.
 """
 from fastapi import APIRouter, Depends, Request, status
 
+from app.core.middleware.rate_limit import rate_limit
+from app.core.schemas import success_response
+from app.core.security.dependencies import get_jwt_service, get_password_service
+from app.core.security.jwt_service import JWTService
+from app.core.security.password_service import PasswordService
 from app.modules.auth.constants import LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, VERIFY_RATE_LIMIT
 from app.modules.auth.dependencies import get_auth_repository, get_current_user
 from app.modules.auth.repository import AuthRepository
@@ -14,20 +19,21 @@ from app.modules.auth.schemas import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
-    TokenPairResponse,
     UserPublic,
     VerifyRequest,
 )
 from app.modules.auth.service import AuthService
-from app.core.middleware.rate_limit import rate_limit
-from app.core.schemas import success_response
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-def get_auth_service(repo: AuthRepository = Depends(get_auth_repository)) -> AuthService:
-    return AuthService(repo)
+def get_auth_service(
+    repo: AuthRepository = Depends(get_auth_repository),
+    password_service: PasswordService = Depends(get_password_service),
+    jwt_service: JWTService = Depends(get_jwt_service),
+) -> AuthService:
+    return AuthService(repo, password_service, jwt_service)
 
 
 @router.post(
@@ -51,7 +57,7 @@ def verify(data: VerifyRequest, service: AuthService = Depends(get_auth_service)
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", *LOGIN_RATE_LIMIT))])
 def login(data: LoginRequest, request: Request, service: AuthService = Depends(get_auth_service)):
-    tokens: TokenPairResponse = service.login(
+    tokens = service.login(
         data.identifier, data.password, request.client.host if request.client else None,
         request.headers.get("user-agent"),
     )

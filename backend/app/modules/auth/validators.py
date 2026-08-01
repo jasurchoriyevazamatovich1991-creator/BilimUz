@@ -1,16 +1,18 @@
 """
 Pure validation functions — no I/O, no DB, no HTTP. Called from Pydantic
 schemas (field_validator) and reusable anywhere else (e.g. AI module input).
+
+Sprint 4 (Auth Cutover): validate_password_strength() now delegates to the
+unified core.security.password_service.PasswordService instead of
+duplicating regex checks here — single source of truth for the password
+policy (12 chars, per core/security/constants.py).
 """
 import re
 
-from app.modules.auth.constants import COMMON_WEAK_PASSWORDS, PASSWORD_MIN_LENGTH
+from app.core.security.password_service import PasswordService
 
 _UZ_PHONE_RE = re.compile(r"^\+998\d{9}$")
-_UPPER_RE = re.compile(r"[A-Z]")
-_LOWER_RE = re.compile(r"[a-z]")
-_DIGIT_RE = re.compile(r"\d")
-_SPECIAL_RE = re.compile(r"[!@#$%^&*()\-_=+\[\]{};:,.<>/?]")
+_password_service = PasswordService()  # stateless — a module-level instance is safe
 
 
 def validate_uzbek_phone(phone: str) -> str:
@@ -20,19 +22,12 @@ def validate_uzbek_phone(phone: str) -> str:
 
 
 def validate_password_strength(password: str) -> str:
-    """Security Engineer policy: 12+ chars, upper, lower, digit, special char."""
-    if len(password) < PASSWORD_MIN_LENGTH:
-        raise ValueError(f"Parol kamida {PASSWORD_MIN_LENGTH} belgidan iborat bo'lishi kerak")
-    if not _UPPER_RE.search(password):
-        raise ValueError("Parolda kamida bitta katta harf bo'lishi kerak")
-    if not _LOWER_RE.search(password):
-        raise ValueError("Parolda kamida bitta kichik harf bo'lishi kerak")
-    if not _DIGIT_RE.search(password):
-        raise ValueError("Parolda kamida bitta raqam bo'lishi kerak")
-    if not _SPECIAL_RE.search(password):
-        raise ValueError("Parolda kamida bitta maxsus belgi bo'lishi kerak (!@#$%...)")
-    if password.lower() in COMMON_WEAK_PASSWORDS:
-        raise ValueError("Bu parol juda ko'p tarqalgan, boshqasini tanlang")
+    """Pydantic field_validator adapter: PasswordService returns ALL
+    violated rules; this raises ValueError with them joined, since
+    Pydantic's field_validator protocol expects a single exception."""
+    result = _password_service.validate_password_strength(password)
+    if not result.is_valid:
+        raise ValueError("; ".join(e.message for e in result.errors))
     return password
 
 
