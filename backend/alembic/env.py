@@ -23,9 +23,12 @@ from app.db.base import Base
 # Add a line here EVERY TIME a new module gets a models.py — otherwise
 # autogenerate silently ignores it.
 from app.modules.auth import models as auth_models  # noqa: F401
+from app.modules.grades import models as grades_models  # noqa: F401
+from app.modules.lessons import models as lessons_models  # noqa: F401
 from app.modules.permissions import models as permissions_models  # noqa: F401
 from app.modules.roles import models as roles_models  # noqa: F401
 from app.modules.subjects import models as subjects_models  # noqa: F401
+from app.modules.topics import models as topics_models  # noqa: F401
 from app.modules.users import models as users_models  # noqa: F401
 
 config = context.config

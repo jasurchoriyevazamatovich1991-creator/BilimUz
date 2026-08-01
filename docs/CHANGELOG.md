@@ -4,6 +4,14 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 5 — Education Core (Grades, Topics, Lessons)
+- `app/modules/grades/` — full CRUD module: pagination, search, sort, filter, soft delete, UUID, 7 test cases
+- `app/modules/topics/` — full CRUD module, cross-module referential validation against `subjects` and `grades` (422 on invalid references instead of a raw DB error), 8 test cases
+- `app/modules/lessons/` — full CRUD module, cross-module referential validation against `topics`, enforces "at least one content type" (video/pdf/content) on both create (schema-level) and update (service-level merge check), 8 test cases
+- All three follow the exact `auth`/`users` architectural pattern: `models, schemas, repository, service, router, dependencies, validators, exceptions, constants, tests/, README.md`
+- Full Swagger documentation (`summary` + `description` on every endpoint and query parameter)
+- Removed 3 stray empty scaffold folders (`app/grades/`, `app/topics/`, `app/lessons/` at the old pre-`app/modules/` location) — repository is cleaner than before Sprint 5, per the sprint's explicit goal
+
 ### Sprint 4 — Auth Cutover
 - Merged the isolated Sprint 3 Argon2/JWT track into the single production `auth` module — see `docs/ADR/ADR-009-Auth-Cutover.md`
 - `PasswordService` (Argon2) and `JWTService` (typed payloads, `nbf` claim) promoted to shared infrastructure: `app/core/security/`
