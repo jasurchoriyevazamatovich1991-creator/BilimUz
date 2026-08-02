@@ -4,6 +4,15 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 7 — Results, Certificates, Analytics
+- `app/modules/results/` — Result creation (idempotent on attempt_id), Statistics (running-average upsert), Ranking calculation ENGINE ONLY (no public leaderboard read endpoint — approved scope limit). Tie-break: higher score → shorter duration → earlier completion. 13 test cases.
+- `app/modules/certificates/` — Certificate issuance idempotent per (user_id, test_id), public verification by code, templates. `pdf_url` always null — PDF export explicitly out of scope this sprint, not a placeholder. 12 test cases.
+- `app/modules/analytics/` — fully independent module (no write dependency from `results`, per approved architecture): computes `daily_statistics`/`monthly_statistics` via explicit Admin-triggered recompute, reading `results` + `attempts` answers read-only. Delete-and-rebuild strategy, N+1-safe subject caching. 11 test cases.
+- Full architecture design document, 2 revisions: `docs/Sprint7_Results_Certificates_Analytics_Architecture.md` — Revision 1 (initial design) → Revision 2 (4 approved decisions: Analytics independence, certificate idempotency key, PDF deferral, ranking tie-break rule)
+- One bug caught and fixed during development (not shipped): a placeholder `_subject_for()` in `analytics/service.py` that always returned `None` — replaced with a real, cached, N+1-safe subject lookup before the module was considered complete
+- No new migrations — all 10 tables already existed in the baseline (`0001_initial_schema.py`)
+- Total Sprint 7 tests: 36
+
 ### Sprint 6 — Test Engine (Tests, Questions, Attempts)
 - `app/modules/tests/` — Test definitions: CRUD, publish-readiness state machine (draft→published→archived), 10 test cases
 - `app/modules/questions/` — Question + QuestionOption + QuestionMedia (3 entities, 1 module, `permissions`-pattern grouping): CRUD, answer-key validation (single/multiple/true-false rules), 15 test cases. One bug found and fixed during development: a silently-swallowed `try/except: pass` in `add_option()` was replaced with a real, always-enforceable single-correct-answer check.
