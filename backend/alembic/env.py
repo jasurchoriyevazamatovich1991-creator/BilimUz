@@ -22,6 +22,7 @@ from app.db.base import Base
 # Import every module's models so Base.metadata knows about their tables.
 # Add a line here EVERY TIME a new module gets a models.py — otherwise
 # autogenerate silently ignores it.
+from app.modules.ai import models as ai_models  # noqa: F401
 from app.modules.analytics import models as analytics_models  # noqa: F401
 from app.modules.attempts import models as attempts_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
@@ -29,6 +30,7 @@ from app.modules.certificates import models as certificates_models  # noqa: F401
 from app.modules.grades import models as grades_models  # noqa: F401
 from app.modules.lessons import models as lessons_models  # noqa: F401
 from app.modules.notifications import models as notifications_models  # noqa: F401
+from app.modules.payments import models as payments_models  # noqa: F401
 from app.modules.permissions import models as permissions_models  # noqa: F401
 from app.modules.questions import models as questions_models  # noqa: F401
 from app.modules.results import models as results_models  # noqa: F401

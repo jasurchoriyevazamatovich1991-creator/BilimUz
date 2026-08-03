@@ -11,6 +11,7 @@ from fastapi import APIRouter
 
 from app.api.v1.health import router as health_router
 from app.api.v1.version import router as version_router
+from app.modules.ai.router import router as ai_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.attempts.router import router as attempts_router
 from app.modules.auth.router import router as auth_router
@@ -19,6 +20,7 @@ from app.modules.certificates.router import template_router as certificate_templ
 from app.modules.grades.router import router as grades_router
 from app.modules.lessons.router import router as lessons_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.payments.router import router as payments_router
 from app.modules.permissions.router import router as permissions_router
 from app.modules.questions.router import router as questions_router
 from app.modules.results.router import router as results_router
@@ -55,5 +57,7 @@ api_router.include_router(analytics_router)
 api_router.include_router(settings_router)
 api_router.include_router(uploads_router)
 api_router.include_router(notifications_router)
+api_router.include_router(ai_router)
+api_router.include_router(payments_router)
 
-# Sprint 8 complete. As modules are implemented, register them here.
+# Sprint 9 complete. As modules are implemented, register them here.

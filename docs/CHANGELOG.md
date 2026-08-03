@@ -4,6 +4,16 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 9 — AI, Payments (Architecture Freeze)
+- `app/modules/ai/` — provider-agnostic AI chat framework: conversations, history (bounded context, 20-message window), recommendations, study plans. `AIProvider` interface, `UnconfiguredAIProvider` the only implementation (honest refusal, 501, no vendor SDK). Rate-limited 10 req/min per user via a new `rate_limit_by_user()` (auth module, reuses the existing Redis mechanism, keyed by user instead of IP). Usage logged via the existing `audit_logs` — no new table. 4000-char message cap. 19 test cases.
+- `app/modules/payments/` — provider-agnostic payment framework: plans, subscriptions, payment lifecycle, webhook architecture, full-refund support, two-layer idempotency. `PaymentProvider` interface + registry, `UnconfiguredPaymentProvider` the only implementation (honest refusal, 501, no vendor SDK). 30 test cases including a simulated concurrent-webhook race-condition test.
+- Alembic migration `0003_unique_provider_txn_id.py` — partial `UNIQUE` index on `transactions.provider_txn_id` (approved decision: both service-layer AND DB-level idempotency).
+- One additive core-adjacent capability: `rate_limit_by_user()` added to `app/modules/auth/dependencies.py` (not `core/`, since it depends on `get_current_user` and `core/` must never import from `app/modules/*`) — reuses the existing Redis INCR/EXPIRE mechanism, does not duplicate it.
+- **Zero vendor SDK dependencies added** — no OpenAI, Anthropic, Gemini, Stripe, Payme, or Click imports anywhere in the codebase, verified by grep as part of validation.
+- Cleanup: removed 5 empty duplicate scaffold folders (`app/certificates/`, `app/notifications/`, `app/uploads/`, `app/payments/`, `app/analytics/` at the pre-`app/modules/` location) — found during this sprint's validation, same recurring class of issue as prior sprints' audits.
+- Full architecture design document: `docs/Sprint9_AI_Payments_Architecture.md`
+- Total Sprint 9 tests: 49
+
 ### Sprint 8 — Notifications, Settings, Uploads (Architecture Freeze)
 - `app/modules/settings/` — general/SMTP/payment/AI settings with encryption at rest (Fernet, `cryptography` library, new `FILE_ENCRYPTION_KEY` env var). Every secret-bearing response schema structurally omits the secret field, verified by dedicated tests. 19 test cases.
 - `app/modules/uploads/` — file upload/download/delete with a `StorageBackend` abstraction (local disk this sprint). UUID-based storage names close path-traversal risk structurally. Size limits: images 10MB, PDF/Office 20MB, audio 50MB, video 200MB. `/download` requires authentication (no public access). Video duration/document page-count intentionally NULL (approved scope boundary). 23 test cases.

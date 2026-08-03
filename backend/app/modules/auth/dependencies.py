@@ -15,7 +15,8 @@ from fastapi import Depends, Header
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import InvalidTokenException, UserNotFoundException
+from app.core.exceptions import InvalidTokenException, RateLimitExceededException, UserNotFoundException
+from app.core.redis_client import redis_client
 from app.core.security.dependencies import get_jwt_service
 from app.core.security.jwt_service import JWTService
 from app.core.security.schemas import TokenType
@@ -66,3 +67,33 @@ def require_roles(*allowed_role_names: str):
         return user
 
     return _check
+
+
+def rate_limit_by_user(key_prefix: str, max_requests: int, window_seconds: int):
+    """
+    User-keyed rate limiting (Sprint 9 — ai module's message-send
+    endpoint: 10 requests/minute per user). Reuses the exact same Redis
+    INCR/EXPIRE mechanism as core.middleware.rate_limit.rate_limit()
+    (IP-based) — this is the user-keyed counterpart, not a parallel
+    implementation, just a different key.
+
+    Lives here (not core/) because it depends on get_current_user, and
+    core/ must never import from app/modules/* (core is lower-level than
+    modules, never the reverse) — same reasoning already documented for
+    every other auth/dependencies.py function.
+
+    Usage: Depends(rate_limit_by_user('ai_message', max_requests=10, window_seconds=60))
+    Returns the authenticated User, so it can replace a plain
+    Depends(get_current_user) in the same endpoint signature.
+    """
+
+    def _dependency(user: User = Depends(get_current_user)) -> User:
+        key = f"ratelimit:{key_prefix}:{user.id}"
+        current = redis_client.incr(key)
+        if current == 1:
+            redis_client.expire(key, window_seconds)
+        if current > max_requests:
+            raise RateLimitExceededException("Juda ko'p so'rov yuborildi. Iltimos, birozdan so'ng qayta urining.")
+        return user
+
+    return _dependency
