@@ -28,13 +28,16 @@ from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.certificates import models as certificates_models  # noqa: F401
 from app.modules.grades import models as grades_models  # noqa: F401
 from app.modules.lessons import models as lessons_models  # noqa: F401
+from app.modules.notifications import models as notifications_models  # noqa: F401
 from app.modules.permissions import models as permissions_models  # noqa: F401
 from app.modules.questions import models as questions_models  # noqa: F401
 from app.modules.results import models as results_models  # noqa: F401
 from app.modules.roles import models as roles_models  # noqa: F401
+from app.modules.settings import models as settings_models  # noqa: F401
 from app.modules.subjects import models as subjects_models  # noqa: F401
 from app.modules.tests import models as tests_models  # noqa: F401
 from app.modules.topics import models as topics_models  # noqa: F401
+from app.modules.uploads import models as uploads_models  # noqa: F401
 from app.modules.users import models as users_models  # noqa: F401
 
 config = context.config

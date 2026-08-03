@@ -18,13 +18,16 @@ from app.modules.certificates.router import router as certificates_router
 from app.modules.certificates.router import template_router as certificate_templates_router
 from app.modules.grades.router import router as grades_router
 from app.modules.lessons.router import router as lessons_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.permissions.router import router as permissions_router
 from app.modules.questions.router import router as questions_router
 from app.modules.results.router import router as results_router
 from app.modules.roles.router import router as roles_router
+from app.modules.settings.router import router as settings_router
 from app.modules.subjects.router import router as subjects_router
 from app.modules.tests.router import router as tests_router
 from app.modules.topics.router import router as topics_router
+from app.modules.uploads.router import router as uploads_router
 from app.modules.users.router import router as users_router
 
 api_router = APIRouter()
@@ -49,5 +52,8 @@ api_router.include_router(results_router)
 api_router.include_router(certificates_router)
 api_router.include_router(certificate_templates_router)
 api_router.include_router(analytics_router)
+api_router.include_router(settings_router)
+api_router.include_router(uploads_router)
+api_router.include_router(notifications_router)
 
-# As modules are implemented, register them here.
+# Sprint 8 complete. As modules are implemented, register them here.

@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     VERIFICATION_CODE_TTL_MINUTES: int = 5
     VERIFICATION_CODE_MAX_ATTEMPTS: int = 5
 
+    # Encryption at rest (Sprint 8 — settings module: SMTP/payment/AI secrets)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # If this key is ever lost, every encrypted row becomes permanently unreadable — no recovery path.
+    FILE_ENCRYPTION_KEY: str = "CHANGE_ME_IN_PRODUCTION_GENERATE_A_REAL_FERNET_KEY"
+
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
 

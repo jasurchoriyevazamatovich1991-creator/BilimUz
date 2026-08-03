@@ -39,6 +39,7 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 5 — Education Core | `grades`, `topics`, `lessons` — to'liq CRUD, cross-module bog'lanish tekshiruvi (`topics→subjects/grades`, `lessons→topics`), 23 test | ✅ Yakunlandi |
 | Sprint 6 — Test Engine | `tests`, `questions` (+options+media), `attempts` — to'liq test topshirish dvigateli: timer, randomizatsiya, scoring, lazy auto-finish, 47 test. Migratsiya `0002` | ✅ Yakunlandi |
 | Sprint 7 — Results, Certificates, Analytics | `results` (reyting hisoblash dvigateli, leaderboard endpoint keyingi sprintga qoldirilgan), `certificates` (PDF'siz, idempotent), `analytics` (mustaqil, faqat `results`ni o'qiydi), 36 test | ✅ Yakunlandi |
+| Sprint 8 — Notifications, Settings, Uploads | `settings` (Fernet shifrlash, maxfiy maydonlar strukturaviy yashirin), `uploads` (mahalliy disk, UUID nomlash), `notifications` (navbat/trigger dvigateli, haqiqiy SMTP/SMS yo'q — ataylab), 66 test | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 

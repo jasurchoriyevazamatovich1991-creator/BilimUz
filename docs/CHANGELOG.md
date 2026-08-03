@@ -4,6 +4,16 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 8 — Notifications, Settings, Uploads (Architecture Freeze)
+- `app/modules/settings/` — general/SMTP/payment/AI settings with encryption at rest (Fernet, `cryptography` library, new `FILE_ENCRYPTION_KEY` env var). Every secret-bearing response schema structurally omits the secret field, verified by dedicated tests. 19 test cases.
+- `app/modules/uploads/` — file upload/download/delete with a `StorageBackend` abstraction (local disk this sprint). UUID-based storage names close path-traversal risk structurally. Size limits: images 10MB, PDF/Office 20MB, audio 50MB, video 200MB. `/download` requires authentication (no public access). Video duration/document page-count intentionally NULL (approved scope boundary). 23 test cases.
+- `app/modules/notifications/` — in-app notifications, templates, and email/SMS queue-and-trigger delivery engine. `EmailProvider`/`SmsProvider` interfaces with only `Unconfigured*` implementations this sprint — honestly raise `ProviderNotConfiguredException` (501) rather than faking delivery. Real SMTP/SMS explicitly deferred. 24 test cases.
+- One additive core capability: `app/core/security/encryption.py` (Fernet-based `EncryptionService`), same precedent as Sprint 4's `jwt_service.py`.
+- Two bugs caught and fixed during development (not shipped): (1) `datetime`/`DateTime` type-annotation mistake repeated across three models this sprint (`Mapped["datetime | None"]` without proper import/column type) — same class of error as earlier sprints, now corrected in all three; (2) `EmailQueueItem`/`SmsQueueItem` initially misused `StatusMixin` for a domain-specific status column, violating the mixin's own documented rule — corrected before the module was considered complete.
+- Full architecture design document, 2 revisions under "Architecture Freeze": `docs/Sprint8_Notifications_Settings_Uploads_Architecture.md`
+- No new migrations — all 12 tables already existed in the baseline (`0001_initial_schema.py`); one new environment variable instead (`FILE_ENCRYPTION_KEY`)
+- Total Sprint 8 tests: 66
+
 ### Sprint 7 — Results, Certificates, Analytics
 - `app/modules/results/` — Result creation (idempotent on attempt_id), Statistics (running-average upsert), Ranking calculation ENGINE ONLY (no public leaderboard read endpoint — approved scope limit). Tie-break: higher score → shorter duration → earlier completion. 13 test cases.
 - `app/modules/certificates/` — Certificate issuance idempotent per (user_id, test_id), public verification by code, templates. `pdf_url` always null — PDF export explicitly out of scope this sprint, not a placeholder. 12 test cases.

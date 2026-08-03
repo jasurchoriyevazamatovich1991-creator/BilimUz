@@ -18,5 +18,9 @@ database/backups/*
 uploads/*
 !uploads/*/.gitkeep
 
+# File uploads storage (Sprint 8 — app/modules/uploads/, local disk backend)
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+
 .DS_Store
 *.log
