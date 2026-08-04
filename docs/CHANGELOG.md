@@ -4,6 +4,14 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 10 — Schools, Learning Centers
+- `app/modules/schools/` — standalone catalog module (name, region, district, address, phone). No uniqueness constraint on name (matches schema — two towns can each have a "1-maktab"). 9 test cases.
+- `app/modules/learning_centers/` — standalone catalog module (name, owner_name, phone, region), structurally close to `schools` but kept separate per the schema's own module boundary. 10 test cases.
+- **Critical finding surfaced and documented, not fixed this sprint**: `profiles` (schema Module 2, the table that would actually reference `schools.id`/`learning_centers.id`) has never been implemented — both new modules ship as complete, standalone catalogs with no consumer yet, an explicitly approved scope boundary (`docs/Sprint10_Schools_LearningCenters_Architecture.md`).
+- Phone validation: broader institutional format (E.164 `+998` + 9 digits, no mobile-operator restriction) than the existing strict mobile-only pattern — defined locally in each module (not imported from `auth`) to preserve zero cross-module dependency.
+- No new migrations — both tables already existed in the baseline (`0001_initial_schema.py`).
+- Total Sprint 10 tests: 19
+
 ### Sprint 9 — AI, Payments (Architecture Freeze)
 - `app/modules/ai/` — provider-agnostic AI chat framework: conversations, history (bounded context, 20-message window), recommendations, study plans. `AIProvider` interface, `UnconfiguredAIProvider` the only implementation (honest refusal, 501, no vendor SDK). Rate-limited 10 req/min per user via a new `rate_limit_by_user()` (auth module, reuses the existing Redis mechanism, keyed by user instead of IP). Usage logged via the existing `audit_logs` — no new table. 4000-char message cap. 19 test cases.
 - `app/modules/payments/` — provider-agnostic payment framework: plans, subscriptions, payment lifecycle, webhook architecture, full-refund support, two-layer idempotency. `PaymentProvider` interface + registry, `UnconfiguredPaymentProvider` the only implementation (honest refusal, 501, no vendor SDK). 30 test cases including a simulated concurrent-webhook race-condition test.
@@ -62,6 +70,14 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 - Built `PasswordService`, `JWTService`, and Register/Login/Refresh/Me APIs as a self-contained parallel implementation, per explicit "do not modify existing endpoints" scope on each step
 - 36 unit tests written across the 6 isolated modules
 - Found and fixed a real compatibility gap (old-system tokens missing the `nbf` claim causing an unhandled `pydantic.ValidationError`) — the fix was carried forward into the Sprint 4 cutover
+
+### Sprint 2 — Enterprise Module Architecture
+- Migrated `auth`, `users`, `roles`, `subjects` from the initial flat scaffold into the `app/modules/{module}/` layered structure (`models, schemas, repository, service, router, dependencies, validators, exceptions, constants, tests/, README.md`) — the pattern every subsequent module (Sprint 3 onward) has followed without deviation
+- Built the `permissions` module from scratch as the RBAC capstone: `Permission` + `RolePermission` (full audit entity, not a bare junction table), `require_permission()` dependency introduced alongside `require_roles()` (additive, no forced migration of existing checks)
+- `roles` module: 8 seeded system roles protected from deletion/rename, role-in-use checks before deletion
+- `subjects` module: QA-reviewed, 3 bugs found and fixed during review (self-collision on rename, unrestricted status field, a false-positive test)
+- Senior review conducted: 64/100 at the time (critical items open: Alembic not yet initialized, tests never executed) — both closed later in Sprint 1's Alembic work and ongoing `py_compile` discipline
+- Not pushed to GitHub until the full sprint was complete (single clean commit, per project convention established this sprint)
 
 ### Added — Sprint 1: Foundation
 - `app/db/` — split from the old combined `core/database.py` into `database.py` (engine), `base.py` (declarative Base), `session.py` (SessionLocal + `get_db()`) — single-responsibility per file

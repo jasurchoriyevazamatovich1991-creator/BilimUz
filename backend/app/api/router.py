@@ -18,6 +18,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.certificates.router import router as certificates_router
 from app.modules.certificates.router import template_router as certificate_templates_router
 from app.modules.grades.router import router as grades_router
+from app.modules.learning_centers.router import router as learning_centers_router
 from app.modules.lessons.router import router as lessons_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.payments.router import router as payments_router
@@ -25,6 +26,7 @@ from app.modules.permissions.router import router as permissions_router
 from app.modules.questions.router import router as questions_router
 from app.modules.results.router import router as results_router
 from app.modules.roles.router import router as roles_router
+from app.modules.schools.router import router as schools_router
 from app.modules.settings.router import router as settings_router
 from app.modules.subjects.router import router as subjects_router
 from app.modules.tests.router import router as tests_router
@@ -59,5 +61,7 @@ api_router.include_router(uploads_router)
 api_router.include_router(notifications_router)
 api_router.include_router(ai_router)
 api_router.include_router(payments_router)
+api_router.include_router(schools_router)
+api_router.include_router(learning_centers_router)
 
-# Sprint 9 complete. As modules are implemented, register them here.
+# Sprint 10 complete. As modules are implemented, register them here.

@@ -13,7 +13,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.modules.settings.constants import MIN_SECRET_LENGTH
-from app.modules.settings.validators import validate_port, validate_secret_value, validate_setting_key
+from app.modules.settings.validators import validate_port, validate_secret_value
 
 
 class GeneralSettingUpsertRequest(BaseModel):

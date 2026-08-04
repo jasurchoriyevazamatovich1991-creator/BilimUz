@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Security
-    BCRYPT_ROUNDS: int = 12
     VERIFICATION_CODE_TTL_MINUTES: int = 5
     VERIFICATION_CODE_MAX_ATTEMPTS: int = 5
 

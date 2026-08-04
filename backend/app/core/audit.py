@@ -5,9 +5,8 @@ needs to write to it and it must not create a circular dependency
 (auth -> audit -> auth). Never call this with a password or token value.
 """
 import uuid
-from datetime import datetime
 
-from sqlalchemy import String, func
+from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, Session, mapped_column
 

@@ -8,7 +8,7 @@ Reads AttemptRepository, AnswerRepository (attempts module) and
 TestRepository (tests module) — all read-only, unmodified.
 """
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.core.audit import log_action
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository

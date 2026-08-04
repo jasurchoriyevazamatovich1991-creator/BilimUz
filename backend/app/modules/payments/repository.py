@@ -2,7 +2,6 @@
 repositories in one file, same cohesive-module reasoning as
 questions/repository.py."""
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
