@@ -4,6 +4,15 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 12 — Audit Logs, System Logs
+- `app/modules/audit_logs/` — **read-only** module surfacing the existing `audit_logs` table (written to from 34 call sites across 20 modules via `core.audit.log_action()`, unchanged) for the first time via the API. Reuses the existing `AuditLog` model from `core/audit.py` rather than duplicating it (approved decision) — `models.py` re-exports it with a documented rationale. 13 test cases, including dedicated coverage of the `metadata_`→`metadata` Pydantic attribute aliasing (SQLAlchemy reserves `metadata` on the declarative base).
+- `app/modules/system_logs/` — genuinely new module (the `system_logs` table has had zero producers since Sprint 1; `core/logging.py` writes to stdout only). Full read+write capability shipped; `core/logging.py` deliberately **not** modified to wire into it this sprint (named Future Improvement, not silently done or silently skipped). 14 test cases.
+- One small, directly-related fix: `AuditLog` (Sprint 1, `core/audit.py`) had never been registered in `alembic/env.py`'s model-import list, unlike every other module's models — added while working in this exact area.
+- Both modules Super Admin only (approved decision) — the most sensitive read/write surfaces in the platform.
+- Date range capped at 90 days on both modules' list endpoints (approved decision).
+- No new migrations — both tables already existed in the baseline (`0001_initial_schema.py`); `core/audit.py` and `core/logging.py` verified untouched.
+- Total Sprint 12 tests: 28
+
 ### Sprint 11 — Profiles
 - `app/modules/profiles/` — 1:1 extension of `User` (bio, address, telegram, instagram, website, school_id, learning_center_id). **Variant A architecture decision (approved before code)**: `first_name`/`last_name`/`birth_date`/`gender`/`phone` are NOT duplicated on `Profile` — `ProfileOut.compose(user, profile)` merges both sources into one response, proven by a dedicated structural test.
 - **Real schema conflict found and surfaced before any code was written**: the original request's field list (`middle_name`, `avatar_upload_id`, plus 5 fields already on `User`) didn't match the actual `profiles` table. Resolved via 3 approved decisions: no duplication (Variant A), no new migration this sprint (`middle_name`/`avatar_upload_id` deferred), existing roles only (no School Admin/Learning Center Admin introduced).

@@ -22,6 +22,7 @@ from app.db.base import Base
 # Import every module's models so Base.metadata knows about their tables.
 # Add a line here EVERY TIME a new module gets a models.py — otherwise
 # autogenerate silently ignores it.
+from app.core.audit import AuditLog  # noqa: F401  — Sprint 1 model, never registered here until Sprint 12
 from app.modules.ai import models as ai_models  # noqa: F401
 from app.modules.analytics import models as analytics_models  # noqa: F401
 from app.modules.attempts import models as attempts_models  # noqa: F401
@@ -40,6 +41,7 @@ from app.modules.roles import models as roles_models  # noqa: F401
 from app.modules.schools import models as schools_models  # noqa: F401
 from app.modules.settings import models as settings_models  # noqa: F401
 from app.modules.subjects import models as subjects_models  # noqa: F401
+from app.modules.system_logs import models as system_logs_models  # noqa: F401
 from app.modules.tests import models as tests_models  # noqa: F401
 from app.modules.topics import models as topics_models  # noqa: F401
 from app.modules.uploads import models as uploads_models  # noqa: F401

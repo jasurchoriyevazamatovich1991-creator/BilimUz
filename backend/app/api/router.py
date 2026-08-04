@@ -14,6 +14,7 @@ from app.api.v1.version import router as version_router
 from app.modules.ai.router import router as ai_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.attempts.router import router as attempts_router
+from app.modules.audit_logs.router import router as audit_logs_router
 from app.modules.auth.router import router as auth_router
 from app.modules.certificates.router import router as certificates_router
 from app.modules.certificates.router import template_router as certificate_templates_router
@@ -30,6 +31,7 @@ from app.modules.roles.router import router as roles_router
 from app.modules.schools.router import router as schools_router
 from app.modules.settings.router import router as settings_router
 from app.modules.subjects.router import router as subjects_router
+from app.modules.system_logs.router import router as system_logs_router
 from app.modules.tests.router import router as tests_router
 from app.modules.topics.router import router as topics_router
 from app.modules.uploads.router import router as uploads_router
@@ -65,5 +67,7 @@ api_router.include_router(payments_router)
 api_router.include_router(schools_router)
 api_router.include_router(learning_centers_router)
 api_router.include_router(profiles_router)
+api_router.include_router(audit_logs_router)
+api_router.include_router(system_logs_router)
 
-# Sprint 11 complete. As modules are implemented, register them here.
+# Sprint 12 complete. As modules are implemented, register them here.

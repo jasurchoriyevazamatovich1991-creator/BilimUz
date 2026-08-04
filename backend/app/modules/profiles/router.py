@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.schemas import success_response
 from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.profiles.dependencies import get_profile_service
-from app.modules.profiles.schemas import ProfileListParams, ProfileOut, ProfileUpdateRequest
+from app.modules.profiles.schemas import ProfileListParams, ProfileUpdateRequest
 from app.modules.profiles.service import ProfileService
 from app.modules.users.models import User
 
