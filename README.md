@@ -42,6 +42,7 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 8 — Notifications, Settings, Uploads | `settings` (Fernet shifrlash, maxfiy maydonlar strukturaviy yashirin), `uploads` (mahalliy disk, UUID nomlash), `notifications` (navbat/trigger dvigateli, haqiqiy SMTP/SMS yo'q — ataylab), 66 test | ✅ Yakunlandi |
 | Sprint 9 — AI, Payments | `ai` (vendor-agnostik, real AI yo'q — faqat interfeys, 10/daqiqa rate-limit), `payments` (vendor-agnostik, 2 qatlamli idempotentlik: servis+DB, to'liq refund), migratsiya `0003`, 49 test | ✅ Yakunlandi |
 | Sprint 10 — Schools, Learning Centers | Mustaqil kataloglar (`profiles` hali qurilmagani uchun iste'molchisiz, ochiq belgilangan), keng telefon validatsiyasi, 19 test | ✅ Yakunlandi |
+| Sprint 11 — Profiles | `User`ning 1:1 kengaytmasi — dublikatsiz (`ProfileOut` User+Profile'ni birlashtiradi), migratsiyasiz, mavjud rollar bilan, 16 test | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 

@@ -33,6 +33,7 @@ from app.modules.lessons import models as lessons_models  # noqa: F401
 from app.modules.notifications import models as notifications_models  # noqa: F401
 from app.modules.payments import models as payments_models  # noqa: F401
 from app.modules.permissions import models as permissions_models  # noqa: F401
+from app.modules.profiles import models as profiles_models  # noqa: F401
 from app.modules.questions import models as questions_models  # noqa: F401
 from app.modules.results import models as results_models  # noqa: F401
 from app.modules.roles import models as roles_models  # noqa: F401

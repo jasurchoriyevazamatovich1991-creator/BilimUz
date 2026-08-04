@@ -4,6 +4,14 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 11 — Profiles
+- `app/modules/profiles/` — 1:1 extension of `User` (bio, address, telegram, instagram, website, school_id, learning_center_id). **Variant A architecture decision (approved before code)**: `first_name`/`last_name`/`birth_date`/`gender`/`phone` are NOT duplicated on `Profile` — `ProfileOut.compose(user, profile)` merges both sources into one response, proven by a dedicated structural test.
+- **Real schema conflict found and surfaced before any code was written**: the original request's field list (`middle_name`, `avatar_upload_id`, plus 5 fields already on `User`) didn't match the actual `profiles` table. Resolved via 3 approved decisions: no duplication (Variant A), no new migration this sprint (`middle_name`/`avatar_upload_id` deferred), existing roles only (no School Admin/Learning Center Admin introduced).
+- Lazy get-or-create: a `Profile` row is created on first access rather than at registration — avoids touching `auth/service.py` (stable since Sprint 4).
+- RBAC simplified from the original request: own profile (any authenticated user), other users' profiles (Super Admin only) — no school-scoped tier exists yet since the corresponding roles weren't introduced (flagged, not hidden).
+- No new migrations — `profiles` already existed in the baseline (`0001_initial_schema.py`).
+- Total Sprint 11 tests: 16
+
 ### Sprint 10 — Schools, Learning Centers
 - `app/modules/schools/` — standalone catalog module (name, region, district, address, phone). No uniqueness constraint on name (matches schema — two towns can each have a "1-maktab"). 9 test cases.
 - `app/modules/learning_centers/` — standalone catalog module (name, owner_name, phone, region), structurally close to `schools` but kept separate per the schema's own module boundary. 10 test cases.

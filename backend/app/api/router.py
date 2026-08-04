@@ -23,6 +23,7 @@ from app.modules.lessons.router import router as lessons_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.payments.router import router as payments_router
 from app.modules.permissions.router import router as permissions_router
+from app.modules.profiles.router import router as profiles_router
 from app.modules.questions.router import router as questions_router
 from app.modules.results.router import router as results_router
 from app.modules.roles.router import router as roles_router
@@ -63,5 +64,6 @@ api_router.include_router(ai_router)
 api_router.include_router(payments_router)
 api_router.include_router(schools_router)
 api_router.include_router(learning_centers_router)
+api_router.include_router(profiles_router)
 
-# Sprint 10 complete. As modules are implemented, register them here.
+# Sprint 11 complete. As modules are implemented, register them here.
