@@ -9,6 +9,8 @@ import { RegisterPage } from "@/pages/public/RegisterPage";
 import { VerifyPage } from "@/pages/public/VerifyPage";
 import { UnsupportedRolePage } from "@/pages/public/UnsupportedRolePage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
+import { UsersListPage } from "@/pages/admin/UsersListPage";
+import { UserDetailPage } from "@/pages/admin/UserDetailPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
@@ -19,10 +21,13 @@ import type { SidebarItem } from "@/utils/sidebarConfig";
 /** Renders every non-dashboard sidebar item as a <Route> pointing at
  * PlaceholderPage — the dashboard item (index route) is handled
  * separately by the caller, since it needs the real dashboard
- * component, not a placeholder. */
-function placeholderRoutesFor(items: SidebarItem[], basePath: string) {
+ * component, not a placeholder. `excludePaths` lets a caller opt a
+ * path out entirely once it has a real page (Sprint 15: "/admin/users"),
+ * without needing to remove it from ADMIN_ITEMS (the sidebar label/path
+ * itself is unchanged — only which component renders it changes). */
+function placeholderRoutesFor(items: SidebarItem[], basePath: string, excludePaths: string[] = []) {
   return items
-    .filter((item) => item.path !== basePath)
+    .filter((item) => item.path !== basePath && !excludePaths.includes(item.path))
     .map((item) => {
       const relativePath = item.path.slice(basePath.length + 1); // strip "/admin/" etc.
       return <Route key={item.path} path={relativePath} element={<PlaceholderPage title={item.label} />} />;
@@ -45,7 +50,9 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute allowedPanel="admin" />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<AdminDashboardPage />} />
-          {placeholderRoutesFor(ADMIN_ITEMS, "/admin")}
+          <Route path="/admin/users" element={<UsersListPage />} />
+          <Route path="/admin/users/:userId" element={<UserDetailPage />} />
+          {placeholderRoutesFor(ADMIN_ITEMS, "/admin", ["/admin/users"])}
         </Route>
       </Route>
 

@@ -4,6 +4,17 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 15 — Frontend: Users Management UI (List/View/Edit)
+- **Critical finding, investigated before writing code**: the backend Users module has no `POST /users` and no `DELETE /users/{id}` — exhaustively verified, only 6 GET/PATCH endpoints exist. "CRUD" was requested but Create/Delete literally don't exist on the backend. **Approved decision (Option A)**: List, View, Edit, Search, Filter, Pagination only — no Create button, no Delete button, no disabled/hidden placeholders for either, anywhere. A vestigial `ban_user` reference found in `users/constants.py`'s comments (no such endpoint exists) was also noted, not acted on.
+- New: `api/roles.ts` + `hooks/useRoles.ts` (role_id → name lookup, deliberately separate from the unrelated `utils/roleConfig.ts`), `hooks/useDebouncedValue.ts` (no external library), `hooks/useUsers.ts` (list/get/update/changeRole), `components/users/StatusBadge.tsx` (display-only, renders all 4 real backend status values including `banned`, zero ban/unban action).
+- `api/users.ts` extended (Sprint 14's `count()` untouched) with `list/get/update/changeRole`.
+- shadcn/ui primitives (`Button`, `Input`, `Card`, built in Sprint 13's continuation) get their first real use.
+- `routes/AppRoutes.tsx` minimally extended (not rewritten): `placeholderRoutesFor()` gained an `excludePaths` parameter so `/admin/users` and the new `/admin/users/:userId` render real pages without touching `utils/sidebarConfig.ts`.
+- Role-change is Super-Admin-gated in the UI (not just relying on the backend's 403), matching the backend's own documented "never bundle privilege escalation with an ordinary edit" intent.
+- Delete semantics recorded as an explicit future consideration only (not designed this sprint) — see the architecture doc's Outstanding Decisions.
+- No backend files touched, no new backend endpoints, no Sprint 13/14 protected files rewritten.
+- 14 new frontend tests (47 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 14 — Frontend: Header Menu, ErrorBoundary, Dashboard Integration
 - **Investigated before writing code**: 9 of the originally-requested 12 topics were already built in Sprint 13 (Login, Refresh, Logout, Auth Guard, Role-based routing, Sidebar, Testing, etc.) — not rebuilt. Scope narrowed to exactly three items, confirmed with the user before implementation, then expanded once more to a specific widget list per role.
 - `Header.tsx` rewritten (approved) into a real dropdown: avatar initials, name, role badge, **Profil, Sozlamalar, Chiqish** menu items, click-outside and Escape both close it.

@@ -62,6 +62,17 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
+## Sprint 15 — Users Management UI (List/View/Edit only)
+
+**Critical finding, investigated before writing code**: the backend Users module has no `POST /users` and no `DELETE /users/{id}` — only 6 GET/PATCH endpoints exist (verified exhaustively). "CRUD" was requested but Create/Delete don't exist. **Approved decision (Option A)**: this sprint ships List, View, Edit, Search, Filter, Pagination only — no Create button, no Delete button, no disabled/hidden placeholders for either, anywhere.
+
+- **New, reused-where-possible**: `api/roles.ts` + `hooks/useRoles.ts` (role_id → name lookup, deliberately NOT an extension of the unrelated `utils/roleConfig.ts`, which maps role *name* → panel). `hooks/useDebouncedValue.ts` (no external library, approved). `hooks/useUsers.ts` (list/get/update/changeRole, same toast-via-`useEffect` pattern as `useDashboardStats.ts`). `components/users/StatusBadge.tsx` — **display-only**, renders all 4 real backend status values (`active, inactive, banned, pending_verification` — verified against `users/models.py`'s enum) including `banned`, with zero ban/unban action anywhere (approved decision 5).
+- **`api/users.ts` extended, not replaced** — Sprint 14's `count()` untouched, `list/get/update/changeRole` added.
+- **shadcn/ui primitives get their first real use**: `Button`, `Input`, `Card` (built in Sprint 13's continuation, never consumed until now).
+- **`routes/AppRoutes.tsx` minimally extended** (not rewritten): `/admin/users` and `/admin/users/:userId` now render real pages instead of `PlaceholderPage` — `placeholderRoutesFor()` gained an `excludePaths` parameter so the sidebar entry itself (`utils/sidebarConfig.ts`, unchanged) doesn't need touching.
+- **Role-change is Super-Admin-gated in the UI too**, not just relying on the backend's 403 — matches the backend's own documented "never bundle privilege escalation with an ordinary edit" design intent.
+- 14 new tests: `useDebouncedValue.test.ts` (4), `StatusBadge.test.tsx` (6 — 4 via `it.each` over every real status value, + 2 more: unknown-status fallback, explicit "no ban/unban button" guarantee), `UsersListPage.test.tsx` (4, including the explicit "no Create/Delete button anywhere" guarantee — the single most important behavioral test this sprint). **Frontend total: 47.**
+
 ## Sprint 14 — Header menu, ErrorBoundary, Dashboard integration
 
 Built on top of Sprint 13 without rewriting its protected pieces (Login, Refresh, Logout, Auth Guard, Sidebar generation, Routing — all untouched):
