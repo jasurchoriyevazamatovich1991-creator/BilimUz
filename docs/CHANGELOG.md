@@ -4,6 +4,18 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 13 — Frontend Foundation
+- `frontend/` — first frontend sprint: Vite + React 19 + TypeScript + Tailwind CSS project setup, previously only empty scaffold folders.
+- API client (`src/api/client.ts`) — Axios, centralized envelope-unwrapping, race-safe silent token refresh (module-level promise, not per-request state — concurrent 401s trigger exactly one refresh call).
+- Auth flow fully functional against the real backend: Login, Register, Verify (6-digit auto-focus code input, matching `docs/UI-UX/ui_ux_blueprint.md`'s pre-existing design exactly).
+- State: TanStack Query (server state) + Zustand (client state, localStorage-persisted — `httpOnly` cookie migration explicitly deferred to a future production-hardening sprint).
+- Four layouts + role-based routing guard (`ProtectedRoute`), covering all 8 real seeded roles (read from `schema_v2.sql`'s seed data, not assumed) — `Parent`/`Guest` map to an honest "not built yet" page rather than being silently folded into another role's panel.
+- Sidebars — navigation shell copied directly from the pre-existing `docs/UI-UX/panel_modules.md` (not redesigned). One bug caught and fixed during implementation: an early draft collapsed Applicant and Student into one sidebar despite the blueprint documenting different content for each — fixed, tested explicitly.
+- **One small, approved backend change**: `auth/schemas.py::UserPublic` gained a `role: str` field (reads `User.role.name` via the existing ORM relationship) — the only way to unblock role-based frontend routing, since neither the JWT payload nor the previous `/auth/me` response carried a role name, and `GET /roles/{id}` (the only endpoint that resolves `role_id` → name) is Admin-only. No other backend file touched.
+- OpenAPI code generation (approved decision) configured (`npm run generate:types`) but **not executed** — no live backend process or npm/PyPI registry access in the environment this was written in. Documented explicitly as a required manual setup step, not faked.
+- 17 frontend unit tests written (Vitest + React Testing Library) — not run in this environment, same `npm install` blocker.
+- **Continuation after a connection interruption**: found and completed two genuine gaps left from the first pass — the approved "Tailwind CSS + shadcn/ui" stack had only Tailwind actually set up (`components.json`, `lib/utils.ts`'s `cn()` helper, and `Button`/`Input`/`Card` primitives were missing entirely), and `frontend/.gitignore` didn't exist. Both added; no already-completed file was regenerated or modified.
+
 ### Sprint 12 — Audit Logs, System Logs
 - `app/modules/audit_logs/` — **read-only** module surfacing the existing `audit_logs` table (written to from 34 call sites across 20 modules via `core.audit.log_action()`, unchanged) for the first time via the API. Reuses the existing `AuditLog` model from `core/audit.py` rather than duplicating it (approved decision) — `models.py` re-exports it with a documented rationale. 13 test cases, including dedicated coverage of the `metadata_`→`metadata` Pydantic attribute aliasing (SQLAlchemy reserves `metadata` on the declarative base).
 - `app/modules/system_logs/` — genuinely new module (the `system_logs` table has had zero producers since Sprint 1; `core/logging.py` writes to stdout only). Full read+write capability shipped; `core/logging.py` deliberately **not** modified to wire into it this sprint (named Future Improvement, not silently done or silently skipped). 14 test cases.

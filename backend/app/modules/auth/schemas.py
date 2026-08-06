@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AliasPath, BaseModel, EmailStr, Field, field_validator
 
 from app.modules.auth.validators import validate_password_strength, validate_uzbek_phone
 
@@ -66,5 +66,12 @@ class UserPublic(BaseModel):
     email: str | None
     status: str
     role_id: uuid.UUID
+    # Sprint 13 (frontend) addition: the role NAME, not just its id —
+    # needed for role-based routing/RBAC UI, which cannot resolve role_id
+    # -> name itself (GET /roles/{id} is Admin-only). Reads User.role.name
+    # via the existing ORM relationship (users/models.py), does not
+    # require a join clause here — SQLAlchemy lazy-loads `.role` if not
+    # already loaded, same session. Additive field, nothing existing changed.
+    role: str = Field(validation_alias=AliasPath("role", "name"))
 
     model_config = {"from_attributes": True}
