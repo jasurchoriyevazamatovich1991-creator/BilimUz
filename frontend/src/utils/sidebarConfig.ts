@@ -33,6 +33,12 @@ export const ADMIN_ITEMS: SidebarItem[] = [
   { label: "Bildirishnomalar", path: "/admin/notifications" },
   { label: "AI", path: "/admin/ai" },
   { label: "Sozlamalar", path: "/admin/settings" },
+  // Sprint 14 addition: Teacher/Student sidebars already had "Profil"
+  // (see TEACHER_ITEMS/STUDENT_ITEMS below) — Admin was the only panel
+  // missing it, needed for the new Header dropdown's Profile link to
+  // resolve to a real route via the existing placeholderRoutesFor()
+  // mechanism in AppRoutes.tsx (unchanged, no new route-wiring code needed).
+  { label: "Profil", path: "/admin/profile" },
 ];
 
 export const TEACHER_ITEMS: SidebarItem[] = [
@@ -43,6 +49,9 @@ export const TEACHER_ITEMS: SidebarItem[] = [
   { label: "Natijalar", path: "/teacher/results" },
   { label: "Statistika", path: "/teacher/statistics" },
   { label: "Profil", path: "/teacher/profile" },
+  // Sprint 14 addition: needed for the Header dropdown's new Settings
+  // menu item (Admin already had "Sozlamalar" in its sidebar).
+  { label: "Sozlamalar", path: "/teacher/settings" },
 ];
 
 // Applicant (Abituriyent) — NOT the same content as Student, per
@@ -56,6 +65,8 @@ export const APPLICANT_ITEMS: SidebarItem[] = [
   { label: "Reyting", path: "/student/ranking" },
   { label: "AI Ustoz", path: "/student/ai" },
   { label: "Profil", path: "/student/profile" },
+  // Sprint 14 addition — see TEACHER_ITEMS's identical note.
+  { label: "Sozlamalar", path: "/student/settings" },
 ];
 
 export const STUDENT_ITEMS: SidebarItem[] = [
@@ -66,6 +77,8 @@ export const STUDENT_ITEMS: SidebarItem[] = [
   { label: "Natijalar", path: "/student/results" },
   { label: "Yutuqlar", path: "/student/achievements" },
   { label: "Profil", path: "/student/profile" },
+  // Sprint 14 addition — see TEACHER_ITEMS's identical note.
+  { label: "Sozlamalar", path: "/student/settings" },
 ];
 
 /**

@@ -62,7 +62,19 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
-## Business rules
+## Sprint 14 — Header menu, ErrorBoundary, Dashboard integration
+
+Built on top of Sprint 13 without rewriting its protected pieces (Login, Refresh, Logout, Auth Guard, Sidebar generation, Routing — all untouched):
+
+- **Header dropdown** (`components/layout/Header.tsx`, rewritten as approved): avatar initials, name, role badge, Profil + Chiqish menu items. Click-outside and `Escape` both close it. Profile links to `${panel}/profile`, which resolves via the *existing* `placeholderRoutesFor()` mechanism in `AppRoutes.tsx` (untouched) — Admin's sidebar gained one new `Profil` entry (`utils/sidebarConfig.ts`) since Teacher/Student already had one; this was the only change needed to make the link resolve to a real route.
+- **Global `ErrorBoundary`** (`components/ErrorBoundary.tsx`): one app-wide boundary (approved decision, not per-layout), wraps `<AppRoutes/>` in `App.tsx`. Catches render crashes, shows a real fallback instead of a blank screen.
+- **Toast system** (`store/toastStore.ts` + `components/layout/ToastContainer.tsx`): global, non-persisted Zustand store, auto-dismiss after 5s. **Deliberately not wired into `api/client.ts`'s interceptor** — that would double-surface form errors (already shown as banners per Sprint 13's documented UX) as toasts too. Toast triggering lives entirely in the new `hooks/useDashboardStats.ts`, via `useEffect` (not directly in render — an earlier draft called the toast action during render, which would have re-fired on every render while `isError` stayed true; fixed before considered complete).
+- **Dashboard backend integration** (`api/users.ts`, `tests.ts`, `subjects.ts`, `results.ts`, `attempts.ts`, `ai.ts`, `schools.ts`, `learningCenters.ts`, `lessons.ts`, `certificates.ts`, `payments.ts` + `hooks/useDashboardStats.ts`): every widget verified against backend source before writing. Widget set per the approved list — **Super Admin**: Users, Schools, Learning Centers, Subjects, Tests, Payments, Results. **Teacher**: Subjects, Lessons, Tests, Results. **Student/Applicant**: Assigned Tests, Results, Certificates.
+  - **Two real gaps found and handled honestly, not faked**: (1) no admin-wide `payments`/`results` list endpoint exists (only `/me`-scoped or catalog-only) — the "Payments" widget shows the real, public `/payments/plans` catalog count instead (clearly labeled "To'lov rejalari", not implying transaction volume), while "Natijalar" (Super Admin) has no real substitute and renders a new `<UnavailableState/>` component instead of fake data. (2) No "assignment" concept exists anywhere in the backend schema — Student's "Assigned Tests" widget shows the same published-tests catalog everyone sees, labeled "Mavjud testlar" (Available), not "Biriktirilgan" (Assigned).
+  - Each widget shows inline `<ErrorState/>` on failure AND triggers the existing global toast — both, not either/or (approved decision, existing toast system reused, no new one built).
+- **Header additions**: Settings menu item added alongside Profile/Logout. Required extending `utils/sidebarConfig.ts` with a `Sozlamalar` entry for Teacher/Applicant/Student (Admin already had one) and a `Profil` entry for Admin (Teacher/Student already had one) — small, justified additions so both links resolve via the *existing, untouched* `placeholderRoutesFor()` route-generation mechanism in `AppRoutes.tsx`. No new backend functionality, no new routing code.
+
+## Business rules (Sprint 13, still accurate)
 
 - **Role → panel mapping is exhaustive over all 8 real seeded roles** (`Super Admin, Admin, Moderator, Teacher, Applicant, Student, Parent, Guest` — read directly from `database/schema/schema_v2.sql`'s seed `INSERT`, not assumed). `Parent` and `Guest` map to an honest "not built yet" page (`/unsupported`) rather than being silently folded into another role's real panel.
 - **Applicant and Student share a layout but NOT sidebar content** — `docs/UI-UX/panel_modules.md` gives them genuinely different navigation (DTM/Blok Test/Reyting vs. Mening fanlarim/Darslar/Yutuqlar). Caught and fixed during implementation (an earlier draft of `sidebarConfig.ts` collapsed them into one list) — tested explicitly (`sidebarConfig.test.ts`).
@@ -72,9 +84,9 @@ src/
 
 ## Tests
 
-Vitest + React Testing Library. `roleConfig.test.ts` (7 — every real role mapped, unknown-role fallback), `sidebarConfig.test.ts` (6 — the Applicant/Student distinction, empty-array for unsupported roles, union deduplication), `client.test.ts` (4 — envelope unwrapping, `ApiError` construction), `ProtectedRoute.test.tsx` (3 — unauthenticated redirect, matching-role render, mismatched-role redirect to the user's own panel).
+Vitest + React Testing Library. Sprint 13 (17): `roleConfig.test.ts` (4), `sidebarConfig.test.ts` (6), `client.test.ts` (4), `ProtectedRoute.test.tsx` (3). Sprint 14 (16 new): `toastStore.test.ts` (4), `ErrorBoundary.test.tsx` (2), `Header.test.tsx` (6), `sidebarConfig.test.ts` additions (4 — Settings/Profil entries across roles). **Total: 33.**
 
-**Not run in this environment** — same `npm install` blocker as the OpenAPI codegen step. Written to be correct and ready; will execute once dependencies are installed in a real environment. Total: 17 test cases (`roleConfig.test.ts` 4, `sidebarConfig.test.ts` 6, `client.test.ts` 4, `ProtectedRoute.test.tsx` 3).
+**Not run in this environment** — same `npm install` blocker as Sprint 13.
 
 ## Sprint 13 scope (Foundation only — approved)
 

@@ -1,21 +1,37 @@
 import { DashboardCard } from "@/components/layout/DashboardCard";
+import { ErrorState } from "@/components/layout/ErrorState";
+import { useStudentDashboardStats } from "@/hooks/useDashboardStats";
 
 /**
- * Shared by Student and Applicant (same layout, per ui_ux_blueprint.md
- * §4.1's card-row pattern: "Faol testlar / So'nggi natijalar / Tavsiya
- * etilgan mavzular"). The AI-recommendation card legitimately shows an
- * empty state this sprint — the `ai` module's own README confirms
- * nothing generates a recommendation yet (no real provider exists) —
- * not faked here either.
+ * Shared by Student and Applicant (same layout). Widget set per the
+ * approved Sprint 14 scope: "Assigned Tests", Results, Certificates.
+ * NOTE: there is no "assignment" concept anywhere in the backend
+ * schema (verified) — "Mavjud testlar" reads the same published-tests
+ * catalog every authenticated user sees, labeled honestly rather than
+ * implying a targeting feature that doesn't exist.
  */
 export function StudentDashboardPage() {
+  const { availableTestsCount, resultsCount, certificatesCount } = useStudentDashboardStats();
+
   return (
     <div>
       <h1 className="mb-6 text-xl font-semibold text-foreground">Dashboard</h1>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DashboardCard title="Faol testlar" />
-        <DashboardCard title="So'nggi natijalar" />
-        <DashboardCard title="Tavsiya etilgan mavzular" isLoading={false} />
+        {availableTestsCount.isError ? (
+          <ErrorState title="Mavjud testlar" />
+        ) : (
+          <DashboardCard title="Mavjud testlar" isLoading={availableTestsCount.isLoading} value={availableTestsCount.data} />
+        )}
+        {resultsCount.isError ? (
+          <ErrorState title="Mening natijalarim" />
+        ) : (
+          <DashboardCard title="Mening natijalarim" isLoading={resultsCount.isLoading} value={resultsCount.data} />
+        )}
+        {certificatesCount.isError ? (
+          <ErrorState title="Sertifikatlarim" />
+        ) : (
+          <DashboardCard title="Sertifikatlarim" isLoading={certificatesCount.isLoading} value={certificatesCount.data} />
+        )}
       </div>
     </div>
   );

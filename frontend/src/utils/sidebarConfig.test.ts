@@ -21,6 +21,31 @@ describe("sidebarForRole", () => {
   });
 });
 
+describe("Sprint 14 additions — Settings entries", () => {
+  it("every role's sidebar includes a Sozlamalar entry", () => {
+    for (const role of ["Super Admin", "Admin", "Moderator", "Teacher", "Applicant", "Student"]) {
+      const items = sidebarForRole(role);
+      expect(items.some((i) => i.label === "Sozlamalar")).toBe(true);
+    }
+  });
+
+  it("Admin's Sozlamalar path is /admin/settings (pre-existing, Sprint 13)", () => {
+    const settings = sidebarForRole("Admin").find((i) => i.label === "Sozlamalar");
+    expect(settings?.path).toBe("/admin/settings");
+  });
+
+  it("Teacher's Sozlamalar path is /teacher/settings (new, Sprint 14)", () => {
+    const settings = sidebarForRole("Teacher").find((i) => i.label === "Sozlamalar");
+    expect(settings?.path).toBe("/teacher/settings");
+  });
+});
+
+describe("Sprint 14 additions — Admin Profil entry", () => {
+  it("Admin now has a Profil entry (Teacher/Student already had one in Sprint 13)", () => {
+    const profil = sidebarForRole("Admin").find((i) => i.label === "Profil");
+    expect(profil?.path).toBe("/admin/profile");
+  });
+});
 describe("APPLICANT_STUDENT_ITEMS", () => {
   it("is the deduplicated union of both role's items", () => {
     const uniquePaths = new Set(APPLICANT_STUDENT_ITEMS.map((i) => i.path));

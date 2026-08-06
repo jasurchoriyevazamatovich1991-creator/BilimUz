@@ -4,6 +4,17 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 14 — Frontend: Header Menu, ErrorBoundary, Dashboard Integration
+- **Investigated before writing code**: 9 of the originally-requested 12 topics were already built in Sprint 13 (Login, Refresh, Logout, Auth Guard, Role-based routing, Sidebar, Testing, etc.) — not rebuilt. Scope narrowed to exactly three items, confirmed with the user before implementation, then expanded once more to a specific widget list per role.
+- `Header.tsx` rewritten (approved) into a real dropdown: avatar initials, name, role badge, **Profil, Sozlamalar, Chiqish** menu items, click-outside and Escape both close it.
+- Global `ErrorBoundary` (one app-wide, approved decision) — the platform's first crash-safety net.
+- Existing global toast system reused for widget errors (no new toast system built, per explicit instruction) — deliberately not wired into `api/client.ts`'s interceptor (would double-surface already-bannered form errors). One bug caught and fixed before considered complete: toast triggering was initially attempted directly during render instead of via `useEffect`, which would have spammed duplicate toasts; also caught and fixed a genuine React Rules-of-Hooks violation (calling a hook inside a `for` loop) in the same file.
+- Dashboard backend integration, full approved widget list — Super Admin (Users, Schools, Learning Centers, Subjects, Tests, Payments, Results), Teacher (Subjects, Lessons, Tests, Results), Student/Applicant (Assigned Tests, Results, Certificates). Every widget verified against real backend source before writing.
+- **Two real API-surface gaps found and handled honestly, not faked**: no admin-wide `payments` or `results` list endpoint exists (only `/me`-scoped) — "Payments" substituted with the real public plans-catalog count (clearly relabeled), "Natijalar" (Super Admin) has no substitute and shows a new, honest `UnavailableState` component instead of invented data. No "assignment" concept exists in the backend schema at all — "Assigned Tests" substituted with the real published-tests catalog, relabeled "Mavjud testlar" (Available), not implying a targeting feature that doesn't exist.
+- Small, justified `utils/sidebarConfig.ts` extensions: `Sozlamalar` (Settings) added to Teacher/Applicant/Student sidebars, `Profil` added to Admin's — both needed only so the new Header links resolve via the existing, untouched `placeholderRoutesFor()` mechanism (no new routing code).
+- No backend files touched, no new backend endpoints, no Sprint 13 protected files (Login, Refresh, Logout, Auth Guard, Routing, `client.ts`, `authStore.ts`) rewritten.
+- 16 new frontend tests (33 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 13 — Frontend Foundation
 - `frontend/` — first frontend sprint: Vite + React 19 + TypeScript + Tailwind CSS project setup, previously only empty scaffold folders.
 - API client (`src/api/client.ts`) — Axios, centralized envelope-unwrapping, race-safe silent token refresh (module-level promise, not per-request state — concurrent 401s trigger exactly one refresh call).
