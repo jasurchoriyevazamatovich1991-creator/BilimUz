@@ -4,6 +4,17 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 17 — Frontend: Subjects, Grades & Topics UI
+- **Key finding, investigated before writing code**: Topics has a wider write RBAC tier than Subjects/Grades — `Admin, Super Admin, Teacher` vs. `Admin, Super Admin` only (verified against real backend `require_roles(...)` on all three routers). Each page's `canWrite` computed independently per module, not copy-pasted.
+- `api/subjects.ts` extended (Sprint 14's `count()` untouched); `api/grades.ts` and `api/topics.ts` created as new files, matching `api/subjects.ts`'s architecture exactly (confirmed neither existed before writing).
+- Subjects' `color` field: native HTML5 `<input type="color">` (no new UI library), default `#0c447c` matching the platform's own documented brand primary.
+- Grades' Edit form: `name` renders as plain read-only text, never a disabled input — matches `GradeUpdateRequest`'s real backend shape (no `name` field). Tested explicitly.
+- Topics: the first cross-module admin CRUD page — Subject/Grade dropdowns read `api/subjects.ts`/`api/grades.ts` read-only, mirroring the backend's own `topics → subjects/grades` dependency at the UI layer. `subject_id` set-once (matches backend), `grade_id` editable.
+- No "N ta mavzu" indicator built (approved — no new aggregation, no frontend-computed count). Topics' cache fully isolated from Subjects/Grades mutations (approved, verified directly).
+- `ConfirmDialog`, `StatusBadge`, `useDebouncedValue` reused unchanged. `routes/AppRoutes.tsx` extended via the existing `excludePaths` mechanism — no new sidebar entries needed (all three already existed from Sprint 13).
+- No backend files touched, no new backend endpoints, no Sprint 13–16 protected files rewritten.
+- 9 new frontend tests (69 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 16 — Frontend: Schools & Learning Centers UI (full CRUD)
 - **Key finding, investigated before writing code**: unlike Sprint 15's Users module, Schools and Learning Centers have full CRUD on the backend (verified: `GET/GET/POST/PATCH/DELETE` all exist) — this sprint legitimately ships Create, Edit, and Delete, which Sprint 15 explicitly could not.
 - Two independent pages per module (approved decision, not a shared mega-component): `SchoolsListPage`/`SchoolFormPage`, `LearningCentersListPage`/`LearningCenterFormPage`.

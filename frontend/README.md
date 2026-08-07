@@ -62,6 +62,20 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
+## Sprint 17 — Subjects, Grades & Topics UI
+
+**Key finding, investigated before writing code**: Topics has a **wider write RBAC tier** than Subjects/Grades — `Admin, Super Admin, Teacher` vs. `Admin, Super Admin` only (verified against real `require_roles(...)` calls in all three backend routers). Each page computes its own `canWrite` against its own module's real role list — never copy-pasted blindly across the three.
+
+- **`api/subjects.ts` extended** (Sprint 14's `count()` untouched); **`api/grades.ts` and `api/topics.ts` are new files**, same style/architecture as `api/subjects.ts` (approved decision — confirmed directly that neither existed before writing).
+- **Subjects' `color` field**: native HTML5 `<input type="color">` (approved — no new UI library), always yields lowercase `#RRGGBB`, matching the backend's hex validation exactly. Default value `#0c447c` — the platform's own documented brand primary (`tailwind.config.js`), not an arbitrary placeholder.
+- **Grades' Edit form**: `name` renders as **plain read-only text**, never a disabled input (approved decision 4) — matches `GradeUpdateRequest`'s real backend shape (no `name` field at all). Tested explicitly (`GradeFormPage.test.tsx`) that no `textbox` role exists for the name.
+- **Topics — the first cross-module admin CRUD page**: Subject/Grade dropdowns (both the Create form's pickers and the List page's filters) read `api/subjects.ts`/`api/grades.ts` read-only, mirroring the backend's own one-directional `topics → subjects/grades` dependency at the UI layer for the first time. `subject_id` is set-once (no field for it in edit mode, matching the backend exactly); `grade_id` remains editable.
+- **"N ta mavzu" indicator**: not built (approved decision — no new aggregation endpoint, no frontend-computed count).
+- **Topics' cache is fully isolated** (approved decision 5) — `hooks/useSubjects.ts`/`useGrades.ts` never reference the `"topics"` query key, `hooks/useTopics.ts` never references `"subjects"`/`"grades"` — verified directly, not just by convention.
+- `ConfirmDialog`, `StatusBadge` (all three modules' `active/inactive/archived` render correctly through the existing fallback path, no changes needed), `useDebouncedValue` all reused unchanged, third/fourth real consumers.
+- `routes/AppRoutes.tsx` extended using the existing `excludePaths` mechanism (Sprint 15/16) — no new routing infrastructure. No new sidebar entries needed (all three already existed from Sprint 13's original scaffold).
+- 9 new tests: `SubjectsListPage.test.tsx` (2 — Teacher is read-only here), `TopicsListPage.test.tsx` (4 — **the critical test**: Teacher genuinely sees write controls on Topics, Moderator does not, plus the read-only Subject-name-resolution check), `GradeFormPage.test.tsx` (3 — name is real read-only text, not a disabled input). **Total: 69.**
+
 ## Sprint 16 — Schools & Learning Centers UI (full CRUD)
 
 **Key finding, investigated before writing code**: unlike Sprint 15's Users module, Schools and Learning Centers have **full CRUD on the backend** (`GET/GET/POST/PATCH/DELETE`, all verified) — so unlike Users, this sprint legitimately ships Create, Edit, **and** Delete.

@@ -15,6 +15,12 @@ import { SchoolsListPage } from "@/pages/admin/SchoolsListPage";
 import { SchoolFormPage } from "@/pages/admin/SchoolFormPage";
 import { LearningCentersListPage } from "@/pages/admin/LearningCentersListPage";
 import { LearningCenterFormPage } from "@/pages/admin/LearningCenterFormPage";
+import { SubjectsListPage } from "@/pages/admin/SubjectsListPage";
+import { SubjectFormPage } from "@/pages/admin/SubjectFormPage";
+import { GradesListPage } from "@/pages/admin/GradesListPage";
+import { GradeFormPage } from "@/pages/admin/GradeFormPage";
+import { TopicsListPage } from "@/pages/admin/TopicsListPage";
+import { TopicFormPage } from "@/pages/admin/TopicFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
@@ -62,7 +68,23 @@ export function AppRoutes() {
           <Route path="/admin/learning-centers" element={<LearningCentersListPage />} />
           <Route path="/admin/learning-centers/new" element={<LearningCenterFormPage />} />
           <Route path="/admin/learning-centers/:centerId" element={<LearningCenterFormPage />} />
-          {placeholderRoutesFor(ADMIN_ITEMS, "/admin", ["/admin/users", "/admin/schools", "/admin/learning-centers"])}
+          <Route path="/admin/subjects" element={<SubjectsListPage />} />
+          <Route path="/admin/subjects/new" element={<SubjectFormPage />} />
+          <Route path="/admin/subjects/:subjectId" element={<SubjectFormPage />} />
+          <Route path="/admin/grades" element={<GradesListPage />} />
+          <Route path="/admin/grades/new" element={<GradeFormPage />} />
+          <Route path="/admin/grades/:gradeId" element={<GradeFormPage />} />
+          <Route path="/admin/topics" element={<TopicsListPage />} />
+          <Route path="/admin/topics/new" element={<TopicFormPage />} />
+          <Route path="/admin/topics/:topicId" element={<TopicFormPage />} />
+          {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
+            "/admin/users",
+            "/admin/schools",
+            "/admin/learning-centers",
+            "/admin/subjects",
+            "/admin/grades",
+            "/admin/topics",
+          ])}
         </Route>
       </Route>
 
