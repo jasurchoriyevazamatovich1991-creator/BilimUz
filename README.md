@@ -49,6 +49,7 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 15 — Users Management UI | Haqiqiy topilma: backendda `POST /users`/`DELETE /users` umuman yo'q — faqat List/View/Edit/Search/Filter/Pagination qurildi, Create/Delete UI ataylab qo'shilmadi. 14 yangi test (jami 47) | ✅ Yakunlandi |
 | Sprint 16 — Schools & Learning Centers UI | Farqli topilma: bu ikkalasida to'liq CRUD bor — Create/Edit/Delete qurildi. Yangi qayta ishlatiladigan `ConfirmDialog`, Moderator uchun yozish tugmalari yashirilgan (lekin o'qish ochiq qoldirilgan — jarayonda tuzatilgan), 13 yangi test (jami 60) | ✅ Yakunlandi |
 | Sprint 17 — Subjects, Grades & Topics UI | Muhim topilma: Topics'ning yozish huquqi kengroq (Teacher ham kiradi), Subjects/Grades'da esa yo'q. Grades'da nom o'zgarmaydi (oddiy matn). Topics — birinchi modullararo CRUD sahifasi (Subjects/Grades'dan faqat o'qish). 9 yangi test (jami 69) | ✅ Yakunlandi |
+| Sprint 18 — Lessons UI | Muhim topilma: backend "video/pdf/matndan kamida bittasi" qoidasini talab qiladi — frontend submit-vaqtida tekshiradi, tugma bloklanmaydi. RBAC Topics bilan bir xil (Teacher yozadi). `type="url"`, yangi `ContentBadges` komponenti. 11 yangi test (jami 80) | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 

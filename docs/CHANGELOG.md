@@ -4,6 +4,18 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 18 — Frontend: Lessons UI
+- **Key finding, investigated before writing code**: `LessonCreateRequest`/`LessonUpdateRequest` have a real backend `model_validator` requiring at least one of `video`, `pdf`, `content` — a new cross-field validation shape not present in any prior CRUD sprint.
+- `api/lessons.ts` extended (Sprint 14's `count()` untouched), following `api/topics.ts`'s style. New `hooks/useLessons.ts` mirrors `hooks/useTopics.ts`'s cache-isolation discipline exactly.
+- RBAC confirmed matching Topics (`Admin, Super Admin, Teacher`), not Subjects/Grades' narrower tier — verified against real backend `require_roles(...)`, tested explicitly.
+- New component: `components/lessons/ContentBadges.tsx` (Video/PDF/Text pills, only for present fields, `StatusBadge`'s visual style, no new icon library).
+- `video`/`pdf` use native `<input type="url">` — no new library.
+- "At least one of video/pdf/content" enforced on submit, never via a disabled button — a single clear message shown when all three are empty, no malformed request reaches the backend. Tested explicitly.
+- `topic_id` set-once: plain read-only text in edit mode, never a disabled `<select>` — same pattern as Grades' `name`/Topics' `subject_id`.
+- `ConfirmDialog`, `StatusBadge`, `useDebouncedValue`, `hooks/useTopics.ts` (read-only) all reused unchanged. No new sidebar entry needed. `routes/AppRoutes.tsx` extended via the existing `excludePaths` mechanism.
+- No backend files touched, no new backend endpoints, no Sprint 13–17 protected files rewritten.
+- 11 new frontend tests (80 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 17 — Frontend: Subjects, Grades & Topics UI
 - **Key finding, investigated before writing code**: Topics has a wider write RBAC tier than Subjects/Grades — `Admin, Super Admin, Teacher` vs. `Admin, Super Admin` only (verified against real backend `require_roles(...)` on all three routers). Each page's `canWrite` computed independently per module, not copy-pasted.
 - `api/subjects.ts` extended (Sprint 14's `count()` untouched); `api/grades.ts` and `api/topics.ts` created as new files, matching `api/subjects.ts`'s architecture exactly (confirmed neither existed before writing).

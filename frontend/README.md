@@ -62,6 +62,19 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
+## Sprint 18 — Lessons UI
+
+**Key finding, investigated before writing code**: `LessonCreateRequest`/`LessonUpdateRequest` have a real backend `model_validator` requiring **at least one of `video`, `pdf`, `content`** — no prior CRUD sprint's form had this "at least one of several optional fields" shape.
+
+- **`api/lessons.ts` extended** (Sprint 14's `count()` untouched), following `api/topics.ts`'s exact CRUD style. New `hooks/useLessons.ts` mirrors `hooks/useTopics.ts` — same cache-isolation discipline (Lessons' mutations never touch `["topics", ...]`, verified directly; reading Topics for the picker never invalidates Lessons' cache either).
+- **RBAC matches Topics, not Subjects/Grades** (approved, verified against `require_roles("Admin", "Super Admin", "Teacher")`): Teacher has real write access here — tested explicitly (`LessonsListPage.test.tsx`), the same class of risk Sprint 17 flagged for Topics.
+- **New, small, reusable-shaped component**: `components/lessons/ContentBadges.tsx` — Video/PDF/Text pills, only rendered for fields actually present, matching `StatusBadge`'s pill visual style (no new icon library).
+- **`video`/`pdf` use native `<input type="url">`** (approved decision 2) — zero new library, browser-native validation.
+- **"At least one of video/pdf/content" — submit is never disabled** (approved decision 3): checked in `handleSubmit`, a single clear message (`"Video, PDF yoki matndan kamida bittasini kiriting."`) renders when all three are empty, and the mutation is never called — no malformed request reaches the backend. Tested explicitly, including that the submit button stays enabled.
+- **`topic_id` is set-once**: plain read-only text in edit mode (approved decision 4, same pattern as Grades' `name` and Topics' `subject_id`), never a disabled `<select>`. Tested explicitly.
+- `ConfirmDialog`, `StatusBadge`, `useDebouncedValue`, and `hooks/useTopics.ts` (read-only, for the picker/lookup) all reused unchanged. No new sidebar entry needed (`Darslar` already existed from Sprint 13). `routes/AppRoutes.tsx` extended via the existing `excludePaths` mechanism.
+- 11 new tests: `ContentBadges.test.tsx` (3), `LessonsListPage.test.tsx` (4 — the critical Teacher-write-access test, plus Student read-only), `LessonFormPage.test.tsx` (4 — topic read-only text, the cross-field validation message with submit never blocked, successful submit with one field filled, `type="url"` confirmed). **Total: 80.**
+
 ## Sprint 17 — Subjects, Grades & Topics UI
 
 **Key finding, investigated before writing code**: Topics has a **wider write RBAC tier** than Subjects/Grades — `Admin, Super Admin, Teacher` vs. `Admin, Super Admin` only (verified against real `require_roles(...)` calls in all three backend routers). Each page computes its own `canWrite` against its own module's real role list — never copy-pasted blindly across the three.

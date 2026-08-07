@@ -21,6 +21,8 @@ import { GradesListPage } from "@/pages/admin/GradesListPage";
 import { GradeFormPage } from "@/pages/admin/GradeFormPage";
 import { TopicsListPage } from "@/pages/admin/TopicsListPage";
 import { TopicFormPage } from "@/pages/admin/TopicFormPage";
+import { LessonsListPage } from "@/pages/admin/LessonsListPage";
+import { LessonFormPage } from "@/pages/admin/LessonFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
@@ -77,6 +79,9 @@ export function AppRoutes() {
           <Route path="/admin/topics" element={<TopicsListPage />} />
           <Route path="/admin/topics/new" element={<TopicFormPage />} />
           <Route path="/admin/topics/:topicId" element={<TopicFormPage />} />
+          <Route path="/admin/lessons" element={<LessonsListPage />} />
+          <Route path="/admin/lessons/new" element={<LessonFormPage />} />
+          <Route path="/admin/lessons/:lessonId" element={<LessonFormPage />} />
           {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
             "/admin/users",
             "/admin/schools",
@@ -84,6 +89,7 @@ export function AppRoutes() {
             "/admin/subjects",
             "/admin/grades",
             "/admin/topics",
+            "/admin/lessons",
           ])}
         </Route>
       </Route>
