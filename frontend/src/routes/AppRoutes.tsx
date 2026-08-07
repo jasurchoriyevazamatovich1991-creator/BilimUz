@@ -11,6 +11,10 @@ import { UnsupportedRolePage } from "@/pages/public/UnsupportedRolePage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
 import { UsersListPage } from "@/pages/admin/UsersListPage";
 import { UserDetailPage } from "@/pages/admin/UserDetailPage";
+import { SchoolsListPage } from "@/pages/admin/SchoolsListPage";
+import { SchoolFormPage } from "@/pages/admin/SchoolFormPage";
+import { LearningCentersListPage } from "@/pages/admin/LearningCentersListPage";
+import { LearningCenterFormPage } from "@/pages/admin/LearningCenterFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
@@ -52,7 +56,13 @@ export function AppRoutes() {
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UsersListPage />} />
           <Route path="/admin/users/:userId" element={<UserDetailPage />} />
-          {placeholderRoutesFor(ADMIN_ITEMS, "/admin", ["/admin/users"])}
+          <Route path="/admin/schools" element={<SchoolsListPage />} />
+          <Route path="/admin/schools/new" element={<SchoolFormPage />} />
+          <Route path="/admin/schools/:schoolId" element={<SchoolFormPage />} />
+          <Route path="/admin/learning-centers" element={<LearningCentersListPage />} />
+          <Route path="/admin/learning-centers/new" element={<LearningCenterFormPage />} />
+          <Route path="/admin/learning-centers/:centerId" element={<LearningCenterFormPage />} />
+          {placeholderRoutesFor(ADMIN_ITEMS, "/admin", ["/admin/users", "/admin/schools", "/admin/learning-centers"])}
         </Route>
       </Route>
 

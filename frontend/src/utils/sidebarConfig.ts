@@ -18,6 +18,10 @@ export interface SidebarItem {
 export const ADMIN_ITEMS: SidebarItem[] = [
   { label: "Dashboard", path: "/admin" },
   { label: "Foydalanuvchilar", path: "/admin/users" },
+  // Sprint 16 addition: approved order places Schools and Learning
+  // Centers right after Users, before Subjects.
+  { label: "Maktablar", path: "/admin/schools" },
+  { label: "O'quv markazlari", path: "/admin/learning-centers" },
   { label: "Rollar", path: "/admin/roles" },
   { label: "Ruxsatlar", path: "/admin/permissions" },
   { label: "Fanlar", path: "/admin/subjects" },

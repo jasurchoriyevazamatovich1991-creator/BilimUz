@@ -4,6 +4,18 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 16 — Frontend: Schools & Learning Centers UI (full CRUD)
+- **Key finding, investigated before writing code**: unlike Sprint 15's Users module, Schools and Learning Centers have full CRUD on the backend (verified: `GET/GET/POST/PATCH/DELETE` all exist) — this sprint legitimately ships Create, Edit, and Delete, which Sprint 15 explicitly could not.
+- Two independent pages per module (approved decision, not a shared mega-component): `SchoolsListPage`/`SchoolFormPage`, `LearningCentersListPage`/`LearningCenterFormPage`.
+- New, reusable: `components/common/ConfirmDialog.tsx` (approved for future Delete flows across other modules), `utils/deriveOptions.ts` (Region filter built from loaded data, no new backend endpoint).
+- `api/schools.ts` and `api/learningCenters.ts` extended (Sprint 14's `count()` on each untouched) with full CRUD methods. New `hooks/useSchools.ts` + `hooks/useLearningCenters.ts` mirror `hooks/useUsers.ts`'s pattern.
+- `StatusBadge` (Sprint 15) reused directly, unchanged, for the 3-value status enum here.
+- **Bug caught and fixed during implementation**: an early draft fully redirected Moderator away from viewing school/center details, but the backend's `GET` endpoints are public — a Moderator reading details is permitted. Fixed to a genuine read-only rendering (disabled fields, no action buttons) instead of denying access; only the Create route remains fully off-limits for non-writers.
+- Sidebar: two new `ADMIN_ITEMS` entries (`Maktablar`, `O'quv markazlari`) inserted after `Foydalanuvchilar`, per the approved order.
+- `routes/AppRoutes.tsx` minimally extended using the existing `excludePaths` mechanism (added in Sprint 15) — no new routing infrastructure.
+- No backend files touched, no new backend endpoints, no Sprint 13–15 protected files rewritten.
+- 13 new frontend tests (60 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 15 — Frontend: Users Management UI (List/View/Edit)
 - **Critical finding, investigated before writing code**: the backend Users module has no `POST /users` and no `DELETE /users/{id}` — exhaustively verified, only 6 GET/PATCH endpoints exist. "CRUD" was requested but Create/Delete literally don't exist on the backend. **Approved decision (Option A)**: List, View, Edit, Search, Filter, Pagination only — no Create button, no Delete button, no disabled/hidden placeholders for either, anywhere. A vestigial `ban_user` reference found in `users/constants.py`'s comments (no such endpoint exists) was also noted, not acted on.
 - New: `api/roles.ts` + `hooks/useRoles.ts` (role_id → name lookup, deliberately separate from the unrelated `utils/roleConfig.ts`), `hooks/useDebouncedValue.ts` (no external library), `hooks/useUsers.ts` (list/get/update/changeRole), `components/users/StatusBadge.tsx` (display-only, renders all 4 real backend status values including `banned`, zero ban/unban action).

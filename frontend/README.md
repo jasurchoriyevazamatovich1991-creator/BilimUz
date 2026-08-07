@@ -62,6 +62,19 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
+## Sprint 16 — Schools & Learning Centers UI (full CRUD)
+
+**Key finding, investigated before writing code**: unlike Sprint 15's Users module, Schools and Learning Centers have **full CRUD on the backend** (`GET/GET/POST/PATCH/DELETE`, all verified) — so unlike Users, this sprint legitimately ships Create, Edit, **and** Delete.
+
+- **Two independent pages per module** (approved decision — not one generic mega-component): `SchoolsListPage.tsx` + `SchoolFormPage.tsx` (shared Create/Edit), `LearningCentersListPage.tsx` + `LearningCenterFormPage.tsx`. Deliberately duplicated structure, not abstracted, matching the backend's own Sprint 10 precedent of keeping structurally-similar modules independent.
+- **New, reusable**: `components/common/ConfirmDialog.tsx` (approved for reuse in future Delete flows across other modules), `utils/deriveOptions.ts` (`deriveDistinctValues` — Region filter dropdown built from the currently-loaded page of results, no new backend endpoint, approved decision).
+- **`api/schools.ts` and `api/learningCenters.ts` extended** (Sprint 14's `count()` on each untouched) with `list/get/create/update/remove`. New `hooks/useSchools.ts` + `hooks/useLearningCenters.ts` mirror `hooks/useUsers.ts`'s pattern exactly (toast-via-`useEffect`, broad list-key cache invalidation on mutation).
+- **`StatusBadge` reused directly, unchanged** — Schools/Learning Centers' 3-value status enum (`active/inactive/archived`) renders correctly through the same component built for Users' 4-value enum in Sprint 15, no Users-specific logic inside it to work around.
+- **Moderator write-gating, found and fixed during implementation**: an early draft only hid the "Qo'shish" button and redirected Moderator away from `/admin/schools/:id` entirely — but the backend's `GET /schools/{id}` is public, so a Moderator reading school details is a permitted action. Fixed to redirect away only from the Create route (`/admin/schools/new`, genuinely off-limits), while the edit route renders a real read-only view (every field `disabled`, zero Save/Delete buttons) for non-writers instead of denying access outright.
+- **Sidebar**: `utils/sidebarConfig.ts`'s `ADMIN_ITEMS` gained two entries (`Maktablar` → `/admin/schools`, `O'quv markazlari` → `/admin/learning-centers`), inserted right after `Foydalanuvchilar` per the approved order.
+- **`routes/AppRoutes.tsx` minimally extended**: `placeholderRoutesFor()`'s existing `excludePaths` parameter (added in Sprint 15) now also excludes both new paths — no new routing mechanism needed.
+- 13 new tests: `deriveOptions.test.ts` (3), `ConfirmDialog.test.tsx` (7), `SchoolsListPage.test.tsx` (3 — the critical Moderator-vs-Admin write-control visibility guarantee). **Total: 60.**
+
 ## Sprint 15 — Users Management UI (List/View/Edit only)
 
 **Critical finding, investigated before writing code**: the backend Users module has no `POST /users` and no `DELETE /users/{id}` — only 6 GET/PATCH endpoints exist (verified exhaustively). "CRUD" was requested but Create/Delete don't exist. **Approved decision (Option A)**: this sprint ships List, View, Edit, Search, Filter, Pagination only — no Create button, no Delete button, no disabled/hidden placeholders for either, anywhere.

@@ -47,6 +47,7 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 13 — Frontend Foundation | Birinchi frontend sprinti: auth oqimi (Login/Register/Verify), token-refresh, RBAC routing (8 haqiqiy rol), sidebar/layout skeleti, 20 test. Backendga 1 ta kichik, tasdiqlangan o'zgarish (`UserPublic.role`) | ✅ Yakunlandi |
 | Sprint 14 — Header, ErrorBoundary, Dashboard | Header dropdown (Profil/Sozlamalar/Chiqish), global ErrorBoundary, dashboard rol bo'yicha to'liq vidjet ro'yxati bilan haqiqiy backend ma'lumotlariga ulandi (2 ta real API bo'shlig'i topilib, soxta ma'lumotsiz halol hal qilindi), 16 yangi test (jami 33) | ✅ Yakunlandi |
 | Sprint 15 — Users Management UI | Haqiqiy topilma: backendda `POST /users`/`DELETE /users` umuman yo'q — faqat List/View/Edit/Search/Filter/Pagination qurildi, Create/Delete UI ataylab qo'shilmadi. 14 yangi test (jami 47) | ✅ Yakunlandi |
+| Sprint 16 — Schools & Learning Centers UI | Farqli topilma: bu ikkalasida to'liq CRUD bor — Create/Edit/Delete qurildi. Yangi qayta ishlatiladigan `ConfirmDialog`, Moderator uchun yozish tugmalari yashirilgan (lekin o'qish ochiq qoldirilgan — jarayonda tuzatilgan), 13 yangi test (jami 60) | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
