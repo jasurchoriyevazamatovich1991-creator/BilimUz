@@ -4,6 +4,19 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 19 — Frontend: Tests & Questions UI
+- **Two requested-analysis assumptions corrected before writing code**: "Test ↔ Lesson" does not exist on the backend (Tests relate to Subject/Grade/Topic only, all optional, all remain editable post-creation — unlike every prior module); no "Archive" action exists despite the backend's own constants mentioning an archived state (only Publish is a real endpoint).
+- **Question Media confirmed as a plain URL field** — no `uploads` module integration, same shape as Lessons' `video`/`pdf`.
+- `api/tests.ts` extended (Sprint 14's `publishedCount()` untouched), `hooks/useTests.ts` (new). `pages/admin/TestsListPage.tsx` + `TestFormPage.tsx` with a Publish button shown only when `status === "draft"` and `question_count > 0`, matching the backend's real precondition — tested across three distinct gating states.
+- **Questions built nested under a Test** (`/admin/tests/:testId/questions`, no standalone sidebar entry) — `api/questions.ts` (new, 10 real endpoints), `hooks/useQuestions.ts`, `TestQuestionsListPage.tsx` + `QuestionFormPage.tsx` — the most complex form in the project.
+- **Options editor**: all edits batched in local state, sent only on Save — nested `options` for new Questions (single `POST`), a computed diff against granular add/update/delete endpoints for existing Questions.
+- **Conditional validation** mirroring the backend's `validate_option_set` exactly: `single_choice`/`true_false` need exactly 1 correct option, `multiple_choice` needs at least 1, both need ≥2 total — checked on submit, Submit never disabled.
+- New `components/questions/MediaTypeBadges.tsx` — independent of Sprint 18's `ContentBadges.tsx` (left unmodified), covers Media's real 4-type set.
+- Option/Media mutations confirmed to invalidate only `["questions", ...]` cache keys, never `["tests", ...]` — verified directly.
+- **A sandbox filesystem incident occurred mid-sprint** (the working directory became partially corrupted) — recovered by restoring the last known-good ZIP (Sprint 18 completion, 592 files, confirmed via `py_compile`/`tsc`) from the persistent outputs directory, then redoing all Sprint 19 work from scratch on the clean base. No partial/corrupted state was ever packaged or presented as final.
+- No backend files touched, no new backend endpoints, no Sprint 13–18 protected files rewritten.
+- 15 new frontend tests (95 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 18 — Frontend: Lessons UI
 - **Key finding, investigated before writing code**: `LessonCreateRequest`/`LessonUpdateRequest` have a real backend `model_validator` requiring at least one of `video`, `pdf`, `content` — a new cross-field validation shape not present in any prior CRUD sprint.
 - `api/lessons.ts` extended (Sprint 14's `count()` untouched), following `api/topics.ts`'s style. New `hooks/useLessons.ts` mirrors `hooks/useTopics.ts`'s cache-isolation discipline exactly.

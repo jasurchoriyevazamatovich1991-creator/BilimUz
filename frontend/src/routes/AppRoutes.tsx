@@ -23,6 +23,10 @@ import { TopicsListPage } from "@/pages/admin/TopicsListPage";
 import { TopicFormPage } from "@/pages/admin/TopicFormPage";
 import { LessonsListPage } from "@/pages/admin/LessonsListPage";
 import { LessonFormPage } from "@/pages/admin/LessonFormPage";
+import { TestsListPage } from "@/pages/admin/TestsListPage";
+import { TestFormPage } from "@/pages/admin/TestFormPage";
+import { TestQuestionsListPage } from "@/pages/admin/TestQuestionsListPage";
+import { QuestionFormPage } from "@/pages/admin/QuestionFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
@@ -82,6 +86,12 @@ export function AppRoutes() {
           <Route path="/admin/lessons" element={<LessonsListPage />} />
           <Route path="/admin/lessons/new" element={<LessonFormPage />} />
           <Route path="/admin/lessons/:lessonId" element={<LessonFormPage />} />
+          <Route path="/admin/tests" element={<TestsListPage />} />
+          <Route path="/admin/tests/new" element={<TestFormPage />} />
+          <Route path="/admin/tests/:testId" element={<TestFormPage />} />
+          <Route path="/admin/tests/:testId/questions" element={<TestQuestionsListPage />} />
+          <Route path="/admin/tests/:testId/questions/new" element={<QuestionFormPage />} />
+          <Route path="/admin/tests/:testId/questions/:questionId" element={<QuestionFormPage />} />
           {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
             "/admin/users",
             "/admin/schools",
@@ -90,6 +100,7 @@ export function AppRoutes() {
             "/admin/grades",
             "/admin/topics",
             "/admin/lessons",
+            "/admin/tests",
           ])}
         </Route>
       </Route>

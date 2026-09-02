@@ -62,6 +62,25 @@ src/
 
 `components.json`, `lib/utils.ts` (`cn()`), and three base primitives (`Button`, `Input`, `Card` in `components/ui/`) were added to complete the approved "Tailwind CSS + shadcn/ui" stack — this had been set up incompletely (Tailwind only) before this continuation. **Login/Register/Verify pages still use plain HTML elements with hand-written Tailwind classes**, not these new primitives — they were already complete and correct before the primitives existed, and retrofitting them now would mean regenerating already-finished files, which this continuation was explicitly told not to do. Wiring existing pages to the new `Button`/`Input` components is a small, safe follow-up for a future session.
 
+## Sprint 19 — Tests & Questions UI
+
+**The most complex sprint so far.** Two requested-analysis assumptions corrected before any code was written:
+
+- **"Test ↔ Lesson" does not exist** — Tests relate to Subject/Grade/Topic only (all optional, all remain editable post-creation, unlike every prior module's immutable-parent shape). No `lesson_id` field anywhere.
+- **No "Archive" action for Tests** — `ALLOWED_STATUS_TRANSITIONS` mentions an `archived` state in the backend's own constants, but only `POST /{id}/publish` exists as a real endpoint. No Archive button built.
+- **Question Media is a plain URL field**, not a file-upload flow — no integration with the `uploads` module, same shape as Lessons' `video`/`pdf`.
+
+Sprint 19 additions:
+- **Tests**: `api/tests.ts` extended (Sprint 14's `publishedCount()` untouched), `hooks/useTests.ts` (new), `pages/admin/TestsListPage.tsx` + `TestFormPage.tsx`. A **Publish button** shown only when `status === "draft"` and `question_count > 0` — matches the backend's own precondition exactly, tested explicitly (draft+0-questions, draft+N-questions, already-published — three distinct gating states).
+- **Questions — nested under a Test** (`/admin/tests/:testId/questions`, approved decision 4, no standalone sidebar entry): `api/questions.ts` (new, 10 real endpoints — 5 Question + 3 Option + 2 Media), `hooks/useQuestions.ts`, `pages/admin/TestQuestionsListPage.tsx` + `QuestionFormPage.tsx` — the most complex form in the project.
+- **Options editor**: all edits (add/remove/edit-text/toggle-correct) accumulate in **local component state only**. On Create, submitted nested with the single `POST /questions` call. On Edit, a diff against the originally-loaded snapshot is computed on Submit and executed via the real granular `add/update/delete` option endpoints — one call per actual change, never per keystroke (approved decision 6).
+- **Conditional validation** (approved decision 7, submit-time, never a disabled button): `single_choice`/`true_false` require exactly 1 correct option; `multiple_choice` requires at least 1; both require ≥2 options total — mirrors the backend's own `validate_option_set` message text exactly. `essay`/`short_answer` show no options section at all.
+- **Radio-vs-checkbox behavior**: `single_choice`/`true_false` use native radio semantics (selecting one deselects any other), `multiple_choice` uses independent checkboxes — tested explicitly.
+- **New `components/questions/MediaTypeBadges.tsx`** (approved decision 5) — deliberately NOT a modification of Sprint 18's `ContentBadges.tsx` (different, larger type set: `image/audio/video/formula`).
+- **Cache isolation** (approved decision 8, verified directly — no code reference, only explanatory comments): Option/Media mutations invalidate only `["questions", ...]`, never `["tests", ...]`.
+- `ConfirmDialog`, `StatusBadge`, `useDebouncedValue`, `useSubjectsList`/`useGradesList`/`useTopicsList` (read-only, for Tests' pickers) all reused unchanged.
+- 15 new tests: `MediaTypeBadges.test.tsx` (4), `TestFormPage.test.tsx` (4 — no Archive button ever, three-state Publish gating), `QuestionFormPage.test.tsx` (7 — the critical conditional validation, submit never blocked, radio-deselect behavior, essay hides options entirely). **Total: 95.**
+
 ## Sprint 18 — Lessons UI
 
 **Key finding, investigated before writing code**: `LessonCreateRequest`/`LessonUpdateRequest` have a real backend `model_validator` requiring **at least one of `video`, `pdf`, `content`** — no prior CRUD sprint's form had this "at least one of several optional fields" shape.
