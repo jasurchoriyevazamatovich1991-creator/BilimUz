@@ -67,6 +67,10 @@ describe("TopicsListPage — RBAC (THE critical test: Teacher CAN write here, un
   it("resolves subject_id to a real subject name via the read-only lookup", async () => {
     useAuthStore.getState().setUser({ id: "u1", first_name: "A", last_name: "B", phone: null, email: null, role: "Admin" });
     renderPage();
-    await waitFor(() => expect(screen.getByText("Matematika")).toBeInTheDocument());
+    // "Matematika" also appears as an <option> in the Subject filter
+    // dropdown — getByRole("cell", ...) matches only the <td>, so this
+    // still verifies the exact same thing (the resolved name rendered
+    // in the table row) without an ambiguous plain-text match.
+    await waitFor(() => expect(screen.getByRole("cell", { name: "Matematika" })).toBeInTheDocument());
   });
 });

@@ -16,8 +16,6 @@ import { usersApi } from "@/api/users";
 import { testsApi } from "@/api/tests";
 import { subjectsApi } from "@/api/subjects";
 import { resultsApi } from "@/api/results";
-import { attemptsApi } from "@/api/attempts";
-import { aiApi } from "@/api/ai";
 import { schoolsApi } from "@/api/schools";
 import { learningCentersApi } from "@/api/learningCenters";
 import { lessonsApi } from "@/api/lessons";

@@ -192,6 +192,13 @@ export function QuestionFormPage() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // testId is already guaranteed non-null by the component-level guard
+    // (line 111), but that narrowing doesn't propagate into this nested
+    // closure for TypeScript's static analysis — re-asserted explicitly
+    // here rather than a blind `!`, since this is the actual point test_id
+    // is used (only on the create branch below).
+    if (!testId) return;
+
     const validationMessage = validateOptions();
     if (validationMessage) {
       setOptionsError(validationMessage);

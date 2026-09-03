@@ -28,6 +28,13 @@ export function VerifyPage() {
   }
 
   function handleDigitChange(index: number, value: string) {
+    // state is already guaranteed non-null by the component-level guard
+    // above, but that narrowing doesn't propagate into this nested
+    // closure for TypeScript's static analysis — re-asserted explicitly
+    // here (a safe no-op in practice, since this handler can't fire
+    // before the guard above has already passed) rather than a blind `!`.
+    if (!state) return;
+
     if (!/^\d?$/.test(value)) return; // one digit only, per ui_ux_blueprint.md's "6 ta katak"
     const next = [...digits];
     next[index] = value;

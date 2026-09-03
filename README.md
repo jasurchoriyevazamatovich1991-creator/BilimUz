@@ -51,6 +51,7 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 17 — Subjects, Grades & Topics UI | Muhim topilma: Topics'ning yozish huquqi kengroq (Teacher ham kiradi), Subjects/Grades'da esa yo'q. Grades'da nom o'zgarmaydi (oddiy matn). Topics — birinchi modullararo CRUD sahifasi (Subjects/Grades'dan faqat o'qish). 9 yangi test (jami 69) | ✅ Yakunlandi |
 | Sprint 18 — Lessons UI | Muhim topilma: backend "video/pdf/matndan kamida bittasi" qoidasini talab qiladi — frontend submit-vaqtida tekshiradi, tugma bloklanmaydi. RBAC Topics bilan bir xil (Teacher yozadi). `type="url"`, yangi `ContentBadges` komponenti. 11 yangi test (jami 80) | ✅ Yakunlandi |
 | Sprint 19 — Tests & Questions UI | Ikki taxmin tuzatildi: Test↔Lesson yo'q (faqat Subject/Grade/Topic), Archive tugmasi yo'q (faqat Publish). Questions Test ichida joylashgan. Options — lokal holatda yig'iladi, faqat Saqlashda yuboriladi. Shartli validatsiya (single/multiple choice). 15 yangi test (jami 95) | ✅ Yakunlandi |
+| Sprint 20 — Student Test Taking / Attempt UI | Birinchi Student-yo'naltirilgan sprint. Haqiqiy backend kamchiligi topildi: `selected_option` — bitta UUID, ro'yxat emas (multiple_choice uchun ham). Timer — faqat vizual, localStorage ishlatmaydi. Submit→CreateResult zanjiri, faol urinishni aniqlash, refresh-xavfsizligi. 15 yangi test (jami 110) | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 

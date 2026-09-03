@@ -4,6 +4,20 @@ All notable changes to BilimUz are recorded here. Format loosely follows [Keep a
 
 ## [Unreleased]
 
+### Sprint 20 — Frontend: Student Test Taking / Attempt UI
+- **First genuinely Student-facing feature build** — Sprints 15–19 were all Admin-panel only.
+- **New BACKEND GAP found during implementation**: `SaveAnswerRequest.selected_option` is a single UUID, not a list — even `multiple_choice` questions can only have one saved answer via the real endpoint. `AttemptPage.tsx` renders single-select (radio) for every question type accordingly — documented in code, not worked around with invented multi-select persistence.
+- `api/attempts.ts` extended (Sprint 14's `myCount()` untouched) with the full lifecycle (`listMine/start/get/saveAnswer/submit/getResult`), every path verified directly against the router. `api/results.ts` extended with `create`/`get`.
+- New `hooks/useAttempt.ts`: active-attempt detection before ever calling `start()` (approved decision 3), refresh-safe `useAttempt` (no localStorage — approved decision 4), `useSaveAnswer` (cache-patched, not a full refetch per click), and the composed `useSubmitAndCreateResult` (approved decision 1 — submit then create-result only on success, distinctly-tagged error if create-result fails post-submit so the UX never implies resubmission is needed).
+- New `hooks/useResults.ts` (no prior file existed).
+- New `components/attempts/Timer.tsx` (approved decision 2 — purely visual, zero localStorage, single-fire via ref guard, matches the documented 5-minute red-warning behavior) and `QuestionNavigator.tsx` (matches documented answered/current/unanswered coloring, no invented flag state).
+- Race-condition guard: manual Submit and Timer-expiry both funnel through one guarded `fireSubmit()`, cannot double-fire.
+- Four new Student pages: `TestsListPage`, `TestDetailPage` (Start/Continue gating, tested), `AttemptPage`, `ResultPage` (only real `ResultOut` fields shown).
+- Certificates: nothing built, per approved decision 5.
+- `is_correct` confirmed absent from every attempt-taking type/response — verified directly, not just by convention.
+- No backend files touched, no new backend endpoints, no Sprint 13–19 protected files rewritten.
+- 15 new frontend tests (110 total) — not run in this environment, same pre-existing `npm install` blocker.
+
 ### Sprint 19 — Frontend: Tests & Questions UI
 - **Two requested-analysis assumptions corrected before writing code**: "Test ↔ Lesson" does not exist on the backend (Tests relate to Subject/Grade/Topic only, all optional, all remain editable post-creation — unlike every prior module); no "Archive" action exists despite the backend's own constants mentioning an archived state (only Publish is a real endpoint).
 - **Question Media confirmed as a plain URL field** — no `uploads` module integration, same shape as Lessons' `video`/`pdf`.

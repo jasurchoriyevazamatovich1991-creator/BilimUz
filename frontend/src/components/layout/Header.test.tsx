@@ -1,14 +1,22 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Header } from "./Header";
 import { useAuthStore } from "@/store/authStore";
 
 function renderHeader() {
+  // Header -> useLogout() -> useQueryClient() needs a real
+  // QueryClientProvider in the tree, same pattern as every other
+  // page-level test in the project (e.g. TopicsListPage.test.tsx) — a
+  // fresh QueryClient per render call keeps each test's cache isolated.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <Header />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

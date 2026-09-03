@@ -29,6 +29,10 @@ import { TestQuestionsListPage } from "@/pages/admin/TestQuestionsListPage";
 import { QuestionFormPage } from "@/pages/admin/QuestionFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
+import { StudentTestsListPage } from "@/pages/student/TestsListPage";
+import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
+import { AttemptPage } from "@/pages/student/AttemptPage";
+import { ResultPage } from "@/pages/student/ResultPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { ADMIN_ITEMS, TEACHER_ITEMS, APPLICANT_STUDENT_ITEMS } from "@/utils/sidebarConfig";
@@ -118,7 +122,11 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute allowedPanel="student" />}>
         <Route element={<StudentLayout />}>
           <Route path="/student" element={<StudentDashboardPage />} />
-          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student")}
+          <Route path="/student/tests" element={<StudentTestsListPage />} />
+          <Route path="/student/tests/:testId" element={<StudentTestDetailPage />} />
+          <Route path="/student/tests/:testId/attempt/:attemptId" element={<AttemptPage />} />
+          <Route path="/student/results/:resultId" element={<ResultPage />} />
+          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests"])}
         </Route>
       </Route>
     </Routes>
