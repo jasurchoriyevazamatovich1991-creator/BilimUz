@@ -7,6 +7,7 @@ import { HomePage } from "@/pages/public/HomePage";
 import { LoginPage } from "@/pages/public/LoginPage";
 import { RegisterPage } from "@/pages/public/RegisterPage";
 import { VerifyPage } from "@/pages/public/VerifyPage";
+import { VerifyCertificatePage } from "@/pages/public/VerifyCertificatePage";
 import { UnsupportedRolePage } from "@/pages/public/UnsupportedRolePage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
 import { UsersListPage } from "@/pages/admin/UsersListPage";
@@ -33,6 +34,8 @@ import { StudentTestsListPage } from "@/pages/student/TestsListPage";
 import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
 import { AttemptPage } from "@/pages/student/AttemptPage";
 import { ResultPage } from "@/pages/student/ResultPage";
+import { CertificatesListPage } from "@/pages/student/CertificatesListPage";
+import { CertificateDetailPage } from "@/pages/student/CertificateDetailPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { ADMIN_ITEMS, TEACHER_ITEMS, APPLICANT_STUDENT_ITEMS } from "@/utils/sidebarConfig";
@@ -63,6 +66,7 @@ export function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/certificates/verify" element={<VerifyCertificatePage />} />
         <Route path="/unsupported" element={<UnsupportedRolePage />} />
       </Route>
 
@@ -126,7 +130,9 @@ export function AppRoutes() {
           <Route path="/student/tests/:testId" element={<StudentTestDetailPage />} />
           <Route path="/student/tests/:testId/attempt/:attemptId" element={<AttemptPage />} />
           <Route path="/student/results/:resultId" element={<ResultPage />} />
-          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests"])}
+          <Route path="/student/certificates" element={<CertificatesListPage />} />
+          <Route path="/student/certificates/:certificateId" element={<CertificateDetailPage />} />
+          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests", "/student/certificates"])}
         </Route>
       </Route>
     </Routes>

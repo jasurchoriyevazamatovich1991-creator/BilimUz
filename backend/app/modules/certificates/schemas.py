@@ -21,6 +21,16 @@ class CertificateOut(BaseModel):
     pdf_url: str | None  # always null in Sprint 7 — see README
     status: str
     created_at: datetime
+    # Not a column on the `certificates` table — lives on the separate
+    # CertificateVerification record (certificate_verification table).
+    # The service layer attaches it as a transient attribute on the
+    # Certificate ORM instance before validation (see service.py's
+    # `_with_verification_code`), so this reads correctly via
+    # `from_attributes=True` without any model/migration change. Safe
+    # to expose to the certificate's own owner — it's the public,
+    # non-secret token the whole verification feature exists to share
+    # (see GET /certificates/verify/{code}'s own docstring).
+    verification_code: str
 
     model_config = {"from_attributes": True}
 

@@ -31,6 +31,18 @@ class CertificateService:
         self.verification_repo = verification_repository
         self.result_repo = result_repository
 
+    def _with_verification_code(self, certificate: Certificate) -> Certificate:
+        """Attaches the linked CertificateVerification's code as a
+        transient (non-persisted, non-mapped) attribute so CertificateOut
+        can read it via from_attributes=True. Certificate has no DB
+        column or ORM relationship for this — setting a plain Python
+        attribute here is invisible to SQLAlchemy's flush/commit, so
+        this can never accidentally get written to the database.
+        """
+        verification = self.verification_repo.get_by_certificate_id(certificate.id)
+        certificate.verification_code = verification.verification_code if verification else ""
+        return certificate
+
     def issue(self, result_id: uuid.UUID, user_id: uuid.UUID, template_id: uuid.UUID | None, actor_id: uuid.UUID) -> Certificate:
         result = self.result_repo.get_by_id(result_id)
         if result is None or result.user_id != user_id:
@@ -40,28 +52,31 @@ class CertificateService:
 
         existing = self.repo.get_by_user_and_test(user_id, result.test_id)
         if existing:
-            return existing
+            return self._with_verification_code(existing)
 
         certificate = Certificate(
             user_id=user_id, result_id=result_id, template_id=template_id,
             certificate_number=generate_certificate_number(), pdf_url=None,
         )
         self.repo.create(certificate)
-        self.verification_repo.create(CertificateVerification(
+        verification = self.verification_repo.create(CertificateVerification(
             certificate_id=certificate.id, verification_code=generate_verification_code(),
         ))
         log_action(self.repo.db, action="certificate.issued", user_id=actor_id, entity_type="certificate", entity_id=certificate.id)
         self.repo.commit()
+        certificate.verification_code = verification.verification_code  # already created above, no second query needed
         return certificate
 
     def get(self, certificate_id: uuid.UUID, user_id: uuid.UUID) -> Certificate:
         certificate = self.repo.get_by_id(certificate_id)
         if certificate is None or certificate.user_id != user_id:
             raise CertificateNotFoundException("Sertifikat topilmadi")
-        return certificate
+        return self._with_verification_code(certificate)
 
     def list_mine(self, user_id: uuid.UUID, page: int, per_page: int) -> tuple[list[Certificate], int]:
-        return self.repo.list_for_user(user_id, page, per_page)
+        items, total = self.repo.list_for_user(user_id, page, per_page)
+        items = [self._with_verification_code(c) for c in items]
+        return items, total
 
 
 class TemplateService:

@@ -50,6 +50,26 @@ def test_verify_returns_valid_true_for_issued_certificate(service, mock_repo, mo
     assert result.is_valid is True
 
 
+def test_verify_response_contains_only_the_three_approved_pii_free_fields(service, mock_repo, mock_cert_repo):
+    """The public endpoint must never leak student PII — asserted
+    directly against the response object's field set, not just by
+    convention. VerificationResultOut is unchanged by this fix; this
+    test exists so any FUTURE accidental field addition breaks loudly."""
+    verification = MagicMock(certificate_id=uuid.uuid4(), verified_count=5)
+    mock_repo.get_by_code.return_value = verification
+    mock_cert_repo.get_by_id.return_value = MagicMock(
+        certificate_number="BILIMUZ-2026-PII0000",
+        status="issued",
+        user_id=uuid.uuid4(),  # exists on the underlying Certificate — must NOT leak into the response
+    )
+
+    result = service.verify("SOMECODE12", ip="9.9.9.9")
+
+    assert set(result.model_dump().keys()) == {"certificate_number", "is_valid", "verified_count"}
+    assert not hasattr(result, "user_id")
+    assert not hasattr(result, "verification_code")  # the code itself is the lookup key, not echoed back
+
+
 def test_certificate_number_has_expected_prefix_and_year():
     number = generate_certificate_number()
     assert number.startswith("BILIMUZ-")

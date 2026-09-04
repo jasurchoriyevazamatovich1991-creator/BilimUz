@@ -79,6 +79,9 @@ export const STUDENT_ITEMS: SidebarItem[] = [
   { label: "Darslar", path: "/student/lessons" },
   { label: "Testlar", path: "/student/tests" },
   { label: "Natijalar", path: "/student/results" },
+  // Sprint 21 addition: needed so CertificatesListPage is reachable
+  // directly, not only via back-navigation from a certificate detail page.
+  { label: "Sertifikatlar", path: "/student/certificates" },
   { label: "Yutuqlar", path: "/student/achievements" },
   { label: "Profil", path: "/student/profile" },
   // Sprint 14 addition — see TEACHER_ITEMS's identical note.

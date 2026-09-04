@@ -4,6 +4,9 @@
  * correct/wrong breakdown — that endpoint does not exist (BACKEND GAP,
  * confirmed in the Sprint 20 audit, not invented here as a fake
  * "review your answers" section).
+ *
+ * Sprint 21 addition: a "Sertifikat olish" button, shown only when
+ * is_passed === true, calling the real POST /certificates endpoint.
  */
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { useResult } from "@/hooks/useResults";
 import { useTest } from "@/hooks/useTests";
+import { useIssueCertificate } from "@/hooks/useCertificates";
 
 export function ResultPage() {
   const { resultId } = useParams<{ resultId: string }>();
@@ -18,10 +22,23 @@ export function ResultPage() {
 
   const { data: result, isLoading, isError } = useResult(resultId);
   const { data: test } = useTest(result?.test_id);
+  const issueCertificate = useIssueCertificate();
 
   if (!resultId) return null;
   if (isError) return <ErrorState title="Natija" />;
   if (isLoading || !result) return <p className="p-6 text-sm text-foreground/50">Yuklanmoqda...</p>;
+
+  function handleGetCertificate() {
+    if (!result) return;
+    // Idempotent on the backend — calling this again for an
+    // already-certified passing result returns the existing
+    // certificate rather than erroring, so no separate
+    // "already have one" branch is needed here.
+    issueCertificate.mutate(
+      { result_id: result.id },
+      { onSuccess: (certificate) => navigate(`/student/certificates/${certificate.id}`) },
+    );
+  }
 
   return (
     <div className="mx-auto max-w-xl">
@@ -46,6 +63,11 @@ export function ResultPage() {
           ) : null}
 
           <div className="flex justify-center gap-3">
+            {result.is_passed === true ? (
+              <Button onClick={handleGetCertificate} disabled={issueCertificate.isPending}>
+                {issueCertificate.isPending ? "..." : "Sertifikat olish"}
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={() => navigate("/student/tests")}>
               Testlarga qaytish
             </Button>
