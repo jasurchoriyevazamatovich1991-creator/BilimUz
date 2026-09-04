@@ -14,6 +14,10 @@ import { UsersListPage } from "@/pages/admin/UsersListPage";
 import { UserDetailPage } from "@/pages/admin/UserDetailPage";
 import { SchoolsListPage } from "@/pages/admin/SchoolsListPage";
 import { SchoolFormPage } from "@/pages/admin/SchoolFormPage";
+import { RolesListPage } from "@/pages/admin/RolesListPage";
+import { RoleFormPage } from "@/pages/admin/RoleFormPage";
+import { PermissionsListPage } from "@/pages/admin/PermissionsListPage";
+import { PermissionFormPage } from "@/pages/admin/PermissionFormPage";
 import { LearningCentersListPage } from "@/pages/admin/LearningCentersListPage";
 import { LearningCenterFormPage } from "@/pages/admin/LearningCenterFormPage";
 import { SubjectsListPage } from "@/pages/admin/SubjectsListPage";
@@ -76,6 +80,12 @@ export function AppRoutes() {
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UsersListPage />} />
           <Route path="/admin/users/:userId" element={<UserDetailPage />} />
+          <Route path="/admin/roles" element={<RolesListPage />} />
+          <Route path="/admin/roles/new" element={<RoleFormPage />} />
+          <Route path="/admin/roles/:roleId" element={<RoleFormPage />} />
+          <Route path="/admin/permissions" element={<PermissionsListPage />} />
+          <Route path="/admin/permissions/new" element={<PermissionFormPage />} />
+          <Route path="/admin/permissions/:permissionId" element={<PermissionFormPage />} />
           <Route path="/admin/schools" element={<SchoolsListPage />} />
           <Route path="/admin/schools/new" element={<SchoolFormPage />} />
           <Route path="/admin/schools/:schoolId" element={<SchoolFormPage />} />
@@ -102,6 +112,8 @@ export function AppRoutes() {
           <Route path="/admin/tests/:testId/questions/:questionId" element={<QuestionFormPage />} />
           {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
             "/admin/users",
+            "/admin/roles",
+            "/admin/permissions",
             "/admin/schools",
             "/admin/learning-centers",
             "/admin/subjects",
