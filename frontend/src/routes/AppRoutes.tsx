@@ -39,6 +39,7 @@ import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
 import { AttemptPage } from "@/pages/student/AttemptPage";
 import { ResultPage } from "@/pages/student/ResultPage";
 import { CertificatesListPage } from "@/pages/student/CertificatesListPage";
+import { NotificationsPage } from "@/pages/student/NotificationsPage";
 import { CertificateDetailPage } from "@/pages/student/CertificateDetailPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -144,7 +145,8 @@ export function AppRoutes() {
           <Route path="/student/results/:resultId" element={<ResultPage />} />
           <Route path="/student/certificates" element={<CertificatesListPage />} />
           <Route path="/student/certificates/:certificateId" element={<CertificateDetailPage />} />
-          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests", "/student/certificates"])}
+          <Route path="/student/notifications" element={<NotificationsPage />} />
+          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests", "/student/certificates", "/student/notifications"])}
         </Route>
       </Route>
     </Routes>

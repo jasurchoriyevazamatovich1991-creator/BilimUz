@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { useLogout } from "@/hooks/useAuth";
 import { resolvePanel, panelBasePath } from "@/utils/roleConfig";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 
 /**
  * Sprint 14: replaces Sprint 13's single flat "Chiqish" button with a
@@ -12,12 +13,22 @@ import { resolvePanel, panelBasePath } from "@/utils/roleConfig";
  * which serves as the approved "Coming Soon" messaging, reusing the
  * already-existing PlaceholderPage component rather than building a
  * new one for the same purpose.
+ *
+ * Sprint 23 addition: a notification bell, shown ONLY for the Student
+ * role (approved scope — Admin notification management is explicitly
+ * out of scope this sprint, and Teacher has no /teacher/notifications
+ * route at all yet, so restricting to Student avoids linking anywhere
+ * dead). Unread count comes from the real backend endpoint (works for
+ * any authenticated user regardless of role — verified). Everything
+ * else in this file is unchanged.
  */
 export function Header() {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isPending } = useLogout();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isStudent = user?.role === "Student";
+  const { data: unreadCount } = useUnreadNotificationCount(isStudent);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -44,7 +55,25 @@ export function Header() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-background px-6 py-4">
-      <div />
+      {isStudent ? (
+        <Link
+          to="/student/notifications"
+          aria-label="Bildirishnomalar"
+          className="relative flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-primary/10"
+        >
+          <span aria-hidden="true">🔔</span>
+          {unreadCount && unreadCount > 0 ? (
+            <span
+              aria-label={`${unreadCount} ta o'qilmagan bildirishnoma`}
+              className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          ) : null}
+        </Link>
+      ) : (
+        <div />
+      )}
       <div ref={menuRef} className="relative">
         <button
           type="button"

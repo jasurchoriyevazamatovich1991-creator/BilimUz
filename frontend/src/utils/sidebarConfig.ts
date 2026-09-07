@@ -82,6 +82,9 @@ export const STUDENT_ITEMS: SidebarItem[] = [
   // Sprint 21 addition: needed so CertificatesListPage is reachable
   // directly, not only via back-navigation from a certificate detail page.
   { label: "Sertifikatlar", path: "/student/certificates" },
+  // Sprint 23 addition: needed so NotificationsPage is reachable from
+  // the sidebar too, not only via the Header bell.
+  { label: "Bildirishnomalar", path: "/student/notifications" },
   { label: "Yutuqlar", path: "/student/achievements" },
   { label: "Profil", path: "/student/profile" },
   // Sprint 14 addition — see TEACHER_ITEMS's identical note.

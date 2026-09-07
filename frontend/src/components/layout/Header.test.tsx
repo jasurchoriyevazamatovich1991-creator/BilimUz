@@ -1,9 +1,12 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Header } from "./Header";
 import { useAuthStore } from "@/store/authStore";
+import { notificationsApi } from "@/api/notifications";
+
+vi.mock("@/api/notifications");
 
 function renderHeader() {
   // Header -> useLogout() -> useQueryClient() needs a real
@@ -76,5 +79,52 @@ describe("Header", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
+
+describe("Header — Sprint 23 notification bell (Student only)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().logout();
+  });
+
+  it("does NOT render a bell for Teacher (out of approved scope, no /teacher/notifications route)", () => {
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Teacher" });
+    renderHeader();
+    expect(screen.queryByLabelText("Bildirishnomalar")).not.toBeInTheDocument();
+  });
+
+  it("does NOT render a bell for Admin (out of approved scope this sprint)", () => {
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Admin" });
+    renderHeader();
+    expect(screen.queryByLabelText("Bildirishnomalar")).not.toBeInTheDocument();
+  });
+
+  it("renders a bell for Student, linking to /student/notifications", () => {
+    vi.mocked(notificationsApi.unreadCount).mockResolvedValue(0);
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Student" });
+    renderHeader();
+    expect(screen.getByLabelText("Bildirishnomalar")).toHaveAttribute("href", "/student/notifications");
+  });
+
+  it("shows the real unread count as a badge when > 0", async () => {
+    vi.mocked(notificationsApi.unreadCount).mockResolvedValue(3);
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Student" });
+    renderHeader();
+    await waitFor(() => expect(screen.getByText("3")).toBeInTheDocument());
+  });
+
+  it("shows no badge when unread count is 0", async () => {
+    vi.mocked(notificationsApi.unreadCount).mockResolvedValue(0);
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Student" });
+    renderHeader();
+    await waitFor(() => expect(screen.getByLabelText("Bildirishnomalar")).toBeInTheDocument());
+    expect(screen.queryByLabelText(/o'qilmagan bildirishnoma/)).not.toBeInTheDocument();
+  });
+
+  it("never calls the unread-count endpoint for a non-Student role (enabled gating)", () => {
+    useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Teacher" });
+    renderHeader();
+    expect(notificationsApi.unreadCount).not.toHaveBeenCalled();
   });
 });
