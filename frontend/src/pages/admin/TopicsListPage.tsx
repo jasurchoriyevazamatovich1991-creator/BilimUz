@@ -9,6 +9,13 @@
  * against backend require_roles("Admin", "Super Admin", "Teacher") on
  * topics' write endpoints) — a WIDER tier than Subjects/Grades, not
  * copy-pasted from either.
+ *
+ * Sprint 26: accepts an optional `basePath` (default "/admin",
+ * unchanged for every existing Admin usage) so Teacher's panel can
+ * mount this exact same component at /teacher/topics instead of
+ * duplicating it — small, safe reuse per the approved Sprint 26 scope,
+ * not a risky shared abstraction (the prop only ever changes which
+ * literal path prefix navigate() uses, nothing else).
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +33,11 @@ import type { TopicOut } from "@/api/topics";
 
 const PER_PAGE = 20;
 
-export function TopicsListPage() {
+interface TopicsListPageProps {
+  basePath?: string;
+}
+
+export function TopicsListPage({ basePath = "/admin" }: TopicsListPageProps) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const canWrite = currentUser?.role === "Admin" || currentUser?.role === "Super Admin" || currentUser?.role === "Teacher";
@@ -72,7 +83,7 @@ export function TopicsListPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Mavzular</h1>
-        {canWrite ? <Button onClick={() => navigate("/admin/topics/new")}>Qo'shish</Button> : null}
+        {canWrite ? <Button onClick={() => navigate(`${basePath}/topics/new`)}>Qo'shish</Button> : null}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -136,7 +147,7 @@ export function TopicsListPage() {
             ) : data && data.items.length > 0 ? (
               data.items.map((topic) => (
                 <tr key={topic.id} className="border-b border-border last:border-0 hover:bg-primary/5">
-                  <td onClick={() => navigate(`/admin/topics/${topic.id}`)} className="cursor-pointer px-4 py-3">
+                  <td onClick={() => navigate(`${basePath}/topics/${topic.id}`)} className="cursor-pointer px-4 py-3">
                     {topic.title}
                   </td>
                   <td className="px-4 py-3 text-foreground/60">{subjectName(topic.subject_id)}</td>

@@ -22,7 +22,7 @@ import type { LessonOut } from "@/api/lessons";
 
 const PER_PAGE = 20;
 
-export function LessonsListPage() {
+export function LessonsListPage({ basePath = "/admin" }: { basePath?: string }) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const canWrite = currentUser?.role === "Admin" || currentUser?.role === "Super Admin" || currentUser?.role === "Teacher";
@@ -64,7 +64,7 @@ export function LessonsListPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Darslar</h1>
-        {canWrite ? <Button onClick={() => navigate("/admin/lessons/new")}>Qo'shish</Button> : null}
+        {canWrite ? <Button onClick={() => navigate(`${basePath}/lessons/new`)}>Qo'shish</Button> : null}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -118,7 +118,7 @@ export function LessonsListPage() {
             ) : data && data.items.length > 0 ? (
               data.items.map((lesson) => (
                 <tr key={lesson.id} className="border-b border-border last:border-0 hover:bg-primary/5">
-                  <td onClick={() => navigate(`/admin/lessons/${lesson.id}`)} className="cursor-pointer px-4 py-3">
+                  <td onClick={() => navigate(`${basePath}/lessons/${lesson.id}`)} className="cursor-pointer px-4 py-3">
                     {lesson.title}
                   </td>
                   <td className="px-4 py-3 text-foreground/60">{topicTitle(lesson.topic_id)}</td>

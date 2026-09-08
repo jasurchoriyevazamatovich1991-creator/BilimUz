@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TopicsListPage } from "./TopicsListPage";
 import { topicsApi } from "@/api/topics";
@@ -28,6 +28,50 @@ const MOCK_TOPIC = {
   description: null, order_number: 1, status: "active",
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
 };
+
+describe("TopicsListPage — Sprint 26 basePath prop (safe reuse for Teacher)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().setUser({ id: "u1", first_name: "A", last_name: "B", phone: null, email: null, role: "Teacher" });
+    vi.mocked(subjectsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 100, total: 0, total_pages: 0 } });
+    vi.mocked(gradesApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 100, total: 0, total_pages: 0 } });
+  });
+
+  it("defaults to /admin — every existing Admin usage is completely unchanged", async () => {
+    vi.mocked(topicsApi.list).mockResolvedValue({ items: [MOCK_TOPIC], meta: { page: 1, per_page: 20, total: 1, total_pages: 1 } });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TopicsListPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Qo'shish")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Qo'shish"));
+    // No route assertions here (no <Routes> tree) — this test only
+    // confirms the component renders identically with zero props,
+    // matching every pre-existing Admin test in this file exactly.
+  });
+
+  it("navigates to /teacher/topics/new when basePath='/teacher' is passed (used by Teacher's routes)", async () => {
+    vi.mocked(topicsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/teacher/topics"]}>
+          <Routes>
+            <Route path="/teacher/topics" element={<TopicsListPage basePath="/teacher" />} />
+            <Route path="/teacher/topics/new" element={<div>TEACHER_NEW_TOPIC_REACHED</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Qo'shish")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Qo'shish"));
+    await waitFor(() => expect(screen.getByText("TEACHER_NEW_TOPIC_REACHED")).toBeInTheDocument());
+  });
+});
 
 describe("TopicsListPage — RBAC (THE critical test: Teacher CAN write here, unlike Subjects/Grades)", () => {
   beforeEach(() => {

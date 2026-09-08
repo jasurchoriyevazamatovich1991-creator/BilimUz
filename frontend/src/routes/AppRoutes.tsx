@@ -33,6 +33,8 @@ import { TestFormPage } from "@/pages/admin/TestFormPage";
 import { TestQuestionsListPage } from "@/pages/admin/TestQuestionsListPage";
 import { QuestionFormPage } from "@/pages/admin/QuestionFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
+import { TeacherSubjectsPage } from "@/pages/teacher/SubjectsPage";
+import { TeacherGradesPage } from "@/pages/teacher/GradesPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { StudentTestsListPage } from "@/pages/student/TestsListPage";
 import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
@@ -130,7 +132,27 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute allowedPanel="teacher" />}>
         <Route element={<TeacherLayout />}>
           <Route path="/teacher" element={<TeacherDashboardPage />} />
-          {placeholderRoutesFor(TEACHER_ITEMS, "/teacher")}
+          <Route path="/teacher/subjects" element={<TeacherSubjectsPage />} />
+          <Route path="/teacher/grades" element={<TeacherGradesPage />} />
+          <Route path="/teacher/topics" element={<TopicsListPage basePath="/teacher" />} />
+          <Route path="/teacher/topics/new" element={<TopicFormPage basePath="/teacher" />} />
+          <Route path="/teacher/topics/:topicId" element={<TopicFormPage basePath="/teacher" />} />
+          <Route path="/teacher/lessons" element={<LessonsListPage basePath="/teacher" />} />
+          <Route path="/teacher/lessons/new" element={<LessonFormPage basePath="/teacher" />} />
+          <Route path="/teacher/lessons/:lessonId" element={<LessonFormPage basePath="/teacher" />} />
+          <Route path="/teacher/tests" element={<TestsListPage basePath="/teacher" />} />
+          <Route path="/teacher/tests/new" element={<TestFormPage basePath="/teacher" />} />
+          <Route path="/teacher/tests/:testId" element={<TestFormPage basePath="/teacher" />} />
+          <Route path="/teacher/tests/:testId/questions" element={<TestQuestionsListPage basePath="/teacher" />} />
+          <Route path="/teacher/tests/:testId/questions/new" element={<QuestionFormPage basePath="/teacher" />} />
+          <Route path="/teacher/tests/:testId/questions/:questionId" element={<QuestionFormPage basePath="/teacher" />} />
+          {placeholderRoutesFor(TEACHER_ITEMS, "/teacher", [
+            "/teacher/subjects",
+            "/teacher/grades",
+            "/teacher/topics",
+            "/teacher/lessons",
+            "/teacher/tests",
+          ])}
         </Route>
       </Route>
 

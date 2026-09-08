@@ -19,7 +19,7 @@ import type { QuestionOut } from "@/api/questions";
 
 const PER_PAGE = 20;
 
-export function TestQuestionsListPage() {
+export function TestQuestionsListPage({ basePath = "/admin" }: { basePath?: string }) {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
@@ -42,7 +42,7 @@ export function TestQuestionsListPage() {
 
   return (
     <div>
-      <button type="button" onClick={() => navigate("/admin/tests")} className="mb-4 text-sm text-primary hover:underline">
+      <button type="button" onClick={() => navigate(`${basePath}/tests`)} className="mb-4 text-sm text-primary hover:underline">
         ← Testlarga qaytish
       </button>
 
@@ -51,7 +51,7 @@ export function TestQuestionsListPage() {
           <h1 className="text-xl font-semibold text-foreground">Savollar</h1>
           {test ? <p className="text-sm text-foreground/60">{test.title}</p> : null}
         </div>
-        {canWrite ? <Button onClick={() => navigate(`/admin/tests/${testId}/questions/new`)}>Qo'shish</Button> : null}
+        {canWrite ? <Button onClick={() => navigate(`${basePath}/tests/${testId}/questions/new`)}>Qo'shish</Button> : null}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -75,7 +75,7 @@ export function TestQuestionsListPage() {
               data.items.map((question) => (
                 <tr key={question.id} className="border-b border-border last:border-0 hover:bg-primary/5">
                   <td
-                    onClick={() => navigate(`/admin/tests/${testId}/questions/${question.id}`)}
+                    onClick={() => navigate(`${basePath}/tests/${testId}/questions/${question.id}`)}
                     className="max-w-xs cursor-pointer truncate px-4 py-3"
                   >
                     {question.question_text}

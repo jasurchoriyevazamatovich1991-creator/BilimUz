@@ -47,6 +47,14 @@ export const ADMIN_ITEMS: SidebarItem[] = [
 
 export const TEACHER_ITEMS: SidebarItem[] = [
   { label: "Dashboard", path: "/teacher" },
+  // Sprint 26 additions: real Teacher content management. "Savollar"
+  // has no standalone entry — Questions have no meaning outside their
+  // parent Test (Sprint 19's established architecture), reached via
+  // Testlar -> a test's "Savollar" link, same as Admin.
+  { label: "Fanlar", path: "/teacher/subjects" },
+  { label: "Sinflar", path: "/teacher/grades" },
+  { label: "Mavzular", path: "/teacher/topics" },
+  { label: "Darslar", path: "/teacher/lessons" },
   { label: "Attestatsiya", path: "/teacher/attestation" },
   { label: "Milliy Sertifikat", path: "/teacher/national-certificate" },
   { label: "Testlar", path: "/teacher/tests" },

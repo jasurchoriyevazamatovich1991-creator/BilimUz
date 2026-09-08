@@ -59,7 +59,7 @@ function newLocalId() {
   return crypto.randomUUID();
 }
 
-export function QuestionFormPage() {
+export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string }) {
   const { testId, questionId } = useParams<{ testId: string; questionId: string }>();
   const isEditMode = !!questionId;
   const navigate = useNavigate();
@@ -104,7 +104,7 @@ export function QuestionFormPage() {
 
   useEffect(() => {
     if (currentUser && !canWrite && !isEditMode) {
-      navigate(`/admin/tests/${testId}/questions`, { replace: true });
+      navigate(`${basePath}/tests/${testId}/questions`, { replace: true });
     }
   }, [currentUser, canWrite, isEditMode, testId, navigate]);
 
@@ -213,7 +213,7 @@ export function QuestionFormPage() {
           onSuccess: () => {
             saveOptionsAndMedia.mutate(
               { optionsDiff: computeOptionsDiff(), mediaDiff: computeMediaDiff() },
-              { onSuccess: () => navigate(`/admin/tests/${testId}/questions/${questionId}`) },
+              { onSuccess: () => navigate(`${basePath}/tests/${testId}/questions/${questionId}`) },
             );
           },
         },
@@ -229,14 +229,14 @@ export function QuestionFormPage() {
           explanation: explanation || undefined,
           options: showOptions ? options.map((o) => ({ option_text: o.option_text, is_correct: o.is_correct })) : undefined,
         },
-        { onSuccess: () => navigate(`/admin/tests/${testId}/questions`) },
+        { onSuccess: () => navigate(`${basePath}/tests/${testId}/questions`) },
       );
     }
   }
 
   function handleConfirmDelete() {
     if (!questionId) return;
-    deleteQuestion.mutate(questionId, { onSuccess: () => navigate(`/admin/tests/${testId}/questions`) });
+    deleteQuestion.mutate(questionId, { onSuccess: () => navigate(`${basePath}/tests/${testId}/questions`) });
   }
 
   const isSubmitting = createQuestion.isPending || updateQuestion.isPending || saveOptionsAndMedia.isPending;
@@ -245,7 +245,7 @@ export function QuestionFormPage() {
     <div className="max-w-2xl">
       <button
         type="button"
-        onClick={() => navigate(`/admin/tests/${testId}/questions`)}
+        onClick={() => navigate(`${basePath}/tests/${testId}/questions`)}
         className="mb-4 text-sm text-primary hover:underline"
       >
         ← Savollarga qaytish

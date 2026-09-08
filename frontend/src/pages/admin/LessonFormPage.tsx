@@ -26,7 +26,7 @@ import { useLesson, useCreateLesson, useUpdateLesson, useDeleteLesson } from "@/
 import { useTopicsList } from "@/hooks/useTopics";
 import { useAuthStore } from "@/store/authStore";
 
-export function LessonFormPage() {
+export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
   const { lessonId } = useParams<{ lessonId: string }>();
   const isEditMode = !!lessonId;
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ export function LessonFormPage() {
 
   useEffect(() => {
     if (currentUser && !canWrite && !isEditMode) {
-      navigate("/admin/lessons", { replace: true });
+      navigate(`${basePath}/lessons`, { replace: true });
     }
   }, [currentUser, canWrite, isEditMode, navigate]);
 
@@ -83,19 +83,19 @@ export function LessonFormPage() {
     if (isEditMode) {
       updateLesson.mutate(
         { title, video: video || undefined, pdf: pdf || undefined, content: content || undefined, status },
-        { onSuccess: () => navigate(`/admin/lessons/${lessonId}`) },
+        { onSuccess: () => navigate(`${basePath}/lessons/${lessonId}`) },
       );
     } else {
       createLesson.mutate(
         { topic_id: topicId, title, video: video || undefined, pdf: pdf || undefined, content: content || undefined },
-        { onSuccess: () => navigate("/admin/lessons") },
+        { onSuccess: () => navigate(`${basePath}/lessons`) },
       );
     }
   }
 
   function handleConfirmDelete() {
     if (!lessonId) return;
-    deleteLesson.mutate(lessonId, { onSuccess: () => navigate("/admin/lessons") });
+    deleteLesson.mutate(lessonId, { onSuccess: () => navigate(`${basePath}/lessons`) });
   }
 
   const isSubmitting = createLesson.isPending || updateLesson.isPending;
@@ -103,7 +103,7 @@ export function LessonFormPage() {
 
   return (
     <div className="max-w-2xl">
-      <button type="button" onClick={() => navigate("/admin/lessons")} className="mb-4 text-sm text-primary hover:underline">
+      <button type="button" onClick={() => navigate(`${basePath}/lessons`)} className="mb-4 text-sm text-primary hover:underline">
         ← Ro'yxatga qaytish
       </button>
 

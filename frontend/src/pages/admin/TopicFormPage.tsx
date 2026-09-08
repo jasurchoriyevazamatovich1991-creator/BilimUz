@@ -5,6 +5,9 @@
  * creation" pattern but for a different field). `grade_id` remains
  * editable. RBAC: Admin, Super Admin, AND Teacher (wider than
  * Subjects/Grades — see TopicsListPage.tsx's docstring).
+ * Sprint 26: accepts an optional `basePath` (default "/admin") for
+ * safe reuse under Teacher's panel — see TopicsListPage.tsx's docstring
+ * for the full rationale.
  */
 import { useState, useEffect, type FormEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -18,7 +21,11 @@ import { useSubjectsList } from "@/hooks/useSubjects";
 import { useGradesList } from "@/hooks/useGrades";
 import { useAuthStore } from "@/store/authStore";
 
-export function TopicFormPage() {
+interface TopicFormPageProps {
+  basePath?: string;
+}
+
+export function TopicFormPage({ basePath = "/admin" }: TopicFormPageProps) {
   const { topicId } = useParams<{ topicId: string }>();
   const isEditMode = !!topicId;
   const navigate = useNavigate();
@@ -52,7 +59,7 @@ export function TopicFormPage() {
 
   useEffect(() => {
     if (currentUser && !canWrite && !isEditMode) {
-      navigate("/admin/topics", { replace: true });
+      navigate(`${basePath}/topics`, { replace: true });
     }
   }, [currentUser, canWrite, isEditMode, navigate]);
 
@@ -65,19 +72,19 @@ export function TopicFormPage() {
     if (isEditMode) {
       updateTopic.mutate(
         { grade_id: gradeId || undefined, title, description: description || undefined, order_number: orderNumber, status },
-        { onSuccess: () => navigate(`/admin/topics/${topicId}`) },
+        { onSuccess: () => navigate(`${basePath}/topics/${topicId}`) },
       );
     } else {
       createTopic.mutate(
         { subject_id: subjectId, grade_id: gradeId || undefined, title, description: description || undefined, order_number: orderNumber },
-        { onSuccess: () => navigate("/admin/topics") },
+        { onSuccess: () => navigate(`${basePath}/topics`) },
       );
     }
   }
 
   function handleConfirmDelete() {
     if (!topicId) return;
-    deleteTopic.mutate(topicId, { onSuccess: () => navigate("/admin/topics") });
+    deleteTopic.mutate(topicId, { onSuccess: () => navigate(`${basePath}/topics`) });
   }
 
   const isSubmitting = createTopic.isPending || updateTopic.isPending;
@@ -85,7 +92,7 @@ export function TopicFormPage() {
 
   return (
     <div className="max-w-2xl">
-      <button type="button" onClick={() => navigate("/admin/topics")} className="mb-4 text-sm text-primary hover:underline">
+      <button type="button" onClick={() => navigate(`${basePath}/topics`)} className="mb-4 text-sm text-primary hover:underline">
         ← Ro'yxatga qaytish
       </button>
 

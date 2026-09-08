@@ -22,7 +22,7 @@ import { useGradesList } from "@/hooks/useGrades";
 import { useTopicsList } from "@/hooks/useTopics";
 import { useAuthStore } from "@/store/authStore";
 
-export function TestFormPage() {
+export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
   const { testId } = useParams<{ testId: string }>();
   const isEditMode = !!testId;
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export function TestFormPage() {
 
   useEffect(() => {
     if (currentUser && !canWrite && !isEditMode) {
-      navigate("/admin/tests", { replace: true });
+      navigate(`${basePath}/tests`, { replace: true });
     }
   }, [currentUser, canWrite, isEditMode, navigate]);
 
@@ -84,15 +84,15 @@ export function TestFormPage() {
       passing_score: passingScore ? Number(passingScore) : undefined,
     };
     if (isEditMode) {
-      updateTest.mutate(payload, { onSuccess: () => navigate(`/admin/tests/${testId}`) });
+      updateTest.mutate(payload, { onSuccess: () => navigate(`${basePath}/tests/${testId}`) });
     } else {
-      createTest.mutate(payload, { onSuccess: () => navigate("/admin/tests") });
+      createTest.mutate(payload, { onSuccess: () => navigate(`${basePath}/tests`) });
     }
   }
 
   function handleConfirmDelete() {
     if (!testId) return;
-    deleteTest.mutate(testId, { onSuccess: () => navigate("/admin/tests") });
+    deleteTest.mutate(testId, { onSuccess: () => navigate(`${basePath}/tests`) });
   }
 
   const isSubmitting = createTest.isPending || updateTest.isPending;
@@ -100,7 +100,7 @@ export function TestFormPage() {
 
   return (
     <div className="max-w-2xl">
-      <button type="button" onClick={() => navigate("/admin/tests")} className="mb-4 text-sm text-primary hover:underline">
+      <button type="button" onClick={() => navigate(`${basePath}/tests`)} className="mb-4 text-sm text-primary hover:underline">
         ← Ro'yxatga qaytish
       </button>
 

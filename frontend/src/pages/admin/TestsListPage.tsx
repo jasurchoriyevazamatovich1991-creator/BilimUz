@@ -20,7 +20,7 @@ import type { TestOut } from "@/api/tests";
 
 const PER_PAGE = 20;
 
-export function TestsListPage() {
+export function TestsListPage({ basePath = "/admin" }: { basePath?: string }) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const canWrite = currentUser?.role === "Admin" || currentUser?.role === "Super Admin" || currentUser?.role === "Teacher";
@@ -60,7 +60,7 @@ export function TestsListPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Testlar</h1>
-        {canWrite ? <Button onClick={() => navigate("/admin/tests/new")}>Qo'shish</Button> : null}
+        {canWrite ? <Button onClick={() => navigate(`${basePath}/tests/new`)}>Qo'shish</Button> : null}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -115,7 +115,7 @@ export function TestsListPage() {
             ) : data && data.items.length > 0 ? (
               data.items.map((test) => (
                 <tr key={test.id} className="border-b border-border last:border-0 hover:bg-primary/5">
-                  <td onClick={() => navigate(`/admin/tests/${test.id}`)} className="cursor-pointer px-4 py-3">
+                  <td onClick={() => navigate(`${basePath}/tests/${test.id}`)} className="cursor-pointer px-4 py-3">
                     {test.title}
                   </td>
                   <td className="px-4 py-3 text-foreground/60">{subjectName(test.subject_id)}</td>
@@ -126,7 +126,7 @@ export function TestsListPage() {
                     <td className="px-4 py-3 space-x-3">
                       <button
                         type="button"
-                        onClick={() => navigate(`/admin/tests/${test.id}/questions`)}
+                        onClick={() => navigate(`${basePath}/tests/${test.id}/questions`)}
                         className="text-sm text-primary hover:underline"
                       >
                         Savollar
