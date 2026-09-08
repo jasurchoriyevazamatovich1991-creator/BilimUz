@@ -9,10 +9,10 @@
  * reinterpreted, just colored for readability.
  */
 const STATUS_STYLES: Record<string, string> = {
-  active: "bg-green-100 text-green-700",
-  inactive: "bg-gray-100 text-gray-600",
-  banned: "bg-red-100 text-red-700",
-  pending_verification: "bg-amber-100 text-amber-700",
+  active: "bg-success/15 text-success",
+  inactive: "bg-muted text-muted-foreground",
+  banned: "bg-destructive/15 text-destructive",
+  pending_verification: "bg-warning/15 text-warning",
 };
 
 interface StatusBadgeProps {
@@ -20,6 +20,6 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const style = STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600"; // unknown future status values still render, not blank
+  const style = STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"; // unknown future status values still render, not blank
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style}`}>{status}</span>;
 }

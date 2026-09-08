@@ -4,6 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLogout } from "@/hooks/useAuth";
 import { resolvePanel, panelBasePath } from "@/utils/roleConfig";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
+import { useThemeStore } from "@/store/themeStore";
 
 /**
  * Sprint 14: replaces Sprint 13's single flat "Chiqish" button with a
@@ -21,6 +22,11 @@ import { useUnreadNotificationCount } from "@/hooks/useNotifications";
  * dead). Unread count comes from the real backend endpoint (works for
  * any authenticated user regardless of role — verified). Everything
  * else in this file is unchanged.
+ *
+ * Sprint 24 addition: a light/dark theme toggle button, shown for
+ * every role (theme preference is universal, unlike the Student-only
+ * notification bell). Minimal — one button, no new dropdown, no
+ * change to the existing menu/logout/notification logic at all.
  */
 export function Header() {
   const user = useAuthStore((s) => s.user);
@@ -29,6 +35,8 @@ export function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
   const isStudent = user?.role === "Student";
   const { data: unreadCount } = useUnreadNotificationCount(isStudent);
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -74,7 +82,16 @@ export function Header() {
       ) : (
         <div />
       )}
-      <div ref={menuRef} className="relative">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-primary/10"
+        >
+          <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+        </button>
+        <div ref={menuRef} className="relative">
         <button
           type="button"
           onClick={() => setIsOpen((v) => !v)}
@@ -122,6 +139,7 @@ export function Header() {
             </button>
           </div>
         ) : null}
+        </div>
       </div>
     </header>
   );

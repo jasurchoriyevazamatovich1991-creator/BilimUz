@@ -55,7 +55,7 @@ export function ResultPage() {
           {result.is_passed !== null ? (
             <div
               className={`mb-6 rounded-md px-4 py-3 text-center text-sm font-medium ${
-                result.is_passed ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                result.is_passed ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
               }`}
             >
               {result.is_passed ? "O'tdingiz" : "O'ta olmadingiz"}

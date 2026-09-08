@@ -113,7 +113,7 @@ export function SubjectsListPage() {
                   <td className="px-4 py-3"><StatusBadge status={subject.status} /></td>
                   {canWrite ? (
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => setPendingDelete(subject)} className="text-sm text-red-600 hover:underline">
+                      <button type="button" onClick={() => setPendingDelete(subject)} className="text-sm text-destructive hover:underline">
                         O'chirish
                       </button>
                     </td>

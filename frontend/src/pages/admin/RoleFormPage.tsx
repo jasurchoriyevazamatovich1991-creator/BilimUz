@@ -217,7 +217,7 @@ export function RoleFormPage() {
                       <button
                         type="button"
                         onClick={() => setPendingRevoke({ id: grant.permission_id, label: grant.permission?.name ?? grant.permission_id })}
-                        className="text-sm text-red-600 hover:underline"
+                        className="text-sm text-destructive hover:underline"
                       >
                         Olib tashlash
                       </button>

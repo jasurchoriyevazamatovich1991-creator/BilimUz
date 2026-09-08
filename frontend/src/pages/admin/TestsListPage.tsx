@@ -131,7 +131,7 @@ export function TestsListPage() {
                       >
                         Savollar
                       </button>
-                      <button type="button" onClick={() => setPendingDelete(test)} className="text-sm text-red-600 hover:underline">
+                      <button type="button" onClick={() => setPendingDelete(test)} className="text-sm text-destructive hover:underline">
                         O'chirish
                       </button>
                     </td>

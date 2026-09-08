@@ -51,7 +51,7 @@ export function Timer({ expiresAt, onExpire }: TimerProps) {
   const isLow = remainingMs <= 5 * 60 * 1000; // matches ui_ux_blueprint.md's documented "5 daqiqa qolganda qizarish" behavior
 
   return (
-    <span className={`font-mono text-sm font-medium ${isLow ? "text-red-600" : "text-foreground/70"}`}>
+    <span className={`font-mono text-sm font-medium ${isLow ? "text-destructive" : "text-foreground/70"}`}>
       {formatRemaining(remainingMs)}
     </span>
   );

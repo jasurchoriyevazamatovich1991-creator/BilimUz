@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useSubject, useCreateSubject, useUpdateSubject, useDeleteSubject } from "@/hooks/useSubjects";
 import { useAuthStore } from "@/store/authStore";
 
-const DEFAULT_COLOR = "#0c447c"; // matches the platform's own documented brand primary (Sprint 13's tailwind.config.js)
+const DEFAULT_COLOR = "#4f46e5"; // matches the platform's Sprint 24 Design System primary (Indigo, hsl(var(--primary)) ≈ #4f46e5 in light mode)
 
 export function SubjectFormPage() {
   const { subjectId } = useParams<{ subjectId: string }>();

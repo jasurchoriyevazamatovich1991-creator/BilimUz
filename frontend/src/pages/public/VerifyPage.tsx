@@ -76,12 +76,12 @@ export function VerifyPage() {
       {/* Backend has no real SMS delivery yet (see api/auth.ts) — the
           debug_code is shown here as-is, exactly as the backend
           returned it. Not a fake/mocked delivery mechanism. */}
-      <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div className="mb-4 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
         Vaqtinchalik kod (SMS hali ulanmagan): <strong>{state.debugCode}</strong>
       </div>
 
       {errorMessage ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
           {errorMessage}
         </div>
       ) : null}

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Header } from "./Header";
 import { useAuthStore } from "@/store/authStore";
 import { notificationsApi } from "@/api/notifications";
+import { useThemeStore } from "@/store/themeStore";
 
 vi.mock("@/api/notifications");
 
@@ -60,14 +61,14 @@ describe("Header", () => {
 
   it("links Profil and Sozlamalar to the role-correct panel paths", () => {
     renderHeader();
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /Aziz Karimov/ }));
     expect(screen.getByRole("menuitem", { name: "Profil" })).toHaveAttribute("href", "/teacher/profile");
     expect(screen.getByRole("menuitem", { name: "Sozlamalar" })).toHaveAttribute("href", "/teacher/settings");
   });
 
   it("closes the dropdown on Escape", () => {
     renderHeader();
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /Aziz Karimov/ }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -75,10 +76,38 @@ describe("Header", () => {
 
   it("closes the dropdown on outside click", () => {
     renderHeader();
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /Aziz Karimov/ }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
+
+describe("Header — Sprint 24 theme toggle", () => {
+  beforeEach(() => {
+    useAuthStore.getState().logout();
+    useAuthStore.getState().setUser({ id: "1", first_name: "Aziz", last_name: "Karimov", phone: null, email: null, role: "Teacher" });
+    document.documentElement.classList.remove("dark");
+    useThemeStore.setState({ theme: "light" }); // reset store state too — persist keeps it across tests otherwise
+  });
+
+  it("renders a theme toggle button for every role (not gated like the notification bell)", () => {
+    renderHeader();
+    expect(screen.getByLabelText(/rejimga o'tish/)).toBeInTheDocument();
+  });
+
+  it("toggles the .dark class on <html> when clicked", () => {
+    renderHeader();
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    fireEvent.click(screen.getByLabelText("Qorong'i rejimga o'tish"));
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+  });
+
+  it("toggles back to light on a second click", () => {
+    renderHeader();
+    fireEvent.click(screen.getByLabelText("Qorong'i rejimga o'tish"));
+    fireEvent.click(screen.getByLabelText("Yorug' rejimga o'tish"));
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 });
 

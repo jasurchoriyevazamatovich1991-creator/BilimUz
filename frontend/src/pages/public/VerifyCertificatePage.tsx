@@ -68,7 +68,7 @@ export function VerifyCertificatePage() {
           </form>
 
           {errorMessage ? (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {errorMessage}
             </div>
           ) : null}
@@ -76,7 +76,7 @@ export function VerifyCertificatePage() {
           {verify.isSuccess ? (
             <div
               className={`mt-4 rounded-md border px-4 py-3 text-sm ${
-                verify.data.is_valid ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"
+                verify.data.is_valid ? "border-success/30 bg-success/10 text-success" : "border-destructive/30 bg-destructive/10 text-destructive"
               }`}
             >
               <p className="font-medium">{verify.data.is_valid ? "Sertifikat haqiqiy" : "Sertifikat haqiqiy emas"}</p>

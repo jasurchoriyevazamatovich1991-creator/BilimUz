@@ -10,9 +10,9 @@ interface ErrorStateProps {
  */
 export function ErrorState({ title }: ErrorStateProps) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-5">
-      <h3 className="text-sm font-medium text-red-700/70">{title}</h3>
-      <p className="mt-3 text-sm text-red-700">Yuklab bo'lmadi</p>
+    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+      <h3 className="text-sm font-medium text-destructive/70">{title}</h3>
+      <p className="mt-3 text-sm text-destructive">Yuklab bo'lmadi</p>
     </div>
   );
 }

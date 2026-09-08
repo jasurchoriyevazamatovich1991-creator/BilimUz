@@ -258,7 +258,7 @@ export function QuestionFormPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {optionsError ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{optionsError}</div>
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive">{optionsError}</div>
             ) : null}
 
             <div>
@@ -350,6 +350,7 @@ export function QuestionFormPage() {
                         onChange={() => toggleOptionCorrect(option.localId)}
                         disabled={!canWrite}
                         aria-label="To'g'ri variant"
+                        className="accent-primary"
                       />
                       <Input
                         value={option.option_text}
@@ -359,7 +360,7 @@ export function QuestionFormPage() {
                         className="flex-1"
                       />
                       {canWrite ? (
-                        <button type="button" onClick={() => removeOptionRow(option.localId)} className="text-sm text-red-600 hover:underline">
+                        <button type="button" onClick={() => removeOptionRow(option.localId)} className="text-sm text-destructive hover:underline">
                           O'chirish
                         </button>
                       ) : null}
@@ -400,7 +401,7 @@ export function QuestionFormPage() {
                       className="flex-1"
                     />
                     {canWrite ? (
-                      <button type="button" onClick={() => removeMediaRow(item.localId)} className="text-sm text-red-600 hover:underline">
+                      <button type="button" onClick={() => removeMediaRow(item.localId)} className="text-sm text-destructive hover:underline">
                         O'chirish
                       </button>
                     ) : null}

@@ -88,7 +88,7 @@ export function TestQuestionsListPage() {
                   <td className="px-4 py-3"><StatusBadge status={question.status} /></td>
                   {canWrite ? (
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => setPendingDelete(question)} className="text-sm text-red-600 hover:underline">
+                      <button type="button" onClick={() => setPendingDelete(question)} className="text-sm text-destructive hover:underline">
                         O'chirish
                       </button>
                     </td>

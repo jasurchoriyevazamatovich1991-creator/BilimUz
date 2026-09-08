@@ -1,9 +1,9 @@
 import { useToastStore } from "@/store/toastStore";
 
 const VARIANT_STYLES = {
-  error: "border-red-200 bg-red-50 text-red-700",
-  success: "border-green-200 bg-green-50 text-green-700",
-  info: "border-blue-200 bg-blue-50 text-blue-700",
+  error: "border-destructive/30 bg-destructive/10 text-destructive",
+  success: "border-success/30 bg-success/10 text-success",
+  info: "border-info/30 bg-info/10 text-info",
 };
 
 /** Mounted once in App.tsx, fixed-position — renders whatever's

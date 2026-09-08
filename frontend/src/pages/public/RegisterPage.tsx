@@ -34,7 +34,7 @@ export function RegisterPage() {
       <h1 className="mb-6 text-2xl font-semibold text-foreground">Ro'yxatdan o'tish</h1>
 
       {errorMessage ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
           {errorMessage}
         </div>
       ) : null}

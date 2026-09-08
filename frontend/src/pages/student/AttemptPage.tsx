@@ -149,6 +149,7 @@ export function AttemptPage() {
                   checked={answeredMap.get(currentQuestion.id) === option.id}
                   onChange={() => handleSelectOption(option.id)}
                   disabled={saveAnswer.isPending}
+                  className="accent-primary"
                 />
                 <span className="text-sm text-foreground">{option.option_text}</span>
               </label>

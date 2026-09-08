@@ -2,8 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * BilimUz Design System — Sprint 24.
+ * Direction: Indigo + Violet + Cyan, bright but not neon, cool-neutral
+ * light mode, deep-navy (not pure black) dark mode. Every value is HSL
+ * WITHOUT the hsl() wrapper, so Tailwind's alpha-modifier syntax
+ * (bg-primary/10 etc. — already used extensively throughout Sprints
+ * 13-23) keeps working exactly as before, now resolving to these new
+ * colors automatically. No component that already used a semantic
+ * token needs to change.
+ */
 :root {
   color-scheme: light;
+
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  --primary: 243 75% 59%;        /* Indigo */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 262 83% 58%;      /* Violet */
+  --secondary-foreground: 0 0% 100%;
+
+  --accent: 189 94% 43%;         /* Cyan */
+  --accent-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 26 40% 15%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --info: 199 89% 48%;
+  --info-foreground: 0 0% 100%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 243 75% 59%;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: 222 47% 8%;
+  --foreground: 210 40% 96%;
+
+  --card: 222 40% 12%;
+  --card-foreground: 210 40% 96%;
+
+  --popover: 222 40% 12%;
+  --popover-foreground: 210 40% 96%;
+
+  --primary: 243 90% 70%;        /* brighter Indigo for dark-bg contrast */
+  --primary-foreground: 222 47% 8%;
+
+  --secondary: 262 75% 68%;      /* soft Violet */
+  --secondary-foreground: 222 47% 8%;
+
+  --accent: 189 85% 58%;         /* Cyan */
+  --accent-foreground: 222 47% 8%;
+
+  --success: 142 60% 52%;
+  --success-foreground: 222 47% 8%;
+
+  --warning: 38 88% 58%;
+  --warning-foreground: 26 40% 12%;
+
+  --destructive: 0 70% 62%;
+  --destructive-foreground: 222 47% 8%;
+
+  --info: 199 85% 58%;
+  --info-foreground: 222 47% 8%;
+
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 243 90% 70%;
 }
 
 body {
