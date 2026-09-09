@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # If this key is ever lost, every encrypted row becomes permanently unreadable — no recovery path.
     FILE_ENCRYPTION_KEY: str = "CHANGE_ME_IN_PRODUCTION_GENERATE_A_REAL_FERNET_KEY"
 
+    # Media storage (Sprint 27 — R2). STORAGE_BACKEND defaults to
+    # "local" so every existing deployment/dev environment is
+    # completely unaffected unless explicitly switched to "r2" — the
+    # R2_* values below are never read at all in the default configuration.
+    STORAGE_BACKEND: str = "local"  # "local" | "r2"
+    R2_ACCOUNT_ID: str = "CHANGE_ME_IN_PRODUCTION"
+    R2_ACCESS_KEY_ID: str = "CHANGE_ME_IN_PRODUCTION"
+    R2_SECRET_ACCESS_KEY: str = "CHANGE_ME_IN_PRODUCTION"
+    R2_BUCKET_NAME: str = "CHANGE_ME_IN_PRODUCTION"
+    R2_ENDPOINT: str = ""  # optional override — defaults to https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
 

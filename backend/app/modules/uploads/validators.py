@@ -1,6 +1,8 @@
 """Pure validation functions — no I/O. Classifying a MIME type and
 checking it against the allowlist+size-limit pair lives here so it's
 unit-testable without touching the filesystem."""
+import uuid
+
 from app.modules.uploads.constants import (
     AUDIO_MIME_TYPES,
     FILE_TYPE_AUDIO,
@@ -41,6 +43,22 @@ def sanitize_display_filename(file_name: str) -> str:
     never derived from this value, so this is a display-safety measure,
     not a path-traversal defense (that's structural, not sanitization-based)."""
     return "".join(ch for ch in file_name if ch.isprintable()).strip() or "file"
+
+
+def build_object_key(file_type: str, lesson_id: uuid.UUID | None, content_type: str) -> str:
+    """Sprint 27 — R2 object key. Structured for readability in the R2
+    dashboard, but the ONLY thing that makes it safe is that every path
+    segment is either a server-generated UUID or a value already
+    validated/loaded from the database (lesson_id, file_type) — never
+    raw user input (matches this module's existing, tested "never trust
+    the caller's filename for the actual path" security property, see
+    README). No path-traversal is possible since nothing here is a
+    free-text string from the request.
+    """
+    generated_name = f"{uuid.uuid4()}{extension_for_content_type(content_type)}"
+    if lesson_id is not None:
+        return f"lessons/{lesson_id}/{file_type}/{generated_name}"
+    return f"misc/{file_type}/{generated_name}"
 
 
 def extension_for_content_type(content_type: str) -> str:
