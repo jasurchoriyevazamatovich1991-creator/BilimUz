@@ -52,9 +52,31 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 18 — Lessons UI | Muhim topilma: backend "video/pdf/matndan kamida bittasi" qoidasini talab qiladi — frontend submit-vaqtida tekshiradi, tugma bloklanmaydi. RBAC Topics bilan bir xil (Teacher yozadi). `type="url"`, yangi `ContentBadges` komponenti. 11 yangi test (jami 80) | ✅ Yakunlandi |
 | Sprint 19 — Tests & Questions UI | Ikki taxmin tuzatildi: Test↔Lesson yo'q (faqat Subject/Grade/Topic), Archive tugmasi yo'q (faqat Publish). Questions Test ichida joylashgan. Options — lokal holatda yig'iladi, faqat Saqlashda yuboriladi. Shartli validatsiya (single/multiple choice). 15 yangi test (jami 95) | ✅ Yakunlandi |
 | Sprint 20 — Student Test Taking / Attempt UI | Birinchi Student-yo'naltirilgan sprint. Haqiqiy backend kamchiligi topildi: `selected_option` — bitta UUID, ro'yxat emas (multiple_choice uchun ham). Timer — faqat vizual, localStorage ishlatmaydi. Submit→CreateResult zanjiri, faol urinishni aniqlash, refresh-xavfsizligi. 15 yangi test (jami 110) | ✅ Yakunlandi |
+| Sprint 21 — Certificates UI | Student Certificates UI, Certificate detail, public certificate verification. Backend `verification_code` qo'shildi, Certificate API bilan real integratsiya. PDF hali mavjud emas. 133 frontend test, Certificate backend testlari 18/18 | ✅ Yakunlandi |
+| Sprint 22 — Roles & Permissions UI | Roles CRUD UI, Permissions CRUD UI, role-permission assign/revoke. RBAC: o'qish Admin+Super Admin, yozish faqat Super Admin. Tizim rollari himoyalangan. 170 frontend test | ✅ Yakunlandi |
+| Sprint 23 — Notifications UI | Student notifications ro'yxati, pagination, Read/Read All, notification bell — real backend endpointlar bilan. 186 frontend test | ✅ Yakunlandi |
+| Sprint 24 — UI/UX & Design System | Indigo + Violet + Cyan dizayn tizimi, Light+Dark tema asosi, shadcn/Tailwind token yangilanishi, qayta ishlatiladigan status/error/toast komponentlari, responsive/accessibility yaxshilanishlari. 194 frontend test | ✅ Yakunlandi |
+| Sprint 25 — Full System Audit | Faqat audit — kod funksiyalari o'zgartirilmadi. Student/Teacher/Admin journey, backend, frontend, DB, xavfsizlik, R2, testlar, performance va production readiness tekshirildi. Umumiy audit balli: 68/100, kritik/yuqori darajali bo'shliqlar aniqlandi | ✅ Yakunlandi (audit) |
+| Sprint 26 — Teacher Panel | Teacher dashboard, Teacher Subjects/Grades (faqat o'qish), Teacher Topics/Lessons/Tests/Questions (to'liq yozish UI) — Admin sahifalarining qayta ishlatiladigan komponentlari `basePath` orqali Teacher panelida ishlatilgan. 203 frontend test, build/TypeScript PASS | ✅ Yakunlandi |
+| Sprint 27 — Cloudflare R2 Media Storage | Private R2 arxitekturasi, presigned upload, xavfsiz signed view URL, fayl metadata PostgreSQL'da, Admin file manager asosi, Lesson↔media integratsiyasi, Teacher/Admin/Super Admin upload RBAC, 2GB videogacha multipart upload, browser→R2 to'g'ridan-to'g'ri yuklash, haqiqiy progress, retry/cancel. 71 backend upload testi, 252 frontend testi, build/TypeScript PASS | ✅ Yakunlandi |
+| Sprint 28 — Full System Audit | Faqat audit. Backend: 384 passed, 6 eski (oldindan mavjud) xato, 3 modul collection muammosi. Frontend: 252/252 PASS, TypeScript/build PASS. Umumiy ball: 68/100. Kritik topilma **G-01**: eski `POST /uploads` orqali katta videoning RAM'ga to'liq o'qilish xavfi. Shuningdek qayd etilgan: **G-03** — `multiple_choice` bir nechta javobni qo'llamaydi; Progress tizimi yo'q; Results history yo'q; real PostgreSQL/R2 E2E test muhiti yo'q; README eskirganligi | ✅ Yakunlandi (audit) |
+| Sprint 29 — Legacy Upload Security Fix | Sprint 28'da aniqlangan **G-01** tuzatildi: eski `POST /uploads` uchun video limiti 20 MB qilib belgilandi, haqiqiy stream hajmi bounded/chunked read orqali tekshiriladi (mijoz e'lon qilgan hajmga ko'r-ko'rona ishonilmaydi). R2/presigned/multipart videoning 2 GB limiti **o'zgarishsiz** qoldi. 9 yangi test, `uploads` moduli 80/80 PASS, to'liq backend 393 passed (6 eski xato/3 collection muammosi o'zgarishsiz), frontend 252/252 PASS, TypeScript/build/`py_compile` PASS. Migratsiya talab qilinmadi | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-**Ochiq eslatma**: test to'plami (100+ unit test) hali **haqiqiy Postgres muhitida ishga tushirilmagan** — faqat sintaksis va qo'lda tekshirilgan.
+**Ochiq eslatma (Sprint 28/29 auditlarida tasdiqlangan, hali bajarilmagan ishlar)**:
+
+- Test to'plami (390+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
+- Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q).
+- `multiple_choice` savol turi — backend `SaveAnswerRequest.selected_option` hali ham bitta UUID, bir nechta javobni qo'llamaydi (Sprint 19'dan beri).
+- **Student Progress** tizimi — umuman mavjud emas (model, endpoint, UI — yo'q).
+- **Results History** (natijalar tarixi ro'yxati) — Student uchun sahifa yo'q, faqat bitta natija ko'rish mavjud.
+- **Student Video Player** — mavjud emas, `Lesson.video` faqat xavfsiz tashqi havola sifatida ko'rsatiladi.
+- **Teacher Media/File UI** — `FileUploader` komponenti tayyor, lekin Teacher paneliga ulanmagan.
+- **Certificate PDF** — hech qachon generatsiya qilinmaydi (`pdf_url` doim `null`).
+- **Rate limiting** — faqat `auth` endpointlarida, boshqa modullarda kengaytirilmagan.
+- **Performance/code splitting** — frontend bitta ~540KB chunk, `React.lazy` qo'llanilmagan.
+- **`Lesson.order_number`** — jadvalda yo'q, darslar tartiblanmaydi.
+- **`Test.max_attempts`** — konfiguratsiya qilinmaydi, backend konstantasi orqali qattiq `1`ga belgilangan.
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
