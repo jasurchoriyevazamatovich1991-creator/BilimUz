@@ -18,6 +18,17 @@ MAX_SIZE_AUDIO = 50 * MB
 GB = 1024 * MB
 MAX_SIZE_VIDEO = 2 * GB
 
+# Sprint 29 — Critical fix. The LEGACY, backend-mediated POST /uploads
+# endpoint must NOT allow a video anywhere near the R2/multipart 2 GB
+# ceiling above — that endpoint reads bytes through this server's own
+# process, unlike the presigned/multipart flow where the browser talks
+# to R2 directly. This limit applies ONLY to video sent through the
+# legacy endpoint; MAX_SIZE_VIDEO (R2/multipart) is completely
+# unchanged, and every other file type's existing legacy limit
+# (image/PDF/audio, all already well under 100 MB) is untouched —
+# those were never the actual risk.
+LEGACY_UPLOAD_MAX_VIDEO_SIZE = 20 * MB
+
 # category -> (allowed MIME types, max size). Allowlist, not a denylist —
 # anything not listed here is rejected, no exceptions.
 IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}

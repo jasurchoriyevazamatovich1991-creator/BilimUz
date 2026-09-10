@@ -32,9 +32,13 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    summary="Upload a file",
-    description="Multipart upload. Size limits: images 10 MB, PDF/Office documents 20 MB, "
-                "audio 50 MB, video 200 MB. MIME type must be on the allowlist — 422 otherwise.",
+    summary="Upload a file (legacy, backend-mediated)",
+    description="Multipart upload — file bytes pass through this backend. Size limits: images "
+                "10 MB, PDF/Office documents 20 MB, audio 50 MB, video 20 MB (Sprint 29 — a "
+                "deliberately small limit for this endpoint specifically; large video must use "
+                "POST /uploads/presigned or /uploads/multipart/initiate instead, where the "
+                "browser uploads directly to R2 up to 2 GB and this server never reads the "
+                "bytes). MIME type must be on the allowlist — 422 otherwise.",
 )
 def upload_file(
     file: UploadFile,

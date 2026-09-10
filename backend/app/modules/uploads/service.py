@@ -20,6 +20,7 @@ from app.modules.uploads.constants import (
     FILE_TYPE_DOCUMENT,
     FILE_TYPE_IMAGE,
     FILE_TYPE_VIDEO,
+    LEGACY_UPLOAD_MAX_VIDEO_SIZE,
     MULTIPART_MAX_PART_NUMBER,
     MULTIPART_PART_SIZE_BYTES,
     PRESIGNED_DOWNLOAD_TTL_SECONDS,
@@ -66,12 +67,53 @@ class UploadService:
         self.storage = storage
         self.lesson_repo = lesson_repository
 
+    def _verify_bounded_stream_size(self, stream: BinaryIO, max_size: int) -> None:
+        """Sprint 29 fix. Reads `stream` in small, fixed-size chunks and
+        raises the moment the cumulative size would exceed `max_size` —
+        never materializes more than one chunk (1 MB) in memory at
+        once, unlike a bare `stream.read()`. This is a genuine defense
+        against a client that lies about the declared Content-
+        Length/size (the fast-path declared-size check in upload()
+        below is skipped or spoofed) — the real byte count is what's
+        enforced here, not just what the client claims.
+
+        Resets the stream position to the start afterward so the
+        unmodified, existing `storage.save()` call downstream can read
+        the (now proven-bounded) content again from the beginning —
+        StorageBackend/LocalDiskStorage/R2Storage are not touched by
+        this fix at all.
+        """
+        CHUNK_SIZE = 1024 * 1024  # 1 MB — bounded, regardless of the file's real or declared size
+        total_read = 0
+        while True:
+            chunk = stream.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            total_read += len(chunk)
+            if total_read > max_size:
+                raise FileTooLargeException(f"Fayl juda katta — maksimal {max_size // (1024*1024)} MB")
+        stream.seek(0)
+
     def upload(self, stream: BinaryIO, original_filename: str, content_type: str, size_bytes: int, user_id: uuid.UUID) -> Upload:
         classification = classify_content_type(content_type)
         if classification is None:
             raise UnsupportedFileTypeException(f"Fayl turi qo'llab-quvvatlanmaydi: {content_type}")
         file_type, max_size = classification
-        if size_bytes > max_size:
+
+        if file_type == FILE_TYPE_VIDEO:
+            # Sprint 29 fix — the legacy, backend-mediated endpoint uses
+            # a small dedicated limit for video, NOT the R2/multipart
+            # 2 GB ceiling (`max_size` from classify_content_type above
+            # is still MAX_SIZE_VIDEO — only ever used here as the
+            # general video-type check, immediately overridden below
+            # for this legacy path specifically). Every other file type
+            # (image/PDF/audio) keeps its existing, already-small limit
+            # and existing declared-size-only check, completely
+            # unchanged — they were never the actual risk.
+            if size_bytes > LEGACY_UPLOAD_MAX_VIDEO_SIZE:
+                raise FileTooLargeException(f"Fayl juda katta — maksimal {LEGACY_UPLOAD_MAX_VIDEO_SIZE // (1024*1024)} MB")
+            self._verify_bounded_stream_size(stream, LEGACY_UPLOAD_MAX_VIDEO_SIZE)
+        elif size_bytes > max_size:
             raise FileTooLargeException(f"Fayl juda katta — maksimal {max_size // (1024*1024)} MB")
 
         generated_name = f"{uuid.uuid4()}{extension_for_content_type(content_type)}"
