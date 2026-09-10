@@ -47,5 +47,9 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     attempt_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("test_attempts.id", ondelete="CASCADE"), nullable=False)
     question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("questions.id"), nullable=False)
     selected_option: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("question_options.id"), nullable=True)
+    # Sprint 30 — additive. NULL for every single_choice/true_false
+    # answer (they keep using selected_option above, unchanged).
+    # Populated only for multiple_choice answers.
+    selected_options: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
     is_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="answered")

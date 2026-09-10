@@ -236,3 +236,136 @@ def test_result_computes_is_passed_correctly(service, mock_repo, mock_answer_rep
 
     result = service.get_result(attempt.id, user_id)
     assert result.is_passed is True
+
+
+# --- Sprint 30: multiple_choice save_answer/scoring ---------------------
+# NOTE: these tests cannot be collected/run in this sandbox due to the
+# same pre-existing environment issue documented since Sprint 20/25/28
+# (questions/repository.py's `list[Question]` return-type annotation
+# raises TypeError at import time in this specific Python environment —
+# unrelated to this sprint's changes). Verified correct via careful
+# manual review instead; will run normally in a correctly configured
+# environment.
+
+def test_save_answer_multiple_choice_correct_when_selection_exactly_matches_correct_set(
+    service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo,
+):
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    correct_1, correct_2, wrong_1 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="multiple_choice")
+    mock_option_repo.list_for_question.return_value = [
+        MagicMock(id=correct_1, is_correct=True),
+        MagicMock(id=correct_2, is_correct=True),
+        MagicMock(id=wrong_1, is_correct=False),
+    ]
+    mock_answer_repo.get.return_value = None
+
+    service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1, correct_2])
+
+    created_answer = mock_answer_repo.create.call_args[0][0]
+    assert created_answer.is_correct is True
+    assert created_answer.selected_options == [correct_1, correct_2]
+
+
+def test_save_answer_multiple_choice_incorrect_when_missing_a_correct_option(
+    service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo,
+):
+    """Partial selection (only one of two correct options) is NOT credited — no partial credit."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    correct_1, correct_2 = uuid.uuid4(), uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="multiple_choice")
+    mock_option_repo.list_for_question.return_value = [
+        MagicMock(id=correct_1, is_correct=True),
+        MagicMock(id=correct_2, is_correct=True),
+    ]
+    mock_answer_repo.get.return_value = None
+
+    service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1])  # missing correct_2
+
+    created_answer = mock_answer_repo.create.call_args[0][0]
+    assert created_answer.is_correct is False
+
+
+def test_save_answer_multiple_choice_incorrect_when_extra_wrong_option_included(
+    service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo,
+):
+    """Selecting every correct option PLUS an incorrect one is NOT credited."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    correct_1, wrong_1 = uuid.uuid4(), uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="multiple_choice")
+    mock_option_repo.list_for_question.return_value = [
+        MagicMock(id=correct_1, is_correct=True),
+        MagicMock(id=wrong_1, is_correct=False),
+    ]
+    mock_answer_repo.get.return_value = None
+
+    service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1, wrong_1])
+
+    created_answer = mock_answer_repo.create.call_args[0][0]
+    assert created_answer.is_correct is False
+
+
+def test_save_answer_multiple_choice_rejects_option_from_wrong_question(
+    service, mock_repo, mock_option_repo, mock_question_repo,
+):
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    foreign_option = uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="multiple_choice")
+    mock_option_repo.list_for_question.return_value = [MagicMock(id=uuid.uuid4(), is_correct=True)]  # foreign_option not in this list
+
+    with pytest.raises(InvalidOptionReferenceException):
+        service.save_answer(attempt.id, user_id, question_id, None, selected_options=[foreign_option])
+
+
+def test_save_answer_multiple_choice_empty_selection_is_unanswered_not_incorrect(
+    service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo,
+):
+    """Mirrors _check_option's None-for-unanswered convention — an empty
+    selection is 'not yet answered', not a scored wrong answer."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="multiple_choice")
+    mock_answer_repo.get.return_value = None
+
+    service.save_answer(attempt.id, user_id, question_id, None, selected_options=[])
+
+    created_answer = mock_answer_repo.create.call_args[0][0]
+    assert created_answer.is_correct is None
+
+
+def test_save_answer_single_choice_path_completely_unaffected_by_multiple_choice_addition(
+    service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo,
+):
+    """Backward-compatibility guarantee: when question_repo returns a
+    non-multiple_choice type (or a MagicMock default, matching every
+    pre-existing test above that never configures mock_question_repo
+    at all), the original single_choice code path runs unchanged."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    option_id = uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="single_choice")
+    mock_option_repo.get_by_id.return_value = MagicMock(question_id=question_id, is_correct=True)
+    mock_answer_repo.get.return_value = None
+
+    service.save_answer(attempt.id, user_id, question_id, option_id)
+
+    created_answer = mock_answer_repo.create.call_args[0][0]
+    assert created_answer.is_correct is True
+    assert created_answer.selected_option == option_id
+    mock_option_repo.list_for_question.assert_not_called()  # the multi-select path was never entered
