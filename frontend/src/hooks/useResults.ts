@@ -4,7 +4,7 @@
  */
 import { useEffect } from "react";
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { resultsApi } from "@/api/results";
+import { resultsApi, type ResultListParams } from "@/api/results";
 import { useToastStore } from "@/store/toastStore";
 import { ApiError } from "@/api/client";
 
@@ -23,6 +23,17 @@ export function useResult(resultId: string | undefined) {
     queryKey: ["results", "detail", resultId],
     queryFn: () => resultsApi.get(resultId as string),
     enabled: !!resultId,
+  });
+  useToastOnQueryError(query);
+  return query;
+}
+
+/** Sprint 34 — Results History. Real backend pagination via the same
+ * GET /results/me endpoint useResult/myCount already use. */
+export function useResultsList(params: ResultListParams) {
+  const query = useQuery({
+    queryKey: ["results", "list", params],
+    queryFn: () => resultsApi.list(params),
   });
   useToastOnQueryError(query);
   return query;

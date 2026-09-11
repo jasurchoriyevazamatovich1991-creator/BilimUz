@@ -47,6 +47,7 @@ import { LessonDetailPage } from "@/pages/student/LessonDetailPage";
 import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
 import { AttemptPage } from "@/pages/student/AttemptPage";
 import { ResultPage } from "@/pages/student/ResultPage";
+import { ResultsHistoryPage } from "@/pages/student/ResultsHistoryPage";
 import { CertificatesListPage } from "@/pages/student/CertificatesListPage";
 import { NotificationsPage } from "@/pages/student/NotificationsPage";
 import { CertificateDetailPage } from "@/pages/student/CertificateDetailPage";
@@ -179,6 +180,7 @@ export function AppRoutes() {
           <Route path="/student/tests" element={<StudentTestsListPage />} />
           <Route path="/student/tests/:testId" element={<StudentTestDetailPage />} />
           <Route path="/student/tests/:testId/attempt/:attemptId" element={<AttemptPage />} />
+          <Route path="/student/results" element={<ResultsHistoryPage />} />
           <Route path="/student/results/:resultId" element={<ResultPage />} />
           <Route path="/student/certificates" element={<CertificatesListPage />} />
           <Route path="/student/certificates/:certificateId" element={<CertificateDetailPage />} />
@@ -189,6 +191,7 @@ export function AppRoutes() {
             "/student/notifications",
             "/student/subjects",
             "/student/lessons",
+            "/student/results",
           ])}
         </Route>
       </Route>

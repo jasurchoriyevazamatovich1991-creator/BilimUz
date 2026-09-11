@@ -23,11 +23,22 @@ export interface ResultOut {
   created_at: string;
 }
 
+export interface ResultListParams {
+  page: number;
+  per_page: number;
+  test_id?: string;
+}
+
 export const resultsApi = {
   myCount: async (): Promise<number> => {
     const result = await unwrap<PaginatedResponse<ResultOut>>(httpClient.get("/results/me", { params: { per_page: 1 } }));
     return result.meta.total;
   },
+
+  /** Sprint 34 — the full paginated list, reusing the exact same
+   * GET /results/me endpoint myCount() above already calls (just
+   * without pinning per_page to 1). */
+  list: (params: ResultListParams) => unwrap<PaginatedResponse<ResultOut>>(httpClient.get("/results/me", { params })),
 
   /** Idempotent on the backend (returns the existing Result if one
    * already exists for this attempt_id) — safe to call more than once. */
