@@ -98,6 +98,7 @@ class AttemptService:
             AnsweredQuestionState(
                 question_id=qid, is_answered=qid in answers,
                 selected_option=answers[qid].selected_option if qid in answers else None,
+                selected_options=answers[qid].selected_options if qid in answers else None,
             )
             for qid in (attempt.question_order or [])
         ]
@@ -108,13 +109,29 @@ class AttemptService:
 
     # --- Answer ------------------------------------------------------------
 
-    def save_answer(self, attempt_id: uuid.UUID, user_id: uuid.UUID, question_id: uuid.UUID, selected_option: uuid.UUID | None) -> None:
+    def save_answer(
+        self, attempt_id: uuid.UUID, user_id: uuid.UUID, question_id: uuid.UUID,
+        selected_option: uuid.UUID | None, selected_options: list[uuid.UUID] | None = None,
+    ) -> None:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
         if question_id not in (attempt.question_order or []):
             raise InvalidQuestionReferenceException("Bu savol ushbu urinishga tegishli emas")
+
+        question = self.question_repo.get_by_id(question_id)
+        if question is not None and question.question_type == "multiple_choice":
+            # Sprint 30 — the only new branch. single_choice/true_false
+            # below is byte-for-byte the original Sprint 6 logic.
+            is_correct = self._check_options(question_id, selected_options or [])
+            existing = self.answer_repo.get(attempt_id, question_id)
+            if existing:
+                self.answer_repo.update(existing, {"selected_options": selected_options, "selected_option": None, "is_correct": is_correct})
+            else:
+                self.answer_repo.create(Answer(attempt_id=attempt_id, question_id=question_id, selected_options=selected_options, is_correct=is_correct))
+            self.repo.commit()
+            return
 
         is_correct = self._check_option(question_id, selected_option)
         existing = self.answer_repo.get(attempt_id, question_id)
@@ -159,6 +176,23 @@ class AttemptService:
         if option is None or option.question_id != question_id:
             raise InvalidOptionReferenceException("Tanlangan variant bu savolga tegishli emas")
         return option.is_correct
+
+    def _check_options(self, question_id: uuid.UUID, selected_options: list[uuid.UUID]) -> bool | None:
+        """Sprint 30 — multiple_choice scoring. Correct iff the
+        student's selected set is EXACTLY the set of correct options —
+        every correct option chosen, and no incorrect one chosen
+        (standard multi-select grading, not partial credit). Returns
+        None (unanswered) only for a genuinely empty selection, mirroring
+        _check_option's None-for-unanswered convention above."""
+        if not selected_options:
+            return None
+        all_options = self.option_repo.list_for_question(question_id)
+        valid_ids = {o.id for o in all_options}
+        for option_id in selected_options:
+            if option_id not in valid_ids:
+                raise InvalidOptionReferenceException("Tanlangan variant bu savolga tegishli emas")
+        correct_ids = {o.id for o in all_options if o.is_correct}
+        return set(selected_options) == correct_ids
 
     def _auto_finish_if_expired(self, attempt: TestAttempt) -> None:
         """Lazy expiration — see docs/Sprint6_TestEngine_Architecture.md

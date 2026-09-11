@@ -38,8 +38,16 @@ def mock_storage():
 
 
 @pytest.fixture
-def service(mock_repo, mock_image_repo, mock_video_repo, mock_document_repo, mock_storage):
-    return UploadService(mock_repo, mock_image_repo, mock_video_repo, mock_document_repo, mock_storage)
+def mock_lesson_repo():
+    """Sprint 27 addition — not used by any pre-existing test in this
+    file (none of them pass a lesson_id), only present so the
+    constructor call below matches UploadService's real signature."""
+    return MagicMock()
+
+
+@pytest.fixture
+def service(mock_repo, mock_image_repo, mock_video_repo, mock_document_repo, mock_storage, mock_lesson_repo):
+    return UploadService(mock_repo, mock_image_repo, mock_video_repo, mock_document_repo, mock_storage, mock_lesson_repo)
 
 
 def test_upload_rejects_unsupported_type(service):

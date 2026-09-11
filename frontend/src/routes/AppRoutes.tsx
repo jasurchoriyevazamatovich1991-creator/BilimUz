@@ -27,6 +27,7 @@ import { GradeFormPage } from "@/pages/admin/GradeFormPage";
 import { TopicsListPage } from "@/pages/admin/TopicsListPage";
 import { TopicFormPage } from "@/pages/admin/TopicFormPage";
 import { LessonsListPage } from "@/pages/admin/LessonsListPage";
+import { AdminFilesPage } from "@/pages/admin/FilesPage";
 import { LessonFormPage } from "@/pages/admin/LessonFormPage";
 import { TestsListPage } from "@/pages/admin/TestsListPage";
 import { TestFormPage } from "@/pages/admin/TestFormPage";
@@ -37,6 +38,12 @@ import { TeacherSubjectsPage } from "@/pages/teacher/SubjectsPage";
 import { TeacherGradesPage } from "@/pages/teacher/GradesPage";
 import { StudentDashboardPage } from "@/pages/student/DashboardPage";
 import { StudentTestsListPage } from "@/pages/student/TestsListPage";
+import { StudentSubjectsPage } from "@/pages/student/SubjectsPage";
+import { StudentSubjectGradesPage } from "@/pages/student/SubjectGradesPage";
+import { StudentSubjectGradeTopicsPage } from "@/pages/student/SubjectGradeTopicsPage";
+import { TopicLessonsPage } from "@/pages/student/TopicLessonsPage";
+import { StudentLessonsPage } from "@/pages/student/LessonsPage";
+import { LessonDetailPage } from "@/pages/student/LessonDetailPage";
 import { StudentTestDetailPage } from "@/pages/student/TestDetailPage";
 import { AttemptPage } from "@/pages/student/AttemptPage";
 import { ResultPage } from "@/pages/student/ResultPage";
@@ -107,6 +114,7 @@ export function AppRoutes() {
           <Route path="/admin/lessons" element={<LessonsListPage />} />
           <Route path="/admin/lessons/new" element={<LessonFormPage />} />
           <Route path="/admin/lessons/:lessonId" element={<LessonFormPage />} />
+          <Route path="/admin/files" element={<AdminFilesPage />} />
           <Route path="/admin/tests" element={<TestsListPage />} />
           <Route path="/admin/tests/new" element={<TestFormPage />} />
           <Route path="/admin/tests/:testId" element={<TestFormPage />} />
@@ -123,6 +131,7 @@ export function AppRoutes() {
             "/admin/grades",
             "/admin/topics",
             "/admin/lessons",
+            "/admin/files",
             "/admin/tests",
           ])}
         </Route>
@@ -161,6 +170,12 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute allowedPanel="student" />}>
         <Route element={<StudentLayout />}>
           <Route path="/student" element={<StudentDashboardPage />} />
+          <Route path="/student/subjects" element={<StudentSubjectsPage />} />
+          <Route path="/student/subjects/:subjectId/grades" element={<StudentSubjectGradesPage />} />
+          <Route path="/student/subjects/:subjectId/grades/:gradeId/topics" element={<StudentSubjectGradeTopicsPage />} />
+          <Route path="/student/topics/:topicId/lessons" element={<TopicLessonsPage />} />
+          <Route path="/student/lessons" element={<StudentLessonsPage />} />
+          <Route path="/student/lessons/:lessonId" element={<LessonDetailPage />} />
           <Route path="/student/tests" element={<StudentTestsListPage />} />
           <Route path="/student/tests/:testId" element={<StudentTestDetailPage />} />
           <Route path="/student/tests/:testId/attempt/:attemptId" element={<AttemptPage />} />
@@ -168,7 +183,13 @@ export function AppRoutes() {
           <Route path="/student/certificates" element={<CertificatesListPage />} />
           <Route path="/student/certificates/:certificateId" element={<CertificateDetailPage />} />
           <Route path="/student/notifications" element={<NotificationsPage />} />
-          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", ["/student/tests", "/student/certificates", "/student/notifications"])}
+          {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", [
+            "/student/tests",
+            "/student/certificates",
+            "/student/notifications",
+            "/student/subjects",
+            "/student/lessons",
+          ])}
         </Route>
       </Route>
     </Routes>

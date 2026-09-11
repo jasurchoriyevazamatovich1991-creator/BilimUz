@@ -23,6 +23,17 @@ class Upload(Base, UUIDPrimaryKeyMixin, TimestampMixin, StatusMixin):
     __tablename__ = "uploads"
 
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # Sprint 27 — the only new column. Nullable: a personal (non-lesson)
+    # upload keeps working exactly as before. See migration 0004 for the
+    # ON DELETE SET NULL rationale.
+    lesson_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True,
+    )
+    # Sprint 27 Amendment (2GB video + multipart) — R2's own multipart
+    # session identifier. NULL for every non-multipart upload (the
+    # original synchronous flow and the single-PUT presigned flow both
+    # never set this).
+    multipart_upload_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_url: Mapped[str] = mapped_column(Text, nullable=False)
     file_type: Mapped[str] = mapped_column(String(30), nullable=False)

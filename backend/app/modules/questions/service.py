@@ -15,6 +15,7 @@ from app.modules.questions.exceptions import (
     MediaNotFoundException,
     OptionNotFoundException,
     QuestionNotFoundException,
+    UploadNotFoundForMediaException,
 )
 from app.modules.questions.models import Question, QuestionMedia, QuestionOption
 from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
@@ -27,6 +28,7 @@ from app.modules.questions.schemas import (
     QuestionUpdateRequest,
 )
 from app.modules.tests.repository import TestRepository
+from app.modules.uploads.repository import UploadRepository
 
 
 class QuestionService:
@@ -151,15 +153,47 @@ class OptionService:
 
 
 class MediaService:
-    def __init__(self, repository: MediaRepository, question_repository: QuestionRepository):
+    def __init__(
+        self,
+        repository: MediaRepository,
+        question_repository: QuestionRepository,
+        option_repository: OptionRepository,
+        upload_repository: UploadRepository,
+    ):
         self.repo = repository
         self.question_repo = question_repository
+        self.option_repo = option_repository
+        self.upload_repo = upload_repository
 
     def add_media(self, question_id: uuid.UUID, data: MediaCreateRequest, actor_id: uuid.UUID) -> QuestionMedia:
         if self.question_repo.get_by_id(question_id) is None:
             raise QuestionNotFoundException("Savol topilmadi")
 
-        media = QuestionMedia(question_id=question_id, media_type=data.media_type, file_url=data.file_url, created_by=actor_id)
+        if data.option_id is not None:
+            option = self.option_repo.get_by_id(data.option_id)
+            if option is None or option.question_id != question_id:
+                raise OptionNotFoundException("Ko'rsatilgan variant (option_id) bu savolga tegishli emas")
+
+        file_url = data.file_url
+        upload_id = data.upload_id
+        if data.upload_id is not None:
+            # Sprint 32 — the real, R2-backed path. `Upload.file_url`
+            # for an R2-backed row is the OBJECT KEY, not a directly
+            # browsable URL (matches Sprint 27's private-bucket design
+            # exactly) — the frontend must call GET /uploads/{id}/
+            # view-url for a real, short-lived signed URL rather than
+            # treating this stored value as browsable. Stored here only
+            # to satisfy the existing NOT NULL file_url column and for
+            # backward-compatible display of legacy (non-R2) rows.
+            upload = self.upload_repo.get_by_id(data.upload_id)
+            if upload is None:
+                raise UploadNotFoundForMediaException("Ko'rsatilgan fayl (upload_id) topilmadi")
+            file_url = upload.file_url
+
+        media = QuestionMedia(
+            question_id=question_id, option_id=data.option_id, media_type=data.media_type,
+            file_url=file_url, upload_id=upload_id, created_by=actor_id,
+        )
         self.repo.create(media)
         self.repo.db.commit()
         return media

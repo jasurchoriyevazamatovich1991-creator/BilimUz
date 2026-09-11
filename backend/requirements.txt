@@ -13,3 +13,15 @@ python-multipart==0.0.12
 redis==5.1.1
 pytest==8.3.3
 httpx==0.27.2
+# Sprint 27 — R2 Media Storage. R2 exposes an S3-compatible API; boto3
+# is the standard, well-audited client for it rather than a bespoke
+# AWS Signature V4 implementation. Only imported lazily inside
+# R2Storage (see uploads/storage.py) — an environment with
+# STORAGE_BACKEND=local never needs it importable at all.
+boto3==1.35.36
+# Sprint 32 — server-side HTML sanitization for rich-text question/
+# option/explanation content (allowlist-based, strips scripts/handlers/
+# unsafe tags before anything is ever persisted). The standard,
+# well-audited choice for this rather than a bespoke regex-based
+# sanitizer, which is a well-known way to introduce XSS bypasses.
+bleach==6.1.0

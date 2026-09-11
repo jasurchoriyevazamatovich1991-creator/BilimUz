@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.modules.questions.constants import ALLOWED_DIFFICULTY_LEVELS, ALLOWED_MEDIA_TYPES, ALLOWED_QUESTION_TYPES
 from app.modules.questions.validators import (
+    sanitize_rich_text,
     validate_media_url,
     validate_option_set,
     validate_option_text,
@@ -49,7 +50,17 @@ class OptionOut(BaseModel):
 
 class MediaCreateRequest(BaseModel):
     media_type: str
-    file_url: str
+    # Sprint 32: file_url is now OPTIONAL — upload_id is the preferred
+    # path (a REAL, R2-backed, ownership-checked Upload row). The
+    # ORIGINAL raw-URL endpoint had no ownership/authorization check
+    # on file_url whatsoever (see Sprint 32 audit) — kept only for
+    # backward compatibility with any existing callers, not recommended
+    # for new content.
+    file_url: str | None = None
+    upload_id: uuid.UUID | None = None
+    # Sprint 32, Phase 7 — when set, this media belongs to that specific
+    # option rather than the question as a whole.
+    option_id: uuid.UUID | None = None
 
     @field_validator("media_type")
     @classmethod
@@ -60,15 +71,23 @@ class MediaCreateRequest(BaseModel):
 
     @field_validator("file_url")
     @classmethod
-    def _url(cls, v: str) -> str:
-        return validate_media_url(v)
+    def _url(cls, v: str | None) -> str | None:
+        return validate_media_url(v) if v else v
+
+    @model_validator(mode="after")
+    def _one_real_source(self) -> "MediaCreateRequest":
+        if not self.file_url and not self.upload_id:
+            raise ValueError("file_url yoki upload_id ko'rsatilishi shart")
+        return self
 
 
 class MediaOut(BaseModel):
     id: uuid.UUID
     question_id: uuid.UUID
+    option_id: uuid.UUID | None
     media_type: str
     file_url: str
+    upload_id: uuid.UUID | None
 
     model_config = {"from_attributes": True}
 
@@ -88,6 +107,15 @@ class QuestionCreateRequest(BaseModel):
     @classmethod
     def _text(cls, v: str) -> str:
         return validate_question_text(v)
+
+    @field_validator("explanation")
+    @classmethod
+    def _explanation(cls, v: str | None) -> str | None:
+        # Sprint 32 — explanation had no sanitization at all before this
+        # (unlike question_text/option_text, which already went through
+        # validate_question_text/validate_option_text). Rendered to
+        # students during result review, so it's a real XSS surface.
+        return sanitize_rich_text(v) if v else v
 
     @field_validator("question_type")
     @classmethod
@@ -125,6 +153,11 @@ class QuestionUpdateRequest(BaseModel):
     @classmethod
     def _text(cls, v: str | None) -> str | None:
         return validate_question_text(v) if v is not None else None
+
+    @field_validator("explanation")
+    @classmethod
+    def _explanation(cls, v: str | None) -> str | None:
+        return sanitize_rich_text(v) if v else v
 
     @field_validator("score")
     @classmethod

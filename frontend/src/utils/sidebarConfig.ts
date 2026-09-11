@@ -28,6 +28,9 @@ export const ADMIN_ITEMS: SidebarItem[] = [
   { label: "Sinflar", path: "/admin/grades" },
   { label: "Mavzular", path: "/admin/topics" },
   { label: "Darslar", path: "/admin/lessons" },
+  // Sprint 27 addition — real media/file management (own uploads,
+  // see FilesPage.tsx's docstring for the exact backend scope).
+  { label: "Fayllar", path: "/admin/files" },
   { label: "Testlar", path: "/admin/tests" },
   { label: "Savollar", path: "/admin/questions" },
   { label: "Natijalar", path: "/admin/results" },

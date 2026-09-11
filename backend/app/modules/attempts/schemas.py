@@ -17,6 +17,12 @@ class StartAttemptRequest(BaseModel):
 class SaveAnswerRequest(BaseModel):
     question_id: uuid.UUID
     selected_option: uuid.UUID | None = None
+    # Sprint 30 — additive, for multiple_choice questions only. A
+    # request should set exactly one of selected_option/selected_options
+    # depending on the question's question_type (enforced in the
+    # service, not here — this schema stays a plain, permissive DTO
+    # matching the existing style).
+    selected_options: list[uuid.UUID] | None = None
 
 
 class OptionForAttemptOut(BaseModel):
@@ -44,6 +50,7 @@ class AnsweredQuestionState(BaseModel):
     question_id: uuid.UUID
     is_answered: bool
     selected_option: uuid.UUID | None = None
+    selected_options: list[uuid.UUID] | None = None
 
 
 class AttemptOut(BaseModel):

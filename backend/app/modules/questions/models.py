@@ -51,7 +51,18 @@ class QuestionMedia(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, Statu
     __tablename__ = "question_media"
 
     question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("questions.id", ondelete="CASCADE"), nullable=False)
+    # Sprint 32 — additive. NULL means this media belongs to the option
+    # specified (option-level media, Phase 7); set means it belongs to
+    # the question as a whole (existing, unchanged default behavior).
+    option_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("question_options.id", ondelete="CASCADE"), nullable=True,
+    )
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     file_url: Mapped[str] = mapped_column(Text, nullable=False)
+    # Sprint 32 — additive. When set, this media is a REAL, R2-backed
+    # Upload row (signed-URL access, ownership-checked) rather than an
+    # arbitrary client-supplied URL. NULL for legacy rows / the
+    # existing raw-file_url path, kept for backward compatibility.
+    upload_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True)
 
     question: Mapped["Question"] = relationship(back_populates="media")
