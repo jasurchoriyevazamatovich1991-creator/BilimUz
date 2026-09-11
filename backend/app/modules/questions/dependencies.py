@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
 from app.modules.questions.service import MediaService, OptionService, QuestionService
 from app.modules.tests.repository import TestRepository
+from app.modules.uploads.repository import UploadRepository
 
 
 def get_question_repository(db: Session = Depends(get_db)) -> QuestionRepository:
@@ -37,5 +38,7 @@ def get_media_repository(db: Session = Depends(get_db)) -> MediaRepository:
 def get_media_service(
     repo: MediaRepository = Depends(get_media_repository),
     q_repo: QuestionRepository = Depends(get_question_repository),
+    opt_repo: OptionRepository = Depends(get_option_repository),
+    db: Session = Depends(get_db),
 ) -> MediaService:
-    return MediaService(repo, q_repo)
+    return MediaService(repo, q_repo, opt_repo, UploadRepository(db))

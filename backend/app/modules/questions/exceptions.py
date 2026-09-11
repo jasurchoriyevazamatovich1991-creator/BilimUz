@@ -20,6 +20,13 @@ class MediaNotFoundException(AppException):
     error_code = "MEDIA_NOT_FOUND"
 
 
+class UploadNotFoundForMediaException(AppException):
+    """Sprint 32 — raised when attaching media to a question/option
+    references an upload_id that doesn't exist."""
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "UPLOAD_NOT_FOUND_FOR_MEDIA"
+
+
 class InvalidTestReferenceException(AppException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code = "INVALID_TEST_REFERENCE"

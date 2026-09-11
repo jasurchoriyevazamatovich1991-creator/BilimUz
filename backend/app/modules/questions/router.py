@@ -172,8 +172,12 @@ def delete_option(
 @router.post(
     "/{question_id}/media",
     status_code=status.HTTP_201_CREATED,
-    summary="Attach media to a question",
-    description="media_type: image, audio, video, or formula. file_url must be an already-hosted http(s) URL.",
+    summary="Attach media to a question or a specific option",
+    description="media_type: image, audio, video, or formula. Provide either `upload_id` (preferred — a real, "
+                "R2-backed Upload row this actor owns; use GET /uploads/{id}/view-url separately to get a real "
+                "signed URL for display) or `file_url` (legacy — an already-hosted http(s) URL, kept for "
+                "backward compatibility only). Optional `option_id` attaches media to that specific option "
+                "instead of the question as a whole.",
 )
 def add_media(
     question_id: uuid.UUID,
