@@ -61,14 +61,19 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 27 — Cloudflare R2 Media Storage | Private R2 arxitekturasi, presigned upload, xavfsiz signed view URL, fayl metadata PostgreSQL'da, Admin file manager asosi, Lesson↔media integratsiyasi, Teacher/Admin/Super Admin upload RBAC, 2GB videogacha multipart upload, browser→R2 to'g'ridan-to'g'ri yuklash, haqiqiy progress, retry/cancel. 71 backend upload testi, 252 frontend testi, build/TypeScript PASS | ✅ Yakunlandi |
 | Sprint 28 — Full System Audit | Faqat audit. Backend: 384 passed, 6 eski (oldindan mavjud) xato, 3 modul collection muammosi. Frontend: 252/252 PASS, TypeScript/build PASS. Umumiy ball: 68/100. Kritik topilma **G-01**: eski `POST /uploads` orqali katta videoning RAM'ga to'liq o'qilish xavfi. Shuningdek qayd etilgan: **G-03** — `multiple_choice` bir nechta javobni qo'llamaydi; Progress tizimi yo'q; Results history yo'q; real PostgreSQL/R2 E2E test muhiti yo'q; README eskirganligi | ✅ Yakunlandi (audit) |
 | Sprint 29 — Legacy Upload Security Fix | Sprint 28'da aniqlangan **G-01** tuzatildi: eski `POST /uploads` uchun video limiti 20 MB qilib belgilandi, haqiqiy stream hajmi bounded/chunked read orqali tekshiriladi (mijoz e'lon qilgan hajmga ko'r-ko'rona ishonilmaydi). R2/presigned/multipart videoning 2 GB limiti **o'zgarishsiz** qoldi. 9 yangi test, `uploads` moduli 80/80 PASS, to'liq backend 393 passed (6 eski xato/3 collection muammosi o'zgarishsiz), frontend 252/252 PASS, TypeScript/build/`py_compile` PASS. Migratsiya talab qilinmadi | ✅ Yakunlandi |
+| Sprint 30 — Multiple Choice Multi-Answer Support | `Answer` modeliga **faqat qo'shimcha** (additive) `selected_options` (ARRAY UUID) ustuni qo'shildi — eski `selected_option` orqaga moslik uchun o'zgarishsiz saqlangan. `multiple_choice` uchun bir nechta variant tanlash endi qo'llab-quvvatlanadi, to'g'ri javob **exact set equality** orqali tekshiriladi (qisman ball yo'q), variant ID'lari tegishli savolga tegishliligi tasdiqlanadi. Migratsiya `0006`. Frontend editor integratsiyasi bu sprint doirasida qilinmadi | ✅ Yakunlandi (backend) |
+| Sprint 31 | — | ⬜ Rejalashtirilgan / boshlanmagan |
+| Sprint 32 — Media-Enabled Question Bank Backend Foundation | `QuestionMedia.upload_id` va `QuestionMedia.option_id` qo'shildi — mavjud R2/uploads infratuzilmasi bilan bog'landi (`upload_id` — afzal, real R2-asoslangan yo'l; `file_url` — legacy moslik uchun saqlangan). Question text, option text va explanation uchun `bleach==6.1.0` asosidagi allowlist rich-text sanitizatsiyasi qo'shildi — `script`, event-handler va `javascript:` kabi xavfli konstruksiyalar bloklanadi, haqiqiy https/http havolalar saqlanadi. Option-darajasidagi media qo'llab-quvvatlanadi. Migratsiya `0007`. 9/9 sanitizer test PASS, to'liq backend 402 passed (6 eski xato o'zgarishsiz), frontend 252/252 PASS, TypeScript/build/`py_compile` PASS. **Frontend Question Editor bu sprintda hali qurilmagan** | ✅ Yakunlandi (backend) |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-**Ochiq eslatma (Sprint 28/29 auditlarida tasdiqlangan, hali bajarilmagan ishlar)**:
+**Hozirgi reja — Sprint 33 (Question Editor Frontend)**: Status — **rejalashtirilgan / boshlanmagan**. Maqsad: Admin va Teacher uchun real Question Editor UI (rich text, formula/LaTeX, rasm/media yuklash — Sprint 32'da qurilgan R2 fundamentidan foydalanib, question va option media, preview, mavjud savolni tahrirlash, mavjud backend API'lar bilan integratsiya, RBAC, XSS-xavfsiz render). Kelajakda SAT/GRE/IELTS/Physics kabi turli savol formatlariga mos universal editor asosini yaratishi kerak. **Hali implement qilinmagan.**
 
-- Test to'plami (390+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
+**Ochiq eslatma (Sprint 28/29/30/32 auditlari va real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
+
+- Test to'plami (400+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
 - Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q).
-- `multiple_choice` savol turi — backend `SaveAnswerRequest.selected_option` hali ham bitta UUID, bir nechta javobni qo'llamaydi (Sprint 19'dan beri).
+- Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan. Frontend Question Editor va Student Attempt UI integratsiyasi alohida ish sifatida davom etadi.
 - **Student Progress** tizimi — umuman mavjud emas (model, endpoint, UI — yo'q).
 - **Results History** (natijalar tarixi ro'yxati) — Student uchun sahifa yo'q, faqat bitta natija ko'rish mavjud.
 - **Student Video Player** — mavjud emas, `Lesson.video` faqat xavfsiz tashqi havola sifatida ko'rsatiladi.
@@ -78,5 +83,17 @@ To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-
 - **Performance/code splitting** — frontend bitta ~540KB chunk, `React.lazy` qo'llanilmagan.
 - **`Lesson.order_number`** — jadvalda yo'q, darslar tartiblanmaydi.
 - **`Test.max_attempts`** — konfiguratsiya qilinmaydi, backend konstantasi orqali qattiq `1`ga belgilangan.
+- **Question Editor (frontend)** — Sprint 32'da faqat backend fundamenti (media/sanitizatsiya) qurildi, UI Sprint 33'ga rejalashtirilgan, hali boshlanmagan.
+
+**Loyiha holati — qisqa xulosa**:
+
+| Sohasi | Holat |
+|---|---|
+| Backend | Barqaror, modulli, 400+ test (mock-asoslangan) |
+| Frontend | Admin/Student panellari to'liq, Teacher qisman, Question Editor yo'q |
+| Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; real E2E sinov yo'q |
+| Question Engine | Multi-answer (backend) + media/sanitizatsiya fundamenti bor; rich-text editor UI yo'q |
+| International Exams (SAT/IELTS/GRE) | Rejalashtirilmagan, kod darajasida mavjud emas |
+| Student/Teacher/Admin | Student — asosiy oqim ishlaydi (Progress/tarix yo'q); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
