@@ -35,13 +35,17 @@ export interface OptionUpdateRequest {
 export interface MediaOut {
   id: string;
   question_id: string;
+  option_id: string | null;
   media_type: string;
   file_url: string;
+  upload_id: string | null;
 }
 
 export interface MediaCreateRequest {
   media_type: string;
-  file_url: string;
+  file_url?: string;
+  upload_id?: string;
+  option_id?: string;
 }
 
 export interface QuestionOut {

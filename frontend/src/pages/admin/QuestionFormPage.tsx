@@ -26,6 +26,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { RichTextEditor } from "@/components/questions/RichTextEditor";
+import { QuestionPreview } from "@/components/questions/QuestionPreview";
+import { FileUploader } from "@/components/uploads/FileUploader";
 import {
   useQuestion,
   useCreateQuestion,
@@ -36,10 +39,14 @@ import {
   type MediaDiff,
 } from "@/hooks/useQuestions";
 import { useAuthStore } from "@/store/authStore";
-import type { OptionOut, MediaOut } from "@/api/questions";
+import { questionsApi, type OptionOut, type MediaOut } from "@/api/questions";
 
 const CHOICE_TYPES = ["single_choice", "multiple_choice", "true_false"];
-const MEDIA_TYPES = ["image", "audio", "video", "formula"];
+// Sprint 33 limitation: FileUploader's onSuccess only returns the new
+// upload_id, not the file's detected MIME/type — every upload here is
+// tagged media_type="image" (the common case for question media).
+// Selecting audio/video/formula explicitly is deferred; documented in
+// the final report rather than building a guessing heuristic.
 
 interface LocalOption {
   localId: string;
@@ -53,6 +60,8 @@ interface LocalMedia {
   id?: string;
   media_type: string;
   file_url: string;
+  upload_id?: string; // Sprint 33 — the real, R2-backed path (preferred over file_url)
+  option_id?: string; // Sprint 33, Phase 6 — set when this media belongs to a specific option, not the question as a whole
 }
 
 function newLocalId() {
@@ -83,6 +92,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
   const [originalOptions, setOriginalOptions] = useState<OptionOut[]>([]);
   const [media, setMedia] = useState<LocalMedia[]>([]);
   const [originalMedia, setOriginalMedia] = useState<MediaOut[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -98,7 +108,12 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
       setOriginalOptions(question.options);
       setOptions(question.options.map((o) => ({ localId: newLocalId(), id: o.id, option_text: o.option_text, is_correct: o.is_correct })));
       setOriginalMedia(question.media);
-      setMedia(question.media.map((m) => ({ localId: newLocalId(), id: m.id, media_type: m.media_type, file_url: m.file_url })));
+      setMedia(
+        question.media.map((m) => ({
+          localId: newLocalId(), id: m.id, media_type: m.media_type, file_url: m.file_url,
+          upload_id: m.upload_id ?? undefined, option_id: m.option_id ?? undefined,
+        })),
+      );
     }
   }, [question]);
 
@@ -140,16 +155,12 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
     );
   }
 
-  function addMediaRow() {
-    setMedia((prev) => [...prev, { localId: newLocalId(), media_type: "image", file_url: "" }]);
+  function handleMediaUploaded(uploadId: string, mediaType: string, optionId?: string) {
+    setMedia((prev) => [...prev, { localId: newLocalId(), media_type: mediaType, file_url: "", upload_id: uploadId, option_id: optionId }]);
   }
 
   function removeMediaRow(localId: string) {
     setMedia((prev) => prev.filter((m) => m.localId !== localId));
-  }
-
-  function updateMediaField(localId: string, field: "media_type" | "file_url", value: string) {
-    setMedia((prev) => prev.map((m) => (m.localId === localId ? { ...m, [field]: value } : m)));
   }
 
   /** Mirrors the backend's validate_option_set exactly — checked on
@@ -184,7 +195,9 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
   }
 
   function computeMediaDiff(): MediaDiff {
-    const toAdd = media.filter((m) => !m.id).map((m) => ({ media_type: m.media_type, file_url: m.file_url }));
+    const toAdd = media
+      .filter((m) => !m.id)
+      .map((m) => ({ media_type: m.media_type, upload_id: m.upload_id, file_url: m.upload_id ? undefined : m.file_url, option_id: m.option_id }));
     const currentIds = new Set(media.filter((m) => m.id).map((m) => m.id));
     const toDelete = originalMedia.filter((m) => !currentIds.has(m.id)).map((m) => m.id);
     return { toAdd, toDelete };
@@ -198,6 +211,16 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
     // here rather than a blind `!`, since this is the actual point test_id
     // is used (only on the create branch below).
     if (!testId) return;
+
+    // RichTextEditor is a contentEditable div, not a native form input —
+    // it doesn't participate in the browser's own `required` validation
+    // (which the original plain <textarea> relied on), so this check
+    // replaces that lost behavior explicitly.
+    const plainQuestionText = questionText.replace(/<[^>]*>/g, "").trim();
+    if (plainQuestionText.length < 3) {
+      setOptionsError("Savol matni kamida 3 belgidan iborat bo'lishi kerak");
+      return;
+    }
 
     const validationMessage = validateOptions();
     if (validationMessage) {
@@ -229,7 +252,21 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
           explanation: explanation || undefined,
           options: showOptions ? options.map((o) => ({ option_text: o.option_text, is_correct: o.is_correct })) : undefined,
         },
-        { onSuccess: () => navigate(`${basePath}/tests/${testId}/questions`) },
+        {
+          onSuccess: async (createdQuestion) => {
+            // QuestionCreateRequest has no nested media field (verified
+            // against the real backend schema) — any media staged
+            // before the question existed is applied here, directly,
+            // using the question's real new id. Sequential (not
+            // parallel), same reasoning as useSaveQuestionOptionsAndMedia.
+            for (const m of media) {
+              await questionsApi.addMedia(createdQuestion.id, {
+                media_type: m.media_type, upload_id: m.upload_id, option_id: m.option_id,
+              });
+            }
+            navigate(`${basePath}/tests/${testId}/questions`);
+          },
+        },
       );
     }
   }
@@ -252,26 +289,34 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
       </button>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{!canWrite ? "Savol ma'lumotlari" : isEditMode ? "Savolni tahrirlash" : "Yangi savol"}</CardTitle>
+          <button type="button" onClick={() => setShowPreview((p) => !p)} className="text-sm text-primary hover:underline">
+            {showPreview ? "Tahrirlashga qaytish" : "Ko'rib chiqish (Preview)"}
+          </button>
         </CardHeader>
         <CardContent>
+          {showPreview ? (
+            <QuestionPreview
+              questionText={questionText}
+              questionType={questionType}
+              options={options}
+              media={media}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {optionsError ? (
               <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive">{optionsError}</div>
             ) : null}
 
             <div>
-              <label htmlFor="questionText" className="mb-1 block text-sm font-medium text-foreground">Savol matni</label>
-              <textarea
-                id="questionText"
+              <label className="mb-1 block text-sm font-medium text-foreground">Savol matni</label>
+              <RichTextEditor
                 value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                required
-                minLength={3}
+                onChange={setQuestionText}
+                placeholder="Savol matnini kiriting..."
+                ariaLabel="Savol matni"
                 disabled={!canWrite}
-                rows={3}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
               />
             </div>
 
@@ -308,14 +353,14 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
             </div>
 
             <div>
-              <label htmlFor="explanation" className="mb-1 block text-sm font-medium text-foreground">Izoh (ixtiyoriy)</label>
-              <textarea
-                id="explanation"
+              <label className="mb-1 block text-sm font-medium text-foreground">Izoh (ixtiyoriy)</label>
+              <RichTextEditor
                 value={explanation}
-                onChange={(e) => setExplanation(e.target.value)}
+                onChange={setExplanation}
+                placeholder="Izoh (ixtiyoriy)..."
+                ariaLabel="Izoh"
                 disabled={!canWrite}
-                rows={2}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                minHeightClassName="min-h-[80px]"
               />
             </div>
 
@@ -340,74 +385,78 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
                     </button>
                   ) : null}
                 </div>
-                <div className="space-y-2">
-                  {options.map((option) => (
-                    <div key={option.localId} className="flex items-center gap-2">
-                      <input
-                        type={isSingleCorrect ? "radio" : "checkbox"}
-                        name="correct-option"
-                        checked={option.is_correct}
-                        onChange={() => toggleOptionCorrect(option.localId)}
-                        disabled={!canWrite}
-                        aria-label="To'g'ri variant"
-                        className="accent-primary"
-                      />
-                      <Input
-                        value={option.option_text}
-                        onChange={(e) => updateOptionText(option.localId, e.target.value)}
-                        placeholder="Variant matni"
-                        disabled={!canWrite}
-                        className="flex-1"
-                      />
-                      {canWrite ? (
-                        <button type="button" onClick={() => removeOptionRow(option.localId)} className="text-sm text-destructive hover:underline">
-                          O'chirish
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {options.map((option, index) => {
+                    const optionMedia = option.id ? media.filter((m) => m.option_id === option.id) : [];
+                    return (
+                      <div key={option.localId} className="rounded-md border border-border p-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type={isSingleCorrect ? "radio" : "checkbox"}
+                            name="correct-option"
+                            checked={option.is_correct}
+                            onChange={() => toggleOptionCorrect(option.localId)}
+                            disabled={!canWrite}
+                            aria-label="To'g'ri variant"
+                            className="accent-primary"
+                          />
+                          <div className="flex-1">
+                            <RichTextEditor
+                              value={option.option_text}
+                              onChange={(html) => updateOptionText(option.localId, html)}
+                              placeholder="Variant matni"
+                              ariaLabel={`Variant matni ${index + 1}`}
+                              disabled={!canWrite}
+                              minHeightClassName="min-h-[44px]"
+                            />
+                          </div>
+                          {canWrite ? (
+                            <button type="button" onClick={() => removeOptionRow(option.localId)} className="text-sm text-destructive hover:underline">
+                              O'chirish
+                            </button>
+                          ) : null}
+                        </div>
+                        {optionMedia.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-2 pl-7">
+                            {optionMedia.map((m) => (
+                              <span key={m.localId} className="rounded bg-primary/10 px-2 py-1 text-xs text-primary">
+                                {m.media_type} {canWrite ? (
+                                  <button type="button" onClick={() => removeMediaRow(m.localId)} className="ml-1 text-destructive">×</button>
+                                ) : null}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {canWrite && option.id ? (
+                          <div className="mt-2 pl-7">
+                            <FileUploader onSuccess={(uploadId) => handleMediaUploaded(uploadId, "image", option.id)} />
+                          </div>
+                        ) : canWrite ? (
+                          <p className="mt-2 pl-7 text-xs text-foreground/50">
+                            Rasm biriktirish uchun avval variantni saqlang.
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
 
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">Media (ixtiyoriy)</span>
-                {canWrite ? (
-                  <button type="button" onClick={addMediaRow} className="text-sm text-primary hover:underline">
-                    + Media qo'shish
-                  </button>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                {media.map((item) => (
-                  <div key={item.localId} className="flex items-center gap-2">
-                    <select
-                      value={item.media_type}
-                      onChange={(e) => updateMediaField(item.localId, "media_type", e.target.value)}
-                      disabled={!canWrite}
-                      className="rounded-md border border-border bg-background px-2 py-2 text-sm disabled:opacity-60"
-                    >
-                      {MEDIA_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                    <Input
-                      type="url"
-                      value={item.file_url}
-                      onChange={(e) => updateMediaField(item.localId, "file_url", e.target.value)}
-                      placeholder="https://..."
-                      disabled={!canWrite}
-                      className="flex-1"
-                    />
-                    {canWrite ? (
-                      <button type="button" onClick={() => removeMediaRow(item.localId)} className="text-sm text-destructive hover:underline">
-                        O'chirish
-                      </button>
+              <span className="mb-2 block text-sm font-medium text-foreground">Savol mediasi (ixtiyoriy)</span>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {media.filter((m) => !m.option_id).map((item) => (
+                  <span key={item.localId} className="rounded bg-primary/10 px-2 py-1 text-xs text-primary">
+                    {item.media_type} {canWrite ? (
+                      <button type="button" onClick={() => removeMediaRow(item.localId)} className="ml-1 text-destructive">×</button>
                     ) : null}
-                  </div>
+                  </span>
                 ))}
               </div>
+              {canWrite ? (
+                <FileUploader onSuccess={(uploadId) => handleMediaUploaded(uploadId, "image")} />
+              ) : null}
             </div>
 
             {canWrite ? (
@@ -423,6 +472,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
               </div>
             ) : null}
           </form>
+          )}
         </CardContent>
       </Card>
 
