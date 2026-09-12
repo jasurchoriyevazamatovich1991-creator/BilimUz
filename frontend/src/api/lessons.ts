@@ -17,6 +17,7 @@ export interface LessonOut {
   topic_id: string;
   title: string;
   video: string | null;
+  video_upload_id: string | null;
   pdf: string | null;
   content: string | null;
   status: string;
@@ -44,6 +45,7 @@ export interface LessonCreateRequest {
 export interface LessonUpdateRequest {
   title?: string;
   video?: string;
+  video_upload_id?: string | null;
   pdf?: string;
   content?: string;
   status?: string;

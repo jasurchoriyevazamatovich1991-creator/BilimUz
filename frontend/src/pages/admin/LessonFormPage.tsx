@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { FileUploader } from "@/components/uploads/FileUploader";
 import { useLesson, useCreateLesson, useUpdateLesson, useDeleteLesson } from "@/hooks/useLessons";
 import { useTopicsList } from "@/hooks/useTopics";
 import { useAuthStore } from "@/store/authStore";
@@ -150,7 +151,7 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required minLength={2} disabled={!canWrite} />
             </div>
             <div>
-              <label htmlFor="video" className="mb-1 block text-sm font-medium text-foreground">Video URL (ixtiyoriy)</label>
+              <label htmlFor="video" className="mb-1 block text-sm font-medium text-foreground">Video URL (ixtiyoriy, eski usul)</label>
               <Input
                 id="video"
                 type="url"
@@ -160,6 +161,20 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
                 disabled={!canWrite}
               />
             </div>
+            {isEditMode && lessonId ? (
+              <div>
+                <span className="mb-1 block text-sm font-medium text-foreground">Video (R2 orqali yuklash)</span>
+                {lesson?.video_upload_id ? (
+                  <p className="mb-2 text-xs text-success">✓ R2 video yuklangan — ustunlik shu videoga beriladi</p>
+                ) : null}
+                {canWrite ? (
+                  <FileUploader
+                    lessonId={lessonId}
+                    onSuccess={(uploadId) => updateLesson.mutate({ video_upload_id: uploadId })}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <div>
               <label htmlFor="pdf" className="mb-1 block text-sm font-medium text-foreground">PDF URL (ixtiyoriy)</label>
               <Input

@@ -21,7 +21,7 @@ function renderPage() {
 describe("StudentLessonsPage (flat 'Darslar' entry)", () => {
   it("loads and shows a lesson on success", async () => {
     vi.mocked(lessonsApi.list).mockResolvedValue({
-      items: [{ id: "l1", topic_id: "t1", title: "Kasrlar", video: null, pdf: null, content: null, status: "active", created_at: "", updated_at: "" }],
+      items: [{ id: "l1", topic_id: "t1", title: "Kasrlar", video: null, video_upload_id: null, pdf: null, content: null, status: "active", created_at: "", updated_at: "" }],
       meta: { page: 1, per_page: 20, total: 1, total_pages: 1 },
     });
     renderPage();

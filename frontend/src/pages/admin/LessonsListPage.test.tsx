@@ -22,7 +22,7 @@ function renderPage() {
 }
 
 const MOCK_LESSON = {
-  id: "l1", topic_id: "t1", title: "Kirish darsi", video: "https://x.com/v", pdf: null, content: null,
+  id: "l1", topic_id: "t1", title: "Kirish darsi", video: "https://x.com/v", video_upload_id: null, pdf: null, content: null,
   status: "active", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
 };
 

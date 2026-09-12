@@ -62,7 +62,7 @@ def test_get_lesson_raises_when_missing(service, mock_repo):
 
 def test_update_rejects_clearing_all_content(service, mock_repo):
     lesson_id = uuid.uuid4()
-    mock_repo.get_by_id.return_value = MagicMock(id=lesson_id, video=None, pdf=None, content="Faqat matn bor edi")
+    mock_repo.get_by_id.return_value = MagicMock(id=lesson_id, video=None, video_upload_id=None, pdf=None, content="Faqat matn bor edi")
     with pytest.raises(EmptyLessonContentException):
         service.update_lesson(lesson_id, LessonUpdateRequest(content=None), actor_id=uuid.uuid4())
 

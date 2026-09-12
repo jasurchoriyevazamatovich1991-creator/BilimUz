@@ -5,10 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LessonFormPage } from "./LessonFormPage";
 import { lessonsApi } from "@/api/lessons";
 import { topicsApi } from "@/api/topics";
+import { uploadsApi } from "@/api/uploads";
 import { useAuthStore } from "@/store/authStore";
 
 vi.mock("@/api/lessons");
 vi.mock("@/api/topics");
+vi.mock("@/api/uploads");
 
 function renderEditPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -34,7 +36,7 @@ describe("LessonFormPage", () => {
 
   it("approved decision 4: topic renders as plain read-only text, not a select, in edit mode", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: "https://x.com/v", pdf: null, content: null,
+      id: "l1", topic_id: "t1", title: "Kirish", video: "https://x.com/v", video_upload_id: null, pdf: null, content: null,
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -45,7 +47,7 @@ describe("LessonFormPage", () => {
 
   it("approved decision 3: submit is never blocked, but shows the exact required message when video/pdf/content are all empty", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, pdf: null, content: null,
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: null,
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -61,11 +63,11 @@ describe("LessonFormPage", () => {
 
   it("submits successfully when at least the content field is filled", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, pdf: null, content: "Matn bor",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "Matn bor",
       status: "active", created_at: "", updated_at: "",
     });
     vi.mocked(lessonsApi.update).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, pdf: null, content: "Matn bor",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "Matn bor",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -77,12 +79,67 @@ describe("LessonFormPage", () => {
 
   it("video and pdf inputs use type='url' (approved decision 2, native browser validation)", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
     await waitFor(() => expect(screen.getByText("1-mavzu")).toBeInTheDocument());
     expect(screen.getByLabelText(/video url/i)).toHaveAttribute("type", "url");
     expect(screen.getByLabelText(/pdf url/i)).toHaveAttribute("type", "url");
+  });
+
+  // --- Sprint 35: R2 video upload ---
+
+  it("edit mode: shows the R2 video upload section (real FileUploader)", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      status: "active", created_at: "", updated_at: "",
+    });
+    renderEditPage();
+    await waitFor(() => expect(screen.getByText("1-mavzu")).toBeInTheDocument());
+    expect(screen.getByText("Video (R2 orqali yuklash)")).toBeInTheDocument();
+  });
+
+  it("shows a confirmation note when an R2 video is already attached", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "u1", pdf: null, content: "x",
+      status: "active", created_at: "", updated_at: "",
+    });
+    renderEditPage();
+    await waitFor(() => expect(screen.getByText(/R2 video yuklangan/)).toBeInTheDocument());
+  });
+
+  it("a successful upload calls updateLesson with the new video_upload_id", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      status: "active", created_at: "", updated_at: "",
+    });
+    vi.mocked(lessonsApi.update).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "new-upload-1", pdf: null, content: "x",
+      status: "active", created_at: "", updated_at: "",
+    });
+    vi.mocked(uploadsApi.createPresignedUpload).mockResolvedValue({
+      upload_id: "new-upload-1", upload_url: "https://r2.example.com/put", required_headers: {},
+    });
+    vi.mocked(uploadsApi.putToPresignedUrl).mockResolvedValue(undefined);
+    vi.mocked(uploadsApi.finalize).mockResolvedValue({
+      id: "new-upload-1", user_id: "u1", lesson_id: "l1", file_name: "clip.mp4", file_type: "video",
+      size_bytes: 1000, status: "ready", created_at: "",
+    });
+
+    renderEditPage();
+    await waitFor(() => expect(screen.getByText("Video (R2 orqali yuklash)")).toBeInTheDocument());
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["x"], "clip.mp4", { type: "video/mp4" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(screen.getByText("Yuklash"));
+
+    await waitFor(() =>
+      expect(uploadsApi.createPresignedUpload).toHaveBeenCalledWith(expect.objectContaining({ lesson_id: "l1" })),
+    );
+    await waitFor(() =>
+      expect(lessonsApi.update).toHaveBeenCalledWith("l1", { video_upload_id: "new-upload-1" }),
+    );
   });
 });

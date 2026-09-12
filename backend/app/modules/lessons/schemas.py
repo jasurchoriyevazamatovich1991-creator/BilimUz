@@ -38,6 +38,13 @@ class LessonUpdateRequest(BaseModel):
     pdf: str | None = None
     content: str | None = None
     status: str | None = None
+    # Sprint 35 — additive. Set after a real R2 upload finalizes (the
+    # Lesson must already exist for this to be meaningful — matches
+    # why this is on Update, not Create). Omitting the field entirely
+    # leaves it unchanged (`exclude_unset=True` in the service);
+    # explicitly sending `null` clears it (removes the R2 video,
+    # falling back to the legacy `video` URL field if present).
+    video_upload_id: uuid.UUID | None = None
 
     @field_validator("title")
     @classmethod
@@ -62,6 +69,7 @@ class LessonOut(BaseModel):
     topic_id: uuid.UUID
     title: str
     video: str | None
+    video_upload_id: uuid.UUID | None
     pdf: str | None
     content: str | None
     status: str

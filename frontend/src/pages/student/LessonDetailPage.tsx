@@ -1,10 +1,20 @@
 /**
- * Sprint 27 scope boundary (explicit): `Lesson.video` is shown as a
- * plain, safe external link — NOT embedded, no YouTube/Vimeo provider
- * detection, no <video> tag, no player UI. Building a real player is
- * Sprint 28's job; this page does not exceed what `Lesson.video`
- * actually is today (a raw URL string, verified against
- * lessons/schemas.py).
+ * Sprint 27 scope boundary (original): `Lesson.video` was shown as a
+ * plain, safe external link only.
+ *
+ * Sprint 35: when `lesson.video_upload_id` is set, a real R2-backed
+ * video is preferred and rendered in a native HTML5 <video> player
+ * using a short-lived signed URL (GET /uploads/{id}/view-url — the
+ * exact same endpoint/authorization Sprint 27 already built; no new
+ * endpoint). The signed URL is fetched only when a video_upload_id
+ * actually exists (no wasted request otherwise) and is never persisted
+ * anywhere — it's held in React Query cache only, matching the
+ * existing query pattern, and simply refetched if it ever expires
+ * (no separate expiry-tracking logic needed).
+ *
+ * When `video_upload_id` is NULL, the legacy `Lesson.video` external
+ * link behavior is completely unchanged — full backward compatibility
+ * for every lesson created before this sprint.
  *
  * Test linkage: there is NO Test<->Lesson relationship on the backend
  * (verified again this sprint — TestListParams/TestOut have topic_id
@@ -19,10 +29,37 @@
  * active-attempt-check / Start-vs-Continue logic exactly as-is.
  */
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { useLesson } from "@/hooks/useLessons";
 import { useTestsList } from "@/hooks/useTests";
+import { uploadsApi } from "@/api/uploads";
+
+function LessonVideoPlayer({ uploadId }: { uploadId: string }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["uploads", "view-url", uploadId],
+    queryFn: () => uploadsApi.getViewUrl(uploadId),
+  });
+
+  if (isLoading) {
+    return <div className="flex aspect-video items-center justify-center rounded-md bg-muted text-sm text-foreground/50">Video yuklanmoqda...</div>;
+  }
+  if (isError || !data) {
+    return <ErrorState title="Video" />;
+  }
+
+  return (
+    <video
+      controls
+      preload="metadata"
+      className="aspect-video w-full rounded-md bg-black"
+      src={data.view_url}
+    >
+      Brauzeringiz video pleerni qo'llab-quvvatlamaydi.
+    </video>
+  );
+}
 
 export function LessonDetailPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
@@ -53,7 +90,12 @@ export function LessonDetailPage() {
         <CardContent className="space-y-4">
           {lesson.content ? <p className="whitespace-pre-wrap text-sm text-foreground/80">{lesson.content}</p> : null}
 
-          {lesson.video ? (
+          {lesson.video_upload_id ? (
+            <div>
+              <h3 className="mb-1 text-sm font-medium text-foreground">Video</h3>
+              <LessonVideoPlayer uploadId={lesson.video_upload_id} />
+            </div>
+          ) : lesson.video ? (
             <div>
               <h3 className="mb-1 text-sm font-medium text-foreground">Video</h3>
               <a

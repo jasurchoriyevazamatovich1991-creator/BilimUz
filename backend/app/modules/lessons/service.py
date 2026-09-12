@@ -72,11 +72,14 @@ class LessonService:
     def _reject_if_would_leave_empty_content(self, lesson: Lesson, updates: dict) -> None:
         """An update must not result in a lesson with zero content fields.
         Merges the incoming update onto the current state before checking,
-        since a PATCH only carries the fields the caller wants to change."""
+        since a PATCH only carries the fields the caller wants to change.
+        Sprint 35: video_upload_id counts as "has video" too — a lesson
+        with only an R2-backed video (no legacy `video` URL) is not empty."""
         final_video = updates.get("video", lesson.video)
+        final_video_upload_id = updates.get("video_upload_id", lesson.video_upload_id)
         final_pdf = updates.get("pdf", lesson.pdf)
         final_content = updates.get("content", lesson.content)
-        if not (final_video or final_pdf or final_content):
+        if not (final_video or final_video_upload_id or final_pdf or final_content):
             raise EmptyLessonContentException(
                 "Dars kamida bitta mazmun turiga ega bo'lishi kerak: video, pdf yoki content"
             )
