@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
+from app.modules.questions.repository import QuestionRepository
 from app.modules.results.repository import RankingRepository, ResultRepository, StatisticsRepository
 from app.modules.results.service import RankingService, ResultService
 from app.modules.tests.repository import TestRepository
@@ -26,7 +27,7 @@ def get_result_service(
     stats_repo: StatisticsRepository = Depends(get_statistics_repository),
     db: Session = Depends(get_db),
 ) -> ResultService:
-    return ResultService(repo, stats_repo, AttemptRepository(db), AnswerRepository(db), TestRepository(db))
+    return ResultService(repo, stats_repo, AttemptRepository(db), AnswerRepository(db), TestRepository(db), QuestionRepository(db))
 
 
 def get_ranking_service(

@@ -15,7 +15,7 @@ from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
 from app.modules.results.models import Result, Statistics
 from app.modules.results.repository import RankingRepository, ResultRepository, StatisticsRepository
-from app.modules.results.schemas import ResultListParams
+from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams
 from app.modules.tests.repository import TestRepository
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
@@ -29,12 +29,14 @@ class ResultService:
         attempt_repository: AttemptRepository,
         answer_repository: AnswerRepository,
         test_repository: TestRepository,
+        question_repository: "QuestionRepository",
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
         self.attempt_repo = attempt_repository
         self.answer_repo = answer_repository
         self.test_repo = test_repository
+        self.question_repo = question_repository
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -67,6 +69,65 @@ class ResultService:
         if result is None or result.user_id != user_id:
             raise ResultNotFoundException("Natija topilmadi")
         return result
+
+    def get_result_detail(self, result_id: uuid.UUID, user_id: uuid.UUID) -> ResultDetailOut:
+        """Sprint 37 — Result Analysis. Reuses get_result()'s own
+        ownership check (a student can only ever reach their own
+        attempt/answers from here, since attempt_id/question_ids below
+        are all derived from THIS already-ownership-verified result,
+        never from a client-supplied id)."""
+        result = self.get_result(result_id, user_id)
+        attempt = self.attempt_repo.get_by_id(result.attempt_id)
+        answers = self.answer_repo.list_for_attempt(result.attempt_id)
+        answers_by_question = {a.question_id: a for a in answers}
+
+        # question_order (Sprint 20) is the real, persisted order the
+        # student actually saw this question set in — reused here
+        # rather than an arbitrary re-sort, so review order matches
+        # the attempt itself.
+        question_ids = list(attempt.question_order or []) if attempt else list(answers_by_question.keys())
+        questions = self.question_repo.list_by_ids(question_ids)
+        questions_by_id = {q.id: q for q in questions}
+
+        correct_count = 0
+        incorrect_count = 0
+        unanswered_count = 0
+        question_reviews: list[QuestionReviewOut] = []
+
+        for qid in question_ids:
+            question = questions_by_id.get(qid)
+            if question is None:
+                continue  # question was hard-deleted after the attempt — skip rather than fabricate
+            answer = answers_by_question.get(qid)
+
+            if answer is None or answer.is_correct is None:
+                unanswered_count += 1
+            elif answer.is_correct:
+                correct_count += 1
+            else:
+                incorrect_count += 1
+
+            question_reviews.append(QuestionReviewOut(
+                question_id=question.id, question_text=question.question_text,
+                question_type=question.question_type, explanation=question.explanation,
+                options=[OptionReviewOut(id=o.id, option_text=o.option_text, is_correct=o.is_correct) for o in question.options],
+                selected_option=answer.selected_option if answer else None,
+                selected_options=answer.selected_options if answer else None,
+                is_correct=answer.is_correct if answer else None,
+            ))
+
+        time_spent_seconds = None
+        if attempt is not None and attempt.finish_time is not None:
+            time_spent_seconds = int((attempt.finish_time - attempt.start_time).total_seconds())
+
+        return ResultDetailOut(
+            id=result.id, attempt_id=result.attempt_id, user_id=result.user_id, test_id=result.test_id,
+            score=result.score, percentage=result.percentage, is_passed=result.is_passed,
+            status=result.status, created_at=result.created_at,
+            total_questions=len(question_ids), correct_answers=correct_count,
+            incorrect_answers=incorrect_count, unanswered=unanswered_count,
+            time_spent_seconds=time_spent_seconds, questions=question_reviews,
+        )
 
     def list_my_results(self, user_id: uuid.UUID, params: ResultListParams) -> tuple[list[Result], int]:
         return self.repo.list_for_user(user_id, params.page, params.per_page, params.test_id, params.sort)

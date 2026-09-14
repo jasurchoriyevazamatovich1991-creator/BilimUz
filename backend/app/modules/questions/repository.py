@@ -25,6 +25,21 @@ class QuestionRepository:
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def list_by_ids(self, question_ids: list[uuid.UUID]) -> list[Question]:
+        """Sprint 37 — bulk fetch for Result Analysis question review,
+        avoiding one query per question. Same selectinload(options)
+        pattern as get_by_id() above, so each returned Question already
+        has its options loaded — no separate OptionRepository call
+        needed for this feature."""
+        if not question_ids:
+            return []
+        stmt = (
+            select(Question)
+            .where(Question.id.in_(question_ids), Question.deleted_at.is_(None))
+            .options(selectinload(Question.options))
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def list(self, params: QuestionListParams) -> tuple[list[Question], int]:
         stmt = select(Question).where(Question.deleted_at.is_(None))
         if params.test_id:

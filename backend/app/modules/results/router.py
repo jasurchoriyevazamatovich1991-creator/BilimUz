@@ -65,16 +65,19 @@ def list_my_results(
 
 @router.get(
     "/{result_id}",
-    summary="Get a result by ID",
-    description="404 if not found or not yours.",
+    summary="Get a result by ID, with full analysis",
+    description="404 if not found or not yours. Includes Sprint 37's result analysis: total/correct/"
+                "incorrect/unanswered counts, time spent (when the underlying attempt has a finish_time), "
+                "and a question-by-question review (question text, options, the student's own answer, "
+                "correctness, and explanation when available) — additive on top of every existing ResultOut field.",
 )
 def get_result(
     result_id: uuid.UUID,
     service: ResultService = Depends(get_result_service),
     user: User = Depends(get_current_user),
 ):
-    result = service.get_result(result_id, user_id=user.id)
-    return success_response(ResultOut.model_validate(result), "Natija topildi.")
+    result = service.get_result_detail(result_id, user_id=user.id)
+    return success_response(result, "Natija topildi.")
 
 
 @router.post(
