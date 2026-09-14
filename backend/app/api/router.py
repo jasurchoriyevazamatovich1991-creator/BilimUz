@@ -25,6 +25,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.payments.router import router as payments_router
 from app.modules.permissions.router import router as permissions_router
 from app.modules.profiles.router import router as profiles_router
+from app.modules.progress.router import router as progress_router
 from app.modules.questions.router import router as questions_router
 from app.modules.results.router import router as results_router
 from app.modules.roles.router import router as roles_router
@@ -67,6 +68,7 @@ api_router.include_router(payments_router)
 api_router.include_router(schools_router)
 api_router.include_router(learning_centers_router)
 api_router.include_router(profiles_router)
+api_router.include_router(progress_router)
 api_router.include_router(audit_logs_router)
 api_router.include_router(system_logs_router)
 

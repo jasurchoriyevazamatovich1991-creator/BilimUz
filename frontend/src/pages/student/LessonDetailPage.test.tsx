@@ -6,10 +6,12 @@ import { LessonDetailPage } from "./LessonDetailPage";
 import { lessonsApi } from "@/api/lessons";
 import { testsApi } from "@/api/tests";
 import { uploadsApi } from "@/api/uploads";
+import { progressApi } from "@/api/progress";
 
 vi.mock("@/api/lessons");
 vi.mock("@/api/tests");
 vi.mock("@/api/uploads");
+vi.mock("@/api/progress");
 
 function renderPage(lessonId = "l1") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -31,7 +33,12 @@ const MOCK_LESSON = {
 };
 
 describe("LessonDetailPage", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 0, total_lessons: 0, percentage: 0, completed_lesson_ids: [],
+    });
+  });
 
   it("legacy lesson (video_upload_id null): shows the raw video URL as a plain safe link, no embedded player", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
@@ -133,5 +140,68 @@ describe("LessonDetailPage", () => {
     vi.mocked(uploadsApi.getViewUrl).mockRejectedValue(new Error("expired or unauthorized"));
     renderPage();
     await waitFor(() => expect(screen.getByText("Video")).toBeInTheDocument());
+  });
+
+  // --- Sprint 36: Student Progress / Lesson Completion ---
+
+  it("shows 'Tugatilgan deb belgilash' when the lesson is not yet completed (real backend state, not localStorage)", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
+    vi.mocked(testsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 0, total_lessons: 5, percentage: 0, completed_lesson_ids: [],
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Tugatilgan deb belgilash")).toBeInTheDocument());
+  });
+
+  it("shows '✓ Tugatildi' when the real backend progress already includes this lesson (page refresh scenario)", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
+    vi.mocked(testsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 1, total_lessons: 5, percentage: 20, completed_lesson_ids: [MOCK_LESSON.id],
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("✓ Tugatildi")).toBeInTheDocument());
+    expect(screen.queryByText("Tugatilgan deb belgilash")).not.toBeInTheDocument();
+  });
+
+  it("clicking the completion button calls the real API with this lesson's id", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
+    vi.mocked(testsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 0, total_lessons: 5, percentage: 0, completed_lesson_ids: [],
+    });
+    vi.mocked(progressApi.completeLesson).mockResolvedValue({ id: "p1", lesson_id: MOCK_LESSON.id, completed_at: "" });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Tugatilgan deb belgilash")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Tugatilgan deb belgilash"));
+    await waitFor(() => expect(progressApi.completeLesson).toHaveBeenCalledWith(MOCK_LESSON.id));
+  });
+
+  it("button is disabled/shows loading text while the completion mutation is pending, preventing duplicate requests from rapid clicks", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
+    vi.mocked(testsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 0, total_lessons: 5, percentage: 0, completed_lesson_ids: [],
+    });
+    vi.mocked(progressApi.completeLesson).mockImplementation(() => new Promise(() => {})); // never resolves
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Tugatilgan deb belgilash")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Tugatilgan deb belgilash"));
+    await waitFor(() => expect(screen.getByText("Belgilanmoqda...")).toBeInTheDocument());
+    expect(screen.getByText("Belgilanmoqda...").closest("button")).toBeDisabled();
+  });
+
+  it("shows an error toast (existing project pattern) when completion fails, and stays in the not-completed state", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue(MOCK_LESSON);
+    vi.mocked(testsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 20, total: 0, total_pages: 0 } });
+    vi.mocked(progressApi.getMyProgress).mockResolvedValue({
+      completed_lessons: 0, total_lessons: 5, percentage: 0, completed_lesson_ids: [],
+    });
+    vi.mocked(progressApi.completeLesson).mockRejectedValue(new Error("network error"));
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Tugatilgan deb belgilash")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Tugatilgan deb belgilash"));
+    await waitFor(() => expect(screen.getByText("Tugatilgan deb belgilash")).toBeInTheDocument()); // reverted, not stuck loading
   });
 });

@@ -31,9 +31,11 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { useLesson } from "@/hooks/useLessons";
 import { useTestsList } from "@/hooks/useTests";
+import { useMyProgress, useCompleteLesson } from "@/hooks/useProgress";
 import { uploadsApi } from "@/api/uploads";
 
 function LessonVideoPlayer({ uploadId }: { uploadId: string }) {
@@ -72,6 +74,9 @@ export function LessonDetailPage() {
     topic_id: lesson?.topic_id,
     status: "published",
   });
+  const { data: progress } = useMyProgress();
+  const completeLesson = useCompleteLesson();
+  const isCompleted = !!(progress && lessonId && progress.completed_lesson_ids.includes(lessonId));
 
   if (!lessonId) return null;
   if (isError) return <ErrorState title="Dars" />;
@@ -136,6 +141,22 @@ export function LessonDetailPage() {
               </div>
             </div>
           ) : null}
+
+          <div className="border-t border-border pt-4">
+            {isCompleted ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-3 py-2 text-sm font-medium text-success">
+                ✓ Tugatildi
+              </span>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => lessonId && completeLesson.mutate(lessonId)}
+                disabled={completeLesson.isPending}
+              >
+                {completeLesson.isPending ? "Belgilanmoqda..." : "Tugatilgan deb belgilash"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

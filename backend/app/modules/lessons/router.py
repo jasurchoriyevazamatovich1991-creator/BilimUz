@@ -8,10 +8,13 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 
 from app.core.schemas import success_response
-from app.modules.auth.dependencies import require_roles
+from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.lessons.dependencies import get_lesson_service
 from app.modules.lessons.schemas import LessonCreateRequest, LessonListParams, LessonOut, LessonUpdateRequest
 from app.modules.lessons.service import LessonService
+from app.modules.progress.dependencies import get_progress_service
+from app.modules.progress.schemas import LessonProgressOut
+from app.modules.progress.service import ProgressService
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
@@ -96,3 +99,27 @@ def delete_lesson(
     user: User = Depends(require_roles("Admin", "Super Admin", "Teacher")),
 ):
     service.delete_lesson(lesson_id, actor_id=user.id)
+
+
+# --- Sprint 36: Student Progress / Lesson Completion ---
+# Lives here (not in a separate lessons-progress sub-route) because
+# completing IS an action on a lesson resource — matches REST
+# convention. The underlying LessonProgress persistence still lives in
+# its own progress module (see app/modules/progress/), imported here
+# read/write-style exactly like any other cross-module service
+# dependency already used throughout this project.
+
+@router.post(
+    "/{lesson_id}/complete",
+    summary="Mark a lesson as completed (Student)",
+    description="Idempotent — completing an already-completed lesson returns the existing progress "
+                "record rather than creating a duplicate. user_id is always the authenticated caller, "
+                "never a request parameter.",
+)
+def complete_lesson(
+    lesson_id: uuid.UUID,
+    progress_service: ProgressService = Depends(get_progress_service),
+    user: User = Depends(get_current_user),
+):
+    progress = progress_service.complete_lesson(user.id, lesson_id)
+    return success_response(LessonProgressOut.model_validate(progress), "Dars tugatilgan deb belgilandi.")
