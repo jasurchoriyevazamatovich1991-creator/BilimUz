@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.modules.lessons.constants import ALLOWED_STATUS_VALUES
-from app.modules.lessons.validators import validate_lesson_title, validate_media_url
+from app.modules.lessons.validators import validate_lesson_title, validate_media_url, validate_order_number
 
 
 class LessonCreateRequest(BaseModel):
@@ -14,6 +14,12 @@ class LessonCreateRequest(BaseModel):
     video: str | None = None
     pdf: str | None = None
     content: str | None = None
+    # Sprint 38 — optional. When omitted, the service assigns the next
+    # available order_number within this topic (current max + 1) so a
+    # Teacher/Admin creating lessons one at a time never has to think
+    # about numbering — matches the existing UX (order isn't manually
+    # tracked today either). An explicit value is still honored if given.
+    order_number: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -24,6 +30,11 @@ class LessonCreateRequest(BaseModel):
     @classmethod
     def _urls(cls, v: str | None) -> str | None:
         return validate_media_url(v)
+
+    @field_validator("order_number")
+    @classmethod
+    def _order_number(cls, v: int | None) -> int | None:
+        return validate_order_number(v) if v is not None else None
 
     @model_validator(mode="after")
     def _at_least_one_content_field(self) -> "LessonCreateRequest":
@@ -45,6 +56,11 @@ class LessonUpdateRequest(BaseModel):
     # explicitly sending `null` clears it (removes the R2 video,
     # falling back to the legacy `video` URL field if present).
     video_upload_id: uuid.UUID | None = None
+    # Sprint 38 — additive. Omitting the field leaves order_number
+    # unchanged; a DB-level UNIQUE(topic_id, order_number) violation
+    # (another lesson in the same topic already has this number) is
+    # surfaced as a clear conflict error, not a silent overwrite.
+    order_number: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -63,6 +79,11 @@ class LessonUpdateRequest(BaseModel):
             raise ValueError(f"status quyidagilardan biri bo'lishi kerak: {', '.join(ALLOWED_STATUS_VALUES)}")
         return v
 
+    @field_validator("order_number")
+    @classmethod
+    def _order_number(cls, v: int | None) -> int | None:
+        return validate_order_number(v) if v is not None else None
+
 
 class LessonOut(BaseModel):
     id: uuid.UUID
@@ -72,6 +93,7 @@ class LessonOut(BaseModel):
     video_upload_id: uuid.UUID | None
     pdf: str | None
     content: str | None
+    order_number: int
     status: str
     created_at: datetime
     updated_at: datetime
@@ -85,4 +107,8 @@ class LessonListParams(BaseModel):
     search: str | None = None
     topic_id: uuid.UUID | None = None
     status: str | None = None
-    sort: str = "-created_at"
+    # Sprint 38 — default changed from "-created_at" to "order_number":
+    # deterministic, curriculum-meaningful ordering is now the sensible
+    # default for a content-browsing list. Any caller can still pass an
+    # explicit `sort` param to get the old behavior.
+    sort: str = "order_number"

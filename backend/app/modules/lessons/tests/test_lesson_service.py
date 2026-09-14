@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.modules.lessons.exceptions import (
+    DuplicateOrderNumberException,
     EmptyLessonContentException,
     InvalidTopicReferenceException,
     LessonNotFoundException,
@@ -86,3 +87,102 @@ def test_delete_soft_deletes(service, mock_repo):
     service.delete_lesson(lesson.id, actor_id=uuid.uuid4())
     mock_repo.soft_delete.assert_called_once_with(lesson)
     mock_repo.commit.assert_called_once()
+
+
+# --- Sprint 38: Lesson Ordering ---
+
+def test_create_without_order_number_auto_assigns_next_in_topic(service, mock_repo, mock_topic_repo):
+    topic_id = uuid.uuid4()
+    mock_topic_repo.get_by_id.return_value = MagicMock(id=topic_id)
+    mock_repo.get_next_order_number.return_value = 3
+
+    service.create_lesson(
+        LessonCreateRequest(topic_id=topic_id, title="Yangi dars", content="Matn"), actor_id=uuid.uuid4(),
+    )
+
+    created_lesson = mock_repo.create.call_args[0][0]
+    assert created_lesson.order_number == 3
+    mock_repo.get_next_order_number.assert_called_once_with(topic_id)
+
+
+def test_create_with_explicit_order_number_uses_it_and_skips_auto_assign(service, mock_repo, mock_topic_repo):
+    topic_id = uuid.uuid4()
+    mock_topic_repo.get_by_id.return_value = MagicMock(id=topic_id)
+
+    service.create_lesson(
+        LessonCreateRequest(topic_id=topic_id, title="Dars", content="Matn", order_number=7), actor_id=uuid.uuid4(),
+    )
+
+    created_lesson = mock_repo.create.call_args[0][0]
+    assert created_lesson.order_number == 7
+    mock_repo.get_next_order_number.assert_not_called()
+
+
+def test_first_lesson_in_a_topic_gets_order_number_zero(service, mock_repo, mock_topic_repo):
+    topic_id = uuid.uuid4()
+    mock_topic_repo.get_by_id.return_value = MagicMock(id=topic_id)
+    mock_repo.get_next_order_number.return_value = 0  # repository's own empty-topic case
+
+    service.create_lesson(
+        LessonCreateRequest(topic_id=topic_id, title="Birinchi dars", content="Matn"), actor_id=uuid.uuid4(),
+    )
+    assert mock_repo.create.call_args[0][0].order_number == 0
+
+
+def test_create_rejects_negative_order_number_at_schema_level():
+    with pytest.raises(ValueError):
+        LessonCreateRequest(topic_id=uuid.uuid4(), title="Dars", content="Matn", order_number=-1)
+
+
+def test_update_rejects_negative_order_number_at_schema_level():
+    with pytest.raises(ValueError):
+        LessonUpdateRequest(order_number=-1)
+
+
+def test_create_duplicate_order_number_raises_conflict_not_silent_overwrite(service, mock_repo, mock_topic_repo):
+    from sqlalchemy.exc import IntegrityError
+    topic_id = uuid.uuid4()
+    mock_topic_repo.get_by_id.return_value = MagicMock(id=topic_id)
+    mock_repo.commit.side_effect = IntegrityError("stmt", {}, Exception("unique violation"))
+
+    with pytest.raises(DuplicateOrderNumberException):
+        service.create_lesson(
+            LessonCreateRequest(topic_id=topic_id, title="Dars", content="Matn", order_number=2), actor_id=uuid.uuid4(),
+        )
+    mock_repo.db.rollback.assert_called_once()
+
+
+def test_update_duplicate_order_number_raises_conflict(service, mock_repo):
+    from sqlalchemy.exc import IntegrityError
+    lesson = MagicMock(id=uuid.uuid4(), video="x", video_upload_id=None, pdf=None, content=None)
+    mock_repo.get_by_id.return_value = lesson
+    mock_repo.commit.side_effect = IntegrityError("stmt", {}, Exception("unique violation"))
+
+    with pytest.raises(DuplicateOrderNumberException):
+        service.update_lesson(lesson.id, LessonUpdateRequest(order_number=1), actor_id=uuid.uuid4())
+    mock_repo.db.rollback.assert_called_once()
+
+
+def test_update_order_number_alone_does_not_touch_content_fields(service, mock_repo):
+    lesson = MagicMock(id=uuid.uuid4(), video="x", video_upload_id=None, pdf=None, content=None)
+    mock_repo.get_by_id.return_value = lesson
+
+    service.update_lesson(lesson.id, LessonUpdateRequest(order_number=5), actor_id=uuid.uuid4())
+
+    updates_passed = mock_repo.update.call_args[0][1]
+    assert updates_passed["order_number"] == 5
+    assert "video" not in updates_passed
+    assert "content" not in updates_passed
+
+
+def test_omitting_order_number_on_update_leaves_it_unchanged(service, mock_repo):
+    """exclude_unset=True — order_number simply isn't in the updates
+    dict when the caller doesn't send it, so the existing value on the
+    Lesson row is never touched."""
+    lesson = MagicMock(id=uuid.uuid4(), video="x", video_upload_id=None, pdf=None, content=None, order_number=4)
+    mock_repo.get_by_id.return_value = lesson
+
+    service.update_lesson(lesson.id, LessonUpdateRequest(title="Yangi nom"), actor_id=uuid.uuid4())
+
+    updates_passed = mock_repo.update.call_args[0][1]
+    assert "order_number" not in updates_passed

@@ -3,7 +3,7 @@ Belongs to a Topic. Content can be video, PDF, and/or rich text — at
 least one is required (enforced in service.py, not at the DB level)."""
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +13,7 @@ from app.db.base import Base
 
 class Lesson(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixin):
     __tablename__ = "lessons"
+    __table_args__ = (UniqueConstraint("topic_id", "order_number", name="uq_lessons_topic_id_order_number"),)
 
     topic_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -25,3 +26,8 @@ class Lesson(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixin)
     video_upload_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True,
     )
+    # Sprint 38 — mirrors Topic.order_number exactly (same type,
+    # default). Additionally enforced UNIQUE per (topic_id,
+    # order_number) above — a genuine DB-level guarantee Topic itself
+    # doesn't have, since Lessons need a truly deterministic order.
+    order_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

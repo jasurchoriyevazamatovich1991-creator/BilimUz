@@ -17,6 +17,16 @@ class LessonRepository:
         stmt = select(Lesson).where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def get_next_order_number(self, topic_id: uuid.UUID) -> int:
+        """Sprint 38 — current max order_number in this topic, + 1 (or 0
+        if the topic has no lessons yet). Includes soft-deleted lessons
+        in the max lookup deliberately — the UNIQUE(topic_id,
+        order_number) constraint applies to them too (they still occupy
+        a row), so a genuinely available number must skip past them."""
+        stmt = select(func.max(Lesson.order_number)).where(Lesson.topic_id == topic_id)
+        current_max = self.db.execute(stmt).scalar_one_or_none()
+        return (current_max + 1) if current_max is not None else 0
+
     def list(self, params: LessonListParams) -> tuple[list[Lesson], int]:
         stmt = select(Lesson).where(Lesson.deleted_at.is_(None))
         stmt = self._apply_filters(stmt, params)

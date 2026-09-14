@@ -5,8 +5,11 @@ dependency lessons → topics, same pattern as topics → subjects/grades).
 """
 import uuid
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.audit import log_action
 from app.modules.lessons.exceptions import (
+    DuplicateOrderNumberException,
     EmptyLessonContentException,
     InvalidTopicReferenceException,
     LessonNotFoundException,
@@ -35,17 +38,30 @@ class LessonService:
         if self.topic_repo.get_by_id(data.topic_id) is None:
             raise InvalidTopicReferenceException("Ko'rsatilgan mavzu (topic_id) mavjud emas")
 
+        order_number = data.order_number if data.order_number is not None else self.repo.get_next_order_number(data.topic_id)
+
         lesson = Lesson(
             topic_id=data.topic_id,
             title=data.title,
             video=data.video,
             pdf=data.pdf,
             content=data.content,
+            order_number=order_number,
             created_by=actor_id,
         )
-        self.repo.create(lesson)
-        log_action(self.repo.db, action="lesson.created", user_id=actor_id, entity_type="lesson", entity_id=lesson.id)
-        self.repo.commit()
+        try:
+            self.repo.create(lesson)
+            log_action(self.repo.db, action="lesson.created", user_id=actor_id, entity_type="lesson", entity_id=lesson.id)
+            self.repo.commit()
+        except IntegrityError:
+            # UNIQUE(topic_id, order_number) — an explicit order_number
+            # the caller provided collides with an existing lesson.
+            # (The auto-computed path above can't hit this in a single
+            # request, but a genuine concurrent-request race is still
+            # possible, same reasoning as payments/service.py's own
+            # IntegrityError handling.)
+            self.repo.db.rollback()
+            raise DuplicateOrderNumberException("Ushbu mavzuda shu order_number allaqachon band")
         return lesson
 
     def update_lesson(self, lesson_id: uuid.UUID, data: LessonUpdateRequest, actor_id: uuid.UUID) -> Lesson:
@@ -60,7 +76,11 @@ class LessonService:
             self.repo.db, action="lesson.updated", user_id=actor_id,
             entity_type="lesson", entity_id=lesson_id, metadata={"fields": list(updates.keys())},
         )
-        self.repo.commit()
+        try:
+            self.repo.commit()
+        except IntegrityError:
+            self.repo.db.rollback()
+            raise DuplicateOrderNumberException("Ushbu mavzuda shu order_number allaqachon band")
         return lesson
 
     def delete_lesson(self, lesson_id: uuid.UUID, actor_id: uuid.UUID) -> None:

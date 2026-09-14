@@ -20,6 +20,7 @@ export interface LessonOut {
   video_upload_id: string | null;
   pdf: string | null;
   content: string | null;
+  order_number: number;
   status: string;
   created_at: string;
   updated_at: string;
@@ -40,6 +41,9 @@ export interface LessonCreateRequest {
   video?: string;
   pdf?: string;
   content?: string;
+  /** Optional — the backend auto-assigns the next available number
+   * within the topic when omitted. */
+  order_number?: number;
 }
 
 export interface LessonUpdateRequest {
@@ -49,6 +53,7 @@ export interface LessonUpdateRequest {
   pdf?: string;
   content?: string;
   status?: string;
+  order_number?: number;
 }
 
 export const lessonsApi = {

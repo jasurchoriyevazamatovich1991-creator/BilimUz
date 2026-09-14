@@ -64,36 +64,38 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 30 — Multiple Choice Multi-Answer Support | `Answer` modeliga **faqat qo'shimcha** (additive) `selected_options` (ARRAY UUID) ustuni qo'shildi — eski `selected_option` orqaga moslik uchun o'zgarishsiz saqlangan. `multiple_choice` uchun bir nechta variant tanlash endi qo'llab-quvvatlanadi, to'g'ri javob **exact set equality** orqali tekshiriladi (qisman ball yo'q), variant ID'lari tegishli savolga tegishliligi tasdiqlanadi. Migratsiya `0006`. Frontend editor integratsiyasi bu sprint doirasida qilinmadi | ✅ Yakunlandi (backend) |
 | Sprint 31 | — | ⬜ Rejalashtirilgan / boshlanmagan |
 | Sprint 32 — Media-Enabled Question Bank Backend Foundation | `QuestionMedia.upload_id` va `QuestionMedia.option_id` qo'shildi — mavjud R2/uploads infratuzilmasi bilan bog'landi (`upload_id` — afzal, real R2-asoslangan yo'l; `file_url` — legacy moslik uchun saqlangan). Question text, option text va explanation uchun `bleach==6.1.0` asosidagi allowlist rich-text sanitizatsiyasi qo'shildi — `script`, event-handler va `javascript:` kabi xavfli konstruksiyalar bloklanadi, haqiqiy https/http havolalar saqlanadi. Option-darajasidagi media qo'llab-quvvatlanadi. Migratsiya `0007`. 9/9 sanitizer test PASS, to'liq backend 402 passed (6 eski xato o'zgarishsiz), frontend 252/252 PASS, TypeScript/build/`py_compile` PASS. **Frontend Question Editor bu sprintda hali qurilmagan** | ✅ Yakunlandi (backend) |
+| Sprint 33 — Question Editor Frontend | Sprint 32'ning backend fundamenti ustiga real UI: kutubxonasiz `RichTextEditor` (contentEditable, xavfsiz — faqat oddiy matn joylash), `FormulaText` (`katex` orqali `$...$` formulalarni render qiladi), `QuestionPreview` (haqiqiy tahrirlovchi holatidan), real R2 media yuklash (`upload_id` asosida, xom URL kiritish olib tashlandi), variant-darajasidagi media (faqat saqlangan variantlar uchun — yangi variantga haqiqiy `option_id` yo'qligi sababli halol cheklov). Jarayonda haqiqiy bo'shliq topildi va tuzatildi: CREATE rejimida media hech qachon yuborilmagan edi. 272/272 frontend test, TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 34 — Student Results History | `GET /results/me` (Sprint 14'dan beri mavjud, faqat hisoblash uchun ishlatilgan) endi to'liq ro'yxat sifatida qayta ishlatildi — yangi backend o'zgarishisiz. `/student/results` marshruti tuzatildi (sidebar allaqachon shu yerga ishora qilar edi, lekin marshrut yo'q edi). Real backend pagination, bo'sh/xato holatlar. 279/279 frontend test, TypeScript/build PASS. Backend o'zgarishi: YO'Q | ✅ Yakunlandi |
+| Sprint 35 — Real Video Player | `Lesson.video_upload_id` (nullable FK → uploads.id, `SET NULL`) — Sprint 27'ning mavjud R2 infratuzilmasi (`POST /uploads/presigned`, `GET /uploads/{id}/view-url` — "lesson-linked → istalgan foydalanuvchi" mantig'i allaqachon mavjud edi) to'liq qayta ishlatildi, **yangi endpoint yaratilmadi**. Eski `Lesson.video` (matn havola) **o'zgarishsiz** saqlangan, orqaga moslik: `video_upload_id` mavjud bo'lsa R2 pleer ustunlik qiladi, aks holda eski havola. Migratsiya `0008`. Backend 408 passed (6 bazaviy xato o'zgarishsiz), frontend 286/286, TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 36 — Student Progress (Lesson Completion) | Yangi, additive `app/modules/progress/` moduli — mavjud `notifications`ning "own record" naqshiga mos (`GET /progress/me`). `POST /lessons/{id}/complete` — **idempotent**, `lessons/router.py`da (REST konventsiyasi). Yangi `lesson_progress` jadvali (`UNIQUE(user_id, lesson_id)`, ikkalasi ham `CASCADE`). `user_id` har doim JWT'dan — boshqa talaba progressini o'qib bo'lmaydi. Dashboard'da real progress karta (X/Y, Z%), LessonDetailPage'da "Tugatilgan deb belgilash" tugmasi (haqiqiy backend holatidan, `localStorage`siz). Migratsiya `0009`. Backend 417 passed (408+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 295/295, TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 37 — Result Analysis | `GET /results/{id}` kengaytirildi (**yangi endpoint emas**) — `ResultDetailOut(ResultOut)` meros orqali, to'liq orqaga moslik. Real `Answer`/`TestAttempt`/`Question` ma'lumotidan hisoblangan: to'g'ri/noto'g'ri/javobsiz soni, sarflangan vaqt (`finish_time - start_time`, mavjud bo'lsa), savol-savol sharh (matn, variantlar, tanlangan javob, to'g'ri javob, izoh). Sprint 30'ning `selected_options` (ko'p tanlovli) to'g'ri qo'llab-quvvatlanadi. Jarayonda muhim regressiya topildi va tuzatildi: yangi `QuestionRepository` importi `results`ning o'z testlarini buzgan edi — string forward-reference orqali hal qilindi. Backend 426 passed (417+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 305/305, TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 38 — Lesson Ordering | `Lesson.order_number` — `Topic.order_number` naqshiga aynan mos (Integer, `default=0`), lekin qo'shimcha ravishda haqiqiy DB-darajasidagi `UNIQUE(topic_id, order_number)` cheklovi bilan (Topic'ning o'zida bu yo'q). Migratsiya `0010` — SQL window function orqali **deterministik backfill** (har bir mavzu ichida `created_at` bo'yicha 0,1,2...), so'ng UNIQUE cheklov qo'llanildi. Yangi dars yaratilganda `order_number` berilmasa, backend avtomatik "shu mavzudagi eng katta raqam+1"ni beradi. `GET /lessons` default tartibi `-created_at`dan `order_number`ga o'zgartirildi — **deterministik tartib**. Admin/Teacher `LessonFormPage`da tahrir qiladi, Student `TopicLessonsPage`da hech qanday frontend o'zgarishisiz to'g'ri tartibda ko'radi (backend default o'zgargani sababli). Backend 435 passed (426+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 311/311 (305+6 yangi), TypeScript/build PASS | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-**Hozirgi reja — Sprint 33 (Question Editor Frontend)**: Status — **rejalashtirilgan / boshlanmagan**. Maqsad: Admin va Teacher uchun real Question Editor UI (rich text, formula/LaTeX, rasm/media yuklash — Sprint 32'da qurilgan R2 fundamentidan foydalanib, question va option media, preview, mavjud savolni tahrirlash, mavjud backend API'lar bilan integratsiya, RBAC, XSS-xavfsiz render). Kelajakda SAT/GRE/IELTS/Physics kabi turli savol formatlariga mos universal editor asosini yaratishi kerak. **Hali implement qilinmagan.**
+**Ochiq eslatma (Sprint 28-38 auditlari va real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
 
-**Ochiq eslatma (Sprint 28/29/30/32 auditlari va real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
-
-- Test to'plami (400+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
+- Test to'plami (430+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
 - Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q).
-- Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan. Frontend Question Editor va Student Attempt UI integratsiyasi alohida ish sifatida davom etadi.
-- **Student Progress** tizimi — umuman mavjud emas (model, endpoint, UI — yo'q).
-- **Results History** (natijalar tarixi ro'yxati) — Student uchun sahifa yo'q, faqat bitta natija ko'rish mavjud.
-- **Student Video Player** — mavjud emas, `Lesson.video` faqat xavfsiz tashqi havola sifatida ko'rsatiladi.
-- **Teacher Media/File UI** — `FileUploader` komponenti tayyor, lekin Teacher paneliga ulanmagan.
+- Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan, Question Editor UI (muallif tomonidan to'g'ri javob belgilash) Sprint 33'da qurilgan. Student Attempt UI (`AttemptPage.tsx`)ning o'zi bu sprintlar davomida o'zgartirilmagan.
+- **Teacher Media/File UI** — `FileUploader` komponenti tayyor (Lesson video yuklashda ishlatiladi, Sprint 35), lekin alohida "Fayllar" boshqaruv sahifasi Teacher paneliga hali ulanmagan.
 - **Certificate PDF** — hech qachon generatsiya qilinmaydi (`pdf_url` doim `null`).
-- **Rate limiting** — faqat `auth` endpointlarida, boshqa modullarda kengaytirilmagan.
-- **Performance/code splitting** — frontend bitta ~540KB chunk, `React.lazy` qo'llanilmagan.
-- **`Lesson.order_number`** — jadvalda yo'q, darslar tartiblanmaydi.
+- **Rate limiting** — faqat `auth` va `ai` endpointlarida, boshqa modullarda kengaytirilmagan.
+- **Performance/code splitting** — frontend bitta ~810KB chunk (Sprint 33'da KaTeX qo'shilgani sababli o'sgan), `React.lazy` qo'llanilmagan.
 - **`Test.max_attempts`** — konfiguratsiya qilinmaydi, backend konstantasi orqali qattiq `1`ga belgilangan.
-- **Question Editor (frontend)** — Sprint 32'da faqat backend fundamenti (media/sanitizatsiya) qurildi, UI Sprint 33'ga rejalashtirilgan, hali boshlanmagan.
+- **Result Analysis'da skill/domain taqsimoti** — savol-savol sharh mavjud (Sprint 37), lekin fan/ko'nikma bo'yicha guruhlashtirish yo'q (bunday taksonomiya backendda umuman yo'q).
 
 **Loyiha holati — qisqa xulosa**:
 
 | Sohasi | Holat |
 |---|---|
-| Backend | Barqaror, modulli, 400+ test (mock-asoslangan) |
-| Frontend | Admin/Student panellari to'liq, Teacher qisman, Question Editor yo'q |
-| Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; real E2E sinov yo'q |
-| Question Engine | Multi-answer (backend) + media/sanitizatsiya fundamenti bor; rich-text editor UI yo'q |
+| Backend | Barqaror, modulli, 435+ test (mock-asoslangan), 26 modul |
+| Frontend | Admin/Student panellari to'liq, Teacher qisman (fayl boshqaruvi yo'q), Question Editor to'liq |
+| Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; Lesson va Question media ikkalasi ham R2'ga bog'langan; real E2E sinov yo'q |
+| Question Engine | Multi-answer (backend+authoring UI) + rich-text/formula/media editor — to'liq |
+| Student Progress | Dars tugatish (Sprint 36) — ishlaydi; video-kuzatish/vaqt kuzatuvi yo'q (ataylab, oddiy saqlangan) |
+| Result Analysis | To'g'ri/xato/javobsiz, vaqt, savol-savol sharh — ishlaydi; skill/domain taqsimoti yo'q |
 | International Exams (SAT/IELTS/GRE) | Rejalashtirilmagan, kod darajasida mavjud emas |
-| Student/Teacher/Admin | Student — asosiy oqim ishlaydi (Progress/tarix yo'q); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
+| Student/Teacher/Admin | Student — to'liq oqim (Video, Progress, Results History, Result Analysis); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)

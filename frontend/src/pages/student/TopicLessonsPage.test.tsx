@@ -24,7 +24,7 @@ function renderPage() {
 }
 
 const MOCK_LESSON = {
-  id: "l1", topic_id: "t1", title: "Kasrlarni qo'shish", video: "https://youtube.com/watch?v=abc", video_upload_id: null,
+  id: "l1", topic_id: "t1", title: "Kasrlarni qo'shish", video: "https://youtube.com/watch?v=abc", video_upload_id: null, order_number: 0,
   pdf: null, content: "Kirish matni", status: "active", created_at: "", updated_at: "",
 };
 
@@ -63,5 +63,30 @@ describe("TopicLessonsPage", () => {
     vi.mocked(lessonsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 100, total: 0, total_pages: 0 } });
     renderPage();
     await waitFor(() => expect(screen.getByText("Bu mavzu uchun hozircha darslar mavjud emas.")).toBeInTheDocument());
+  });
+
+  // --- Sprint 38: Lesson Ordering ---
+
+  it("does not hardcode an explicit sort param — inherits the backend's order_number default", async () => {
+    vi.mocked(lessonsApi.list).mockResolvedValue({ items: [], meta: { page: 1, per_page: 100, total: 0, total_pages: 0 } });
+    renderPage();
+    await waitFor(() => expect(lessonsApi.list).toHaveBeenCalled());
+    const callArgs = vi.mocked(lessonsApi.list).mock.calls[0][0];
+    expect(callArgs.sort).toBeUndefined();
+  });
+
+  it("renders lessons in exactly the order the backend returns them, with no client-side re-sort", async () => {
+    const lessonB = { ...MOCK_LESSON, id: "l2", title: "Kasrlarni ayirish", order_number: 1 };
+    const lessonA = { ...MOCK_LESSON, id: "l1", title: "Kasrlarni qo'shish", order_number: 0 };
+    // Deliberately returned in order_number order (as the real backend
+    // default sort now guarantees) — this test would fail if the page
+    // ever silently re-sorted by title, created_at, or anything else.
+    vi.mocked(lessonsApi.list).mockResolvedValue({ items: [lessonA, lessonB], meta: { page: 1, per_page: 100, total: 2, total_pages: 1 } });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Kasrlarni qo'shish")).toBeInTheDocument());
+    const titles = screen.getAllByRole("button").map((el) => el.textContent).filter((t): t is string => !!t && t.includes("Kasrlarni"));
+    const firstIndex = titles.findIndex((t) => t.includes("qo'shish"));
+    const secondIndex = titles.findIndex((t) => t.includes("ayirish"));
+    expect(firstIndex).toBeLessThan(secondIndex);
   });
 });

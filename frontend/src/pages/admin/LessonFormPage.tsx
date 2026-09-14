@@ -46,6 +46,10 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
   const [pdf, setPdf] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("active");
+  // Sprint 38 — string state (not number) so the input can be
+  // genuinely empty on CREATE, meaning "let the backend auto-assign
+  // the next number in this topic" rather than defaulting to 0.
+  const [orderNumber, setOrderNumber] = useState("");
   const [contentError, setContentError] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -56,6 +60,7 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
       setPdf(lesson.pdf ?? "");
       setContent(lesson.content ?? "");
       setStatus(lesson.status);
+      setOrderNumber(String(lesson.order_number));
     }
   }, [lesson]);
 
@@ -83,12 +88,18 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
 
     if (isEditMode) {
       updateLesson.mutate(
-        { title, video: video || undefined, pdf: pdf || undefined, content: content || undefined, status },
+        {
+          title, video: video || undefined, pdf: pdf || undefined, content: content || undefined, status,
+          order_number: orderNumber.trim() ? Number(orderNumber) : undefined,
+        },
         { onSuccess: () => navigate(`${basePath}/lessons/${lessonId}`) },
       );
     } else {
       createLesson.mutate(
-        { topic_id: topicId, title, video: video || undefined, pdf: pdf || undefined, content: content || undefined },
+        {
+          topic_id: topicId, title, video: video || undefined, pdf: pdf || undefined, content: content || undefined,
+          order_number: orderNumber.trim() ? Number(orderNumber) : undefined,
+        },
         { onSuccess: () => navigate(`${basePath}/lessons`) },
       );
     }
@@ -196,6 +207,21 @@ export function LessonFormPage({ basePath = "/admin" }: { basePath?: string }) {
                 rows={4}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
               />
+            </div>
+            <div>
+              <label htmlFor="orderNumber" className="mb-1 block text-sm font-medium text-foreground">Tartib raqami (order_number)</label>
+              <Input
+                id="orderNumber"
+                type="number"
+                min={0}
+                placeholder={isEditMode ? undefined : "Bo'sh qoldirsangiz avtomatik belgilanadi"}
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                disabled={!canWrite}
+              />
+              <p className="mt-1 text-xs text-foreground/50">
+                Shu mavzu ichida darslar shu raqam bo'yicha tartiblanadi. Har bir mavzuda noyob bo'lishi kerak.
+              </p>
             </div>
             {isEditMode ? (
               <div>

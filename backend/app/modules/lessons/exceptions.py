@@ -22,3 +22,11 @@ class EmptyLessonContentException(AppException):
     """A lesson must provide at least one of: video, pdf, content."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code = "EMPTY_LESSON_CONTENT"
+
+
+class DuplicateOrderNumberException(AppException):
+    """Sprint 38 — raised when a UNIQUE(topic_id, order_number)
+    violation is caught (another lesson in the same topic already has
+    this order_number)."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "DUPLICATE_ORDER_NUMBER"

@@ -16,3 +16,11 @@ def validate_media_url(url: str | None) -> str | None:
     if not stripped.startswith(ALLOWED_URL_SCHEMES):
         raise ValueError(f"URL {' yoki '.join(ALLOWED_URL_SCHEMES)} bilan boshlanishi kerak")
     return stripped
+
+
+def validate_order_number(order_number: int) -> int:
+    """Sprint 38 — mirrors topics/validators.py's validate_order_number
+    exactly (same rule: non-negative)."""
+    if order_number < 0:
+        raise ValueError("order_number manfiy bo'lishi mumkin emas")
+    return order_number

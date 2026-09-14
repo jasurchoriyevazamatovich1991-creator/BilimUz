@@ -1,11 +1,13 @@
 /**
  * GET /lessons?topic_id=X&status=active — real, public, filtered list.
- * No order_number on Lesson (verified against lessons/schemas.py — the
- * field genuinely does not exist, unlike Topic which has one) — the
- * backend's own default sort (`-created_at`) is used as-is; no ordering
- * UI is built here since there is nothing reliable to order by. This
- * is a real, documented GAP (see docs/Sprint27_...md), not silently
- * worked around with an invented client-side order.
+ *
+ * Sprint 38: Lesson.order_number now exists, and the backend's default
+ * sort changed from `-created_at` to `order_number` (see
+ * lessons/schemas.py's LessonListParams). This page never hardcoded an
+ * explicit `sort` param, so it automatically inherited the new
+ * deterministic order with ZERO changes here — items.map() below
+ * simply renders the API response in the order it's returned, which is
+ * now curriculum-meaningful rather than creation-time-based.
  */
 import { useNavigate, useParams } from "react-router-dom";
 import { ErrorState } from "@/components/layout/ErrorState";

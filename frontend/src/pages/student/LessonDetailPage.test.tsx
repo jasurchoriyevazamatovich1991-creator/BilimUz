@@ -28,7 +28,7 @@ function renderPage(lessonId = "l1") {
 }
 
 const MOCK_LESSON = {
-  id: "l1", topic_id: "t1", title: "Kasrlarni qo'shish", video: "https://youtube.com/watch?v=abc", video_upload_id: null,
+  id: "l1", topic_id: "t1", title: "Kasrlarni qo'shish", video: "https://youtube.com/watch?v=abc", video_upload_id: null, order_number: 0,
   pdf: null, content: "Bu darsda kasrlarni qanday qo'shishni o'rganamiz.", status: "active", created_at: "", updated_at: "",
 };
 

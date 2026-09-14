@@ -36,7 +36,7 @@ describe("LessonFormPage", () => {
 
   it("approved decision 4: topic renders as plain read-only text, not a select, in edit mode", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: "https://x.com/v", video_upload_id: null, pdf: null, content: null,
+      id: "l1", topic_id: "t1", title: "Kirish", video: "https://x.com/v", video_upload_id: null, order_number: 0, pdf: null, content: null,
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -47,7 +47,7 @@ describe("LessonFormPage", () => {
 
   it("approved decision 3: submit is never blocked, but shows the exact required message when video/pdf/content are all empty", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: null,
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: null,
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -63,11 +63,11 @@ describe("LessonFormPage", () => {
 
   it("submits successfully when at least the content field is filled", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "Matn bor",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: "Matn bor",
       status: "active", created_at: "", updated_at: "",
     });
     vi.mocked(lessonsApi.update).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "Matn bor",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: "Matn bor",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -79,7 +79,7 @@ describe("LessonFormPage", () => {
 
   it("video and pdf inputs use type='url' (approved decision 2, native browser validation)", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -92,7 +92,7 @@ describe("LessonFormPage", () => {
 
   it("edit mode: shows the R2 video upload section (real FileUploader)", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -102,7 +102,7 @@ describe("LessonFormPage", () => {
 
   it("shows a confirmation note when an R2 video is already attached", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "u1", pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "u1", order_number: 0, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     renderEditPage();
@@ -111,11 +111,11 @@ describe("LessonFormPage", () => {
 
   it("a successful upload calls updateLesson with the new video_upload_id", async () => {
     vi.mocked(lessonsApi.get).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, order_number: 0, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     vi.mocked(lessonsApi.update).mockResolvedValue({
-      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "new-upload-1", pdf: null, content: "x",
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: "new-upload-1", order_number: 0, pdf: null, content: "x",
       status: "active", created_at: "", updated_at: "",
     });
     vi.mocked(uploadsApi.createPresignedUpload).mockResolvedValue({
@@ -140,6 +140,76 @@ describe("LessonFormPage", () => {
     );
     await waitFor(() =>
       expect(lessonsApi.update).toHaveBeenCalledWith("l1", { video_upload_id: "new-upload-1" }),
+    );
+  });
+
+  // --- Sprint 38: Lesson Ordering ---
+
+  it("shows the order_number input field", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      order_number: 2, status: "active", created_at: "", updated_at: "",
+    });
+    renderEditPage();
+    await waitFor(() => expect(screen.getByLabelText(/Tartib raqami/)).toBeInTheDocument());
+  });
+
+  it("edit mode: loads the existing order_number into the field", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      order_number: 5, status: "active", created_at: "", updated_at: "",
+    });
+    renderEditPage();
+    await waitFor(() => expect(screen.getByLabelText(/Tartib raqami/)).toHaveValue(5));
+  });
+
+  it("create mode: leaving order_number empty sends undefined, letting the backend auto-assign", async () => {
+    vi.mocked(topicsApi.list).mockResolvedValue({
+      items: [{ id: "t1", subject_id: "s1", grade_id: null, title: "1-mavzu", description: null, order_number: 0, status: "active", created_at: "", updated_at: "" }],
+      meta: { page: 1, per_page: 100, total: 1, total_pages: 1 },
+    });
+    vi.mocked(lessonsApi.create).mockResolvedValue({
+      id: "new1", topic_id: "t1", title: "Yangi dars", video: null, video_upload_id: null, pdf: null, content: "Matn",
+      order_number: 3, status: "active", created_at: "", updated_at: "",
+    });
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={["/admin/lessons/new"]}>
+          <Routes>
+            <Route path="/admin/lessons/new" element={<LessonFormPage />} />
+            <Route path="/admin/lessons" element={<div>LESSONS_LIST</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Sarlavha")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("option", { name: "1-mavzu" })).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Mavzu"), { target: { value: "t1" } });
+    fireEvent.change(screen.getByLabelText("Sarlavha"), { target: { value: "Yangi dars" } });
+    fireEvent.change(screen.getByLabelText("Matn (ixtiyoriy)"), { target: { value: "Matn" } });
+    fireEvent.click(screen.getByText("Saqlash"));
+
+    await waitFor(() =>
+      expect(lessonsApi.create).toHaveBeenCalledWith(expect.objectContaining({ order_number: undefined })),
+    );
+  });
+
+  it("edit mode: an explicit order_number value is sent as a number, not a string", async () => {
+    vi.mocked(lessonsApi.get).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      order_number: 2, status: "active", created_at: "", updated_at: "",
+    });
+    vi.mocked(lessonsApi.update).mockResolvedValue({
+      id: "l1", topic_id: "t1", title: "Kirish", video: null, video_upload_id: null, pdf: null, content: "x",
+      order_number: 9, status: "active", created_at: "", updated_at: "",
+    });
+    renderEditPage();
+    await waitFor(() => expect(screen.getByLabelText(/Tartib raqami/)).toHaveValue(2));
+    fireEvent.change(screen.getByLabelText(/Tartib raqami/), { target: { value: "9" } });
+    fireEvent.click(screen.getByText("Saqlash"));
+
+    await waitFor(() =>
+      expect(lessonsApi.update).toHaveBeenCalledWith("l1", expect.objectContaining({ order_number: 9 })),
     );
   });
 });
