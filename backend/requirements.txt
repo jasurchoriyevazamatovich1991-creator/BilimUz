@@ -25,3 +25,10 @@ boto3==1.35.36
 # well-audited choice for this rather than a bespoke regex-based
 # sanitizer, which is a well-known way to introduce XSS bypasses.
 bleach==6.1.0
+# Sprint 39 Phase 3D — pydantic.EmailStr (used in auth/schemas.py's
+# RegisterRequest.email since the earliest auth sprints) requires this
+# at runtime; it was never actually listed here, which only became
+# visible once real backend startup was attempted for the first time
+# against real PostgreSQL (mock-based tests never triggered pydantic's
+# lazy EmailStr schema generation).
+email-validator==2.2.0
