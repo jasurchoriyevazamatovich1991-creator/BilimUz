@@ -150,8 +150,13 @@ def mock_media_repo():
 
 
 @pytest.fixture
-def media_service(mock_media_repo, mock_question_repo):
-    return MediaService(mock_media_repo, mock_question_repo)
+def mock_upload_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def media_service(mock_media_repo, mock_question_repo, mock_option_repo, mock_upload_repo):
+    return MediaService(mock_media_repo, mock_question_repo, mock_option_repo, mock_upload_repo)
 
 
 def test_add_media_rejects_invalid_question(media_service, mock_question_repo):
