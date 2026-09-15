@@ -66,3 +66,11 @@ class VerificationResultOut(BaseModel):
     certificate_number: str
     is_valid: bool
     verified_count: int
+
+
+class DownloadUrlOut(BaseModel):
+    """Sprint 43 — matches uploads/schemas.py's ViewUrlOut exactly (a
+    single required string field), the project's existing convention
+    for a signed-URL response. No `expires_in` field — that convention
+    doesn't exist anywhere else in this codebase either."""
+    download_url: str

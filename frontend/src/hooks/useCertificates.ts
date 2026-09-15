@@ -66,3 +66,16 @@ export function useVerifyCertificate() {
     mutationFn: (code: string) => certificatesApi.verify(code),
   });
 }
+
+/** Sprint 43 — mutation (not a query) since it's triggered by the
+ * "Yuklab olish" button click, matching hooks/useUploads.ts's
+ * useViewUrl pattern for the same reason (a signed URL is a one-time
+ * action result, not cacheable app state). */
+export function useDownloadCertificate() {
+  const addToast = useToastStore((s) => s.addToast);
+  return useMutation({
+    mutationFn: (certificateId: string) => certificatesApi.getDownloadUrl(certificateId),
+    onError: (error) =>
+      addToast(error instanceof ApiError ? error.message : "Sertifikatni yuklab bo'lmadi", "error"),
+  });
+}

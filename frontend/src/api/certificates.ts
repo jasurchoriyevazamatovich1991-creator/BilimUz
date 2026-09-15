@@ -43,6 +43,11 @@ export interface VerificationResultOut {
   verified_count: number;
 }
 
+/** Sprint 43 — matches uploads.ts's ViewUrlOut pattern exactly. */
+export interface DownloadUrlOut {
+  download_url: string;
+}
+
 export const certificatesApi = {
   myCount: async (): Promise<number> => {
     const result = await unwrap<PaginatedResponse<CertificateOut>>(
@@ -60,6 +65,12 @@ export const certificatesApi = {
    * already-certified passing result returns the existing certificate,
    * not an error (verified directly in service.py::issue()). */
   issue: (data: IssueCertificateRequest) => unwrap<CertificateOut>(httpClient.post("/certificates", data)),
+
+  /** Sprint 43 — real PDF download. Never use certificate.pdf_url
+   * directly as a public link; this returns a short-lived signed URL
+   * (same pattern as uploads.ts's getViewUrl for R2-backed media). */
+  getDownloadUrl: (certificateId: string) =>
+    unwrap<DownloadUrlOut>(httpClient.get(`/certificates/${certificateId}/download`)),
 
   /** Public — no Authorization header needed, works even for a logged-out visitor. */
   verify: (code: string) => unwrap<VerificationResultOut>(httpClient.get(`/certificates/verify/${code}`)),

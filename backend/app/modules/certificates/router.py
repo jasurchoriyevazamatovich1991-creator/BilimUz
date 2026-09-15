@@ -16,6 +16,7 @@ from app.modules.certificates.dependencies import (
 )
 from app.modules.certificates.schemas import (
     CertificateOut,
+    DownloadUrlOut,
     IssueCertificateRequest,
     TemplateCreateRequest,
     TemplateOut,
@@ -76,6 +77,22 @@ def get_certificate(
 ):
     certificate = service.get(certificate_id, user_id=user.id)
     return success_response(CertificateOut.model_validate(certificate), "Sertifikat topildi.")
+
+
+@router.get(
+    "/{certificate_id}/download",
+    summary="Get a signed PDF download URL for a certificate",
+    description="Ownership-checked (same 404-for-not-found-or-not-yours shape as GET /certificates/{id}). "
+                "Generates the PDF on demand if it wasn't already generated, then returns a short-lived "
+                "signed URL via the existing storage abstraction — never a permanent public URL.",
+)
+def download_certificate(
+    certificate_id: uuid.UUID,
+    service: CertificateService = Depends(get_certificate_service),
+    user: User = Depends(get_current_user),
+):
+    download_url = service.get_download_url(certificate_id, user_id=user.id)
+    return success_response(DownloadUrlOut(download_url=download_url), "Yuklab olish havolasi yaratildi.")
 
 
 @router.get(

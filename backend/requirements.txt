@@ -32,3 +32,13 @@ bleach==6.1.0
 # against real PostgreSQL (mock-based tests never triggered pydantic's
 # lazy EmailStr schema generation).
 email-validator==2.2.0
+# Sprint 43 — Certificate PDF generation (server-side, synchronous).
+# reportlab is pure-Python (no system-level binary/font-rendering
+# dependency, unlike WeasyPrint), matching this sprint's explicit
+# "no system-level dependencies" constraint.
+reportlab==4.2.5
+# qrcode[pil] — generates the verification QR code embedded in the PDF.
+# The [pil] extra pulls in Pillow, needed to render the QR as an image
+# reportlab can place on the page; no separate Pillow pin was already
+# present in this file.
+qrcode[pil]==7.4.2

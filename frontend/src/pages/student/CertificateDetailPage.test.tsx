@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CertificateDetailPage } from "./CertificateDetailPage";
@@ -50,14 +50,36 @@ describe("CertificateDetailPage", () => {
     await waitFor(() => expect(screen.getByText("Sertifikat")).toBeInTheDocument());
   });
 
-  it("NEVER shows a download button — pdf_url is always null in the current backend", async () => {
+  it("shows a working Download PDF button that calls the download endpoint and opens the signed URL", async () => {
+    vi.mocked(certificatesApi.get).mockResolvedValue({
+      id: "c1", user_id: "u1", result_id: "r1", template_id: null,
+      certificate_number: "CERT-0042", pdf_url: "certificates/c1.pdf", status: "issued", created_at: "2026-01-01T00:00:00Z", verification_code: "VC-TEST-0042",
+    });
+    vi.mocked(certificatesApi.getDownloadUrl).mockResolvedValue({ download_url: "https://signed.example.com/certificates/c1.pdf" });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText("CERT-0042")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Yuklab olish (PDF)"));
+
+    await waitFor(() => expect(certificatesApi.getDownloadUrl).toHaveBeenCalledWith("c1"));
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith("https://signed.example.com/certificates/c1.pdf", "_blank", "noopener,noreferrer"));
+    openSpy.mockRestore();
+  });
+
+  it("shows a toast error when the download endpoint fails", async () => {
     vi.mocked(certificatesApi.get).mockResolvedValue({
       id: "c1", user_id: "u1", result_id: "r1", template_id: null,
       certificate_number: "CERT-0042", pdf_url: null, status: "issued", created_at: "2026-01-01T00:00:00Z", verification_code: "VC-TEST-0042",
     });
+    vi.mocked(certificatesApi.getDownloadUrl).mockRejectedValue(new ApiError("Server xatosi", null, 500));
+
     renderDetailPage();
     await waitFor(() => expect(screen.getByText("CERT-0042")).toBeInTheDocument());
-    expect(screen.queryByText(/yuklab olish/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/download/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Yuklab olish (PDF)"));
+
+    await waitFor(() => expect(certificatesApi.getDownloadUrl).toHaveBeenCalledWith("c1"));
+    // The button remains visible/usable after a failed attempt (not stuck in a broken state).
+    expect(screen.getByText("Yuklab olish (PDF)")).toBeInTheDocument();
   });
 });

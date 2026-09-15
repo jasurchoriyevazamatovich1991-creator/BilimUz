@@ -42,6 +42,11 @@ class CertificateRepository:
         self.db.flush()
         return certificate
 
+    def update_pdf_url(self, certificate: Certificate, pdf_url: str) -> Certificate:
+        certificate.pdf_url = pdf_url
+        self.db.flush()
+        return certificate
+
     def commit(self) -> None:
         self.db.commit()
 

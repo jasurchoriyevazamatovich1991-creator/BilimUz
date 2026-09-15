@@ -6,6 +6,11 @@ from app.db.session import get_db
 from app.modules.certificates.repository import CertificateRepository, TemplateRepository, VerificationRepository
 from app.modules.certificates.service import CertificateService, TemplateService, VerificationService
 from app.modules.results.repository import ResultRepository
+from app.modules.subjects.repository import SubjectRepository
+from app.modules.tests.repository import TestRepository
+from app.modules.uploads.dependencies import get_storage_backend
+from app.modules.uploads.storage import StorageBackend
+from app.modules.users.repository import UserRepository
 
 
 def get_certificate_repository(db: Session = Depends(get_db)) -> CertificateRepository:
@@ -24,8 +29,12 @@ def get_certificate_service(
     repo: CertificateRepository = Depends(get_certificate_repository),
     verification_repo: VerificationRepository = Depends(get_verification_repository),
     db: Session = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage_backend),
 ) -> CertificateService:
-    return CertificateService(repo, verification_repo, ResultRepository(db))
+    return CertificateService(
+        repo, verification_repo, ResultRepository(db),
+        TestRepository(db), SubjectRepository(db), UserRepository(db), storage,
+    )
 
 
 def get_template_service(repo: TemplateRepository = Depends(get_template_repository)) -> TemplateService:
