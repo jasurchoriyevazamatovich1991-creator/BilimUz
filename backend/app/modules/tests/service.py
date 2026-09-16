@@ -59,6 +59,7 @@ class TestService:
             passing_score=data.passing_score,
             shuffle_questions=data.shuffle_questions,
             shuffle_answers=data.shuffle_answers,
+            max_attempts=data.max_attempts,
             created_by=actor_id,
         )
         self.repo.create(test)

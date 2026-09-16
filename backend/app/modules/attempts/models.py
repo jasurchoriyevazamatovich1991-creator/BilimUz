@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,3 +53,12 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     selected_options: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
     is_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="answered")
+    # Sprint 45 — additive. Storage foundation only: QuestionType.SHORT_ANSWER
+    # and .ESSAY have existed since the earliest sprints, but Answer had
+    # nowhere to store a text response (verified directly against this
+    # model before this sprint — only selected_option/selected_options
+    # existed). NULL for every existing answer and for every
+    # choice-based answer (selected_option/selected_options are still
+    # how those are recorded, completely unchanged). Grading/scoring of
+    # a free-text answer is explicitly out of scope for this sprint.
+    text_answer: Mapped[str | None] = mapped_column(Text, nullable=True)

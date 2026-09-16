@@ -4,7 +4,7 @@ module, which reads this model read-only."""
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -39,3 +39,37 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     shuffle_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     shuffle_answers: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=TestStatus.DRAFT)
+    # Sprint 45 — additive. NULL (every test before this sprint, and any
+    # test that doesn't explicitly set it) means "use the platform
+    # default" — attempts/constants.py's DEFAULT_MAX_ATTEMPTS = 1,
+    # completely unchanged behavior. This is what takes max_attempts
+    # out of hardcoding: a Test can now opt into a different limit
+    # without any code change, but nothing changes for a Test that
+    # doesn't set it.
+    max_attempts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sprint 45 — Generic Exam Engine foundation. Optional grouping of
+    Questions within a Test (e.g. SAT's "Reading and Writing" / "Math",
+    IELTS's "Listening" / "Reading" / "Writing" / "Speaking"). A Test
+    with zero sections (every existing Physics/National Certificate
+    test) is completely unaffected — its Questions simply have
+    section_id = NULL, the same as before this table existed.
+
+    order_number mirrors the proven UNIQUE(topic_id, order_number)
+    pattern lessons.models.Lesson established in Sprint 38 — same
+    reasoning: a real DB-level guarantee of deterministic section
+    order within one test, not just an advisory sort hint."""
+    __tablename__ = "exam_sections"
+    __table_args__ = (UniqueConstraint("test_id", "order_number", name="uq_exam_sections_test_id_order_number"),)
+
+    test_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tests.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    order_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Optional section-level timing, independent of Test.duration
+    # (which remains the whole-test timer attempts/service.py already
+    # uses — unchanged). NULL means this section has no timing of its
+    # own; nothing in this sprint enforces it yet (foundation only,
+    # per this sprint's explicit scope).
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)

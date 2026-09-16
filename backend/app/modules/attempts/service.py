@@ -25,6 +25,7 @@ from app.modules.attempts.exceptions import (
 from app.modules.attempts.constants import ACTIVE_STATUSES, DEFAULT_MAX_ATTEMPTS
 from app.modules.attempts.models import Answer, AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
+from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.attempts.schemas import (
     AnsweredQuestionState,
     AttemptDetailOut,
@@ -63,9 +64,14 @@ class AttemptService:
         if test.status != "published":
             raise TestNotPublishedException("Faqat e'lon qilingan testlarga urinish boshlash mumkin")
 
+        # Sprint 45 — test.max_attempts (nullable) overrides the
+        # platform default when a Test opts in; every existing test has
+        # max_attempts = NULL, so this is byte-identical behavior to
+        # before this sprint for all of them.
+        effective_max_attempts = test.max_attempts if test.max_attempts is not None else DEFAULT_MAX_ATTEMPTS
         existing = self.repo.count_for_user_and_test(user_id, test_id)
-        if existing >= DEFAULT_MAX_ATTEMPTS:
-            raise MaxAttemptsExceededException(f"Bu test uchun maksimal urinishlar soni ({DEFAULT_MAX_ATTEMPTS}) tugagan")
+        if existing >= effective_max_attempts:
+            raise MaxAttemptsExceededException(f"Bu test uchun maksimal urinishlar soni ({effective_max_attempts}) tugagan")
 
         questions = self.question_repo.list_all_for_test(test_id)
         question_ids = build_question_order([q.id for q in questions], shuffle=test.shuffle_questions)
@@ -207,14 +213,15 @@ class AttemptService:
         questions = [self.question_repo.get_by_id(qid) for qid in (attempt.question_order or [])]
         questions = [q for q in questions if q is not None]
 
-        correct_by_question = {a.question_id: a.is_correct for a in answers}
-        total_score = sum(float(q.score) for q in questions if correct_by_question.get(q.id) is True)
-        total_possible = sum(float(q.score) for q in questions) or 1.0
-        percentage = round((total_score / total_possible) * 100, 2)
+        # Sprint 45 — delegates to the Scoring Strategy foundation
+        # (scoring.py). DEFAULT_SCORING_STRATEGY.calculate() is the
+        # exact same arithmetic this method used to do inline —
+        # extracted, not changed.
+        result = DEFAULT_SCORING_STRATEGY.calculate(questions, answers)
 
         self.repo.update(attempt, {
             "status": new_status.value, "finish_time": datetime.now(timezone.utc),
-            "score": total_score, "percentage": percentage,
+            "score": result.score, "percentage": result.percentage,
         })
 
     def _build_result(self, attempt: TestAttempt) -> SubmitResultOut:

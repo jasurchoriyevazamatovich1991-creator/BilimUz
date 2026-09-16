@@ -32,6 +32,12 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixi
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     score: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=1)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sprint 45 — additive. NULL for every existing question (a
+    # question with no section, exactly as before this sprint). Optional
+    # link to a Generic Exam Engine section (e.g. SAT's "Math",
+    # IELTS's "Listening") — SET NULL on section delete so removing a
+    # section never cascades into deleting questions.
+    section_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="SET NULL"), nullable=True)
 
     options: Mapped[list["QuestionOption"]] = relationship(back_populates="question", cascade="all, delete-orphan")
     media: Mapped[list["QuestionMedia"]] = relationship(back_populates="question", cascade="all, delete-orphan")

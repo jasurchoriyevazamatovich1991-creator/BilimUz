@@ -18,6 +18,9 @@ class TestCreateRequest(BaseModel):
     passing_score: float | None = None
     shuffle_questions: bool = True
     shuffle_answers: bool = True
+    # Sprint 45 — optional. None (the default) keeps the exact existing
+    # behavior (platform default DEFAULT_MAX_ATTEMPTS = 1).
+    max_attempts: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -33,6 +36,13 @@ class TestCreateRequest(BaseModel):
     @classmethod
     def _passing_score(cls, v: float | None) -> float | None:
         return validate_passing_score(v)
+
+    @field_validator("max_attempts")
+    @classmethod
+    def _max_attempts(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("max_attempts kamida 1 bo'lishi kerak")
+        return v
 
     @field_validator("difficulty")
     @classmethod
@@ -53,6 +63,7 @@ class TestUpdateRequest(BaseModel):
     passing_score: float | None = None
     shuffle_questions: bool | None = None
     shuffle_answers: bool | None = None
+    max_attempts: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -68,6 +79,13 @@ class TestUpdateRequest(BaseModel):
     @classmethod
     def _passing_score(cls, v: float | None) -> float | None:
         return validate_passing_score(v)
+
+    @field_validator("max_attempts")
+    @classmethod
+    def _max_attempts(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("max_attempts kamida 1 bo'lishi kerak")
+        return v
 
 
 class TestPublishRequest(BaseModel):
@@ -92,6 +110,7 @@ class TestOut(BaseModel):
     shuffle_questions: bool
     shuffle_answers: bool
     status: str
+    max_attempts: int | None
     created_at: datetime
     updated_at: datetime
 

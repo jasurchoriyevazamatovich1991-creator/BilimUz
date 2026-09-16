@@ -58,14 +58,14 @@ def test_start_rejects_unpublished_test(service, mock_test_repo):
 
 
 def test_start_rejects_when_max_attempts_reached(service, mock_test_repo, mock_repo):
-    mock_test_repo.get_by_id.return_value = MagicMock(status="published")
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", max_attempts=None)
     mock_repo.count_for_user_and_test.return_value = 1  # DEFAULT_MAX_ATTEMPTS == 1
     with pytest.raises(MaxAttemptsExceededException):
         service.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
 
 
 def test_start_succeeds_and_snapshots_question_order(service, mock_test_repo, mock_repo, mock_question_repo):
-    mock_test_repo.get_by_id.return_value = MagicMock(status="published", duration=60, shuffle_questions=False)
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", duration=60, shuffle_questions=False, max_attempts=None)
     mock_repo.count_for_user_and_test.return_value = 0
     q_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
     mock_question_repo.list_all_for_test.return_value = [MagicMock(id=qid) for qid in q_ids]
