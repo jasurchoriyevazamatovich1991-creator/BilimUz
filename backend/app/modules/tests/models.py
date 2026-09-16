@@ -47,6 +47,12 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     # without any code change, but nothing changes for a Test that
     # doesn't set it.
     max_attempts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Sprint 47 — additive, generic. NULL for every existing test
+    # (unchanged). Deliberately a plain nullable string, not an enum —
+    # no IELTS-specific values ("Academic"/"General Training") are
+    # hardcoded anywhere in production code; this field only carries
+    # whatever value a caller assigns it.
+    exam_variant: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
 class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -102,3 +108,24 @@ class ExamModule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # separate routing-rule concept) to decide which Module 2 variant
     # an attempt is routed to.
     difficulty_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+
+class QuestionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sprint 47 — IELTS Engine foundation, deliberately generic (not an
+    IELTS-specific "Passage" model). Represents a shared stimulus a set
+    of Questions is grouped under — e.g. an IELTS Reading passage or
+    Listening audio, or a future SAT shared Reading & Writing passage.
+    A question that doesn't use groups (every existing question) is
+    completely unaffected — group_id stays NULL, exactly as before
+    this table existed.
+
+    Always scoped to exactly one Test (mandatory test_id) — mirrors
+    ExamSection's own ownership pattern exactly, including the same
+    UNIQUE(test_id, order_number) deterministic-ordering guarantee."""
+    __tablename__ = "question_groups"
+    __table_args__ = (UniqueConstraint("test_id", "order_number", name="uq_question_groups_test_id_order_number"),)
+
+    test_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tests.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    stimulus_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    order_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

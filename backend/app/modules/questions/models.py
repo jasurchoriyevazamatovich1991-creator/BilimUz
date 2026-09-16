@@ -44,6 +44,10 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixi
     # "Module 1" within the "Math" section) — SET NULL on module
     # delete, same reasoning as section_id above.
     module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_modules.id", ondelete="SET NULL"), nullable=True)
+    # Sprint 47 — additive. NULL for every existing question. Optional
+    # link to a shared QuestionGroup (e.g. an IELTS Reading passage's
+    # set of questions) — SET NULL on group delete.
+    group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("question_groups.id", ondelete="SET NULL"), nullable=True)
 
     options: Mapped[list["QuestionOption"]] = relationship(back_populates="question", cascade="all, delete-orphan")
     media: Mapped[list["QuestionMedia"]] = relationship(back_populates="question", cascade="all, delete-orphan")

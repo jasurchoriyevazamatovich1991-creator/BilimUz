@@ -10,7 +10,7 @@ schema_v2.sql) — no AuditMixin, same situation as the attempts module.
 """
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,3 +51,22 @@ class Ranking(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     score: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+
+
+class ResultSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sprint 47 — IELTS Engine foundation. Generic, additive
+    section-level score storage under a Result — deliberately NOT
+    IELTS-specific columns (no listening_score/reading_score/
+    writing_score/speaking_score). One row per (result, section).
+
+    Existing Result.score/.percentage/.is_passed are completely
+    unchanged. Nothing in this sprint creates a ResultSection
+    automatically; a Result with zero ResultSection rows (every
+    existing result) behaves exactly as before this table existed."""
+    __tablename__ = "result_sections"
+    __table_args__ = (UniqueConstraint("result_id", "section_id", name="uq_result_sections_result_id_section_id"),)
+
+    result_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("results.id", ondelete="CASCADE"), nullable=False)
+    section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="CASCADE"), nullable=False)
+    raw_score: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    scaled_score: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)

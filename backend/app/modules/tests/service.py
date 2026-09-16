@@ -60,6 +60,7 @@ class TestService:
             shuffle_questions=data.shuffle_questions,
             shuffle_answers=data.shuffle_answers,
             max_attempts=data.max_attempts,
+            exam_variant=data.exam_variant,
             created_by=actor_id,
         )
         self.repo.create(test)

@@ -21,6 +21,8 @@ class TestCreateRequest(BaseModel):
     # Sprint 45 — optional. None (the default) keeps the exact existing
     # behavior (platform default DEFAULT_MAX_ATTEMPTS = 1).
     max_attempts: int | None = None
+    # Sprint 47 — optional, generic. No IELTS-specific enum.
+    exam_variant: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -64,6 +66,7 @@ class TestUpdateRequest(BaseModel):
     shuffle_questions: bool | None = None
     shuffle_answers: bool | None = None
     max_attempts: int | None = None
+    exam_variant: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -111,6 +114,7 @@ class TestOut(BaseModel):
     shuffle_answers: bool
     status: str
     max_attempts: int | None
+    exam_variant: str | None
     created_at: datetime
     updated_at: datetime
 
