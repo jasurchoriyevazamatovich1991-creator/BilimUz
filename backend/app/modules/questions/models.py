@@ -38,6 +38,12 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixi
     # IELTS's "Listening") — SET NULL on section delete so removing a
     # section never cascades into deleting questions.
     section_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="SET NULL"), nullable=True)
+    # Sprint 46 — additive. NULL for every existing question (a
+    # question with no module, exactly as before this sprint).
+    # Optional link to a Generic Exam Engine module (e.g. SAT's
+    # "Module 1" within the "Math" section) — SET NULL on module
+    # delete, same reasoning as section_id above.
+    module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_modules.id", ondelete="SET NULL"), nullable=True)
 
     options: Mapped[list["QuestionOption"]] = relationship(back_populates="question", cascade="all, delete-orphan")
     media: Mapped[list["QuestionMedia"]] = relationship(back_populates="question", cascade="all, delete-orphan")

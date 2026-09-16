@@ -73,3 +73,32 @@ class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # own; nothing in this sprint enforces it yet (foundation only,
     # per this sprint's explicit scope).
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ExamModule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sprint 46 — Generic Exam Module foundation. Optional second
+    hierarchy level under ExamSection (Sprint 45's audit finding: a
+    Section alone cannot represent SAT's two-module structure inside
+    "Reading and Writing" / "Math"). A Section with zero modules
+    (every ExamSection created before this sprint, and any exam that
+    doesn't need module-level structure — e.g. plain IELTS sections)
+    is completely unaffected.
+
+    Mirrors ExamSection's own pattern exactly (same UNIQUE(parent,
+    order_number) guarantee, same TimestampMixin usage) — this sprint
+    deliberately adds no SAT-specific fields beyond the one nullable
+    difficulty_tier the approved scope explicitly asked for as a
+    foundation placeholder; no routing/adaptive logic reads it yet."""
+    __tablename__ = "exam_modules"
+    __table_args__ = (UniqueConstraint("section_id", "order_number", name="uq_exam_modules_section_id_order_number"),)
+
+    section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    order_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Foundation placeholder only (Sprint 46 audit item 3) — no
+    # adaptive routing logic reads or writes this yet. A future
+    # "SAT Adaptive Implementation" sprint would use this (plus a
+    # separate routing-rule concept) to decide which Module 2 variant
+    # an attempt is routed to.
+    difficulty_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
