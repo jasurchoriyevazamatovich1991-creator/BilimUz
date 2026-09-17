@@ -74,13 +74,14 @@ class ModulePerformance:
 
 
 class SequentialRoutingStrategy:
-    """The ONLY strategy this sprint ships — deliberately NOT adaptive.
-    Always routes to the candidate with the next-higher order_number,
+    """The default, deterministic strategy — NOT adaptive. Always
+    routes to the candidate with the next-higher order_number,
     completely ignoring `performance`. This exists purely so the
     AdaptiveRoutingStrategy interface has one working, testable
-    implementation (per this sprint's explicit "foundation strategy
+    implementation (per Sprint 48's explicit "foundation strategy
     may return a deterministic/default next module only if needed for
-    tests" allowance) — a real adaptive strategy is out of scope."""
+    tests" allowance) — a real adaptive strategy is
+    PerformanceThresholdRoutingStrategy, below."""
 
     def decide_next_module(
         self,
@@ -93,6 +94,89 @@ class SequentialRoutingStrategy:
             return RoutingDecision(next_module_id=None)
         next_candidate = min(upcoming, key=lambda c: c.order_number)
         return RoutingDecision(next_module_id=next_candidate.module_id)
+
+
+@dataclass(frozen=True)
+class PerformanceThresholdRule:
+    """One (minimum performance ratio -> routing_variant) rule.
+    min_ratio is inclusive: a candidate whose performance ratio is
+    exactly equal to min_ratio satisfies this rule (the "exactly
+    threshold" boundary case is intentional, not an off-by-one)."""
+    min_ratio: float
+    variant: str
+
+
+class PerformanceThresholdRoutingStrategy:
+    """Sprint 49 — the first real (non-sequential) implementation of
+    the existing AdaptiveRoutingStrategy Protocol from Sprint 48. Pure
+    Python: no database, no FastAPI, no repositories, no HTTP, no
+    knowledge of any specific exam. Reuses routing_group/routing_variant
+    exactly as Sprint 48 defined them on ExamModule/ModuleCandidate —
+    no schema change, no new field.
+
+    Configuration is a set of PerformanceThresholdRule lists, one per
+    routing_group, supplied by the caller (this class invents no
+    exam-specific defaults) — a caller constructs this with its own
+    rules for whatever routing_group names its own ExamModule rows
+    use; this class never hardcodes any of that.
+
+    Decision logic: within the completed module's own routing_group,
+    among the rules whose min_ratio the candidate's performance ratio
+    satisfies (ratio >= min_ratio), the rule with the HIGHEST min_ratio
+    wins (the "best-matching tier" the candidate qualifies for) — then
+    the one candidate module matching that (routing_group,
+    routing_variant) pair is selected.
+
+    Deliberately never invents a fallback: if the completed module has
+    no routing_group, no rules are configured for that group, no rule's
+    threshold is met, or no candidate module actually has the winning
+    variant, the result is RoutingDecision(next_module_id=None) — never
+    a guessed/default module. Callers that need a fallback must decide
+    that explicitly themselves; this strategy will not hide it."""
+
+    def __init__(self, rules_by_group: dict[str, list[PerformanceThresholdRule]]):
+        # Defensive copy — the caller's dict/list can be mutated
+        # afterwards without ever changing this strategy's behavior
+        # (Sprint 49's explicit "do not mutate input collections" /
+        # determinism requirement).
+        self._rules_by_group: dict[str, list[PerformanceThresholdRule]] = {
+            group: list(rules) for group, rules in rules_by_group.items()
+        }
+
+    def decide_next_module(
+        self,
+        completed_module: ExamModule,
+        performance: ModulePerformance,
+        candidates: list[ModuleCandidate],
+    ) -> RoutingDecision:
+        if not candidates:
+            return RoutingDecision(next_module_id=None)
+
+        if performance.total_count <= 0:
+            raise ValueError("ModulePerformance.total_count must be a positive integer to compute a ratio")
+        if performance.correct_count < 0 or performance.correct_count > performance.total_count:
+            raise ValueError("ModulePerformance.correct_count must be between 0 and total_count")
+
+        group = completed_module.routing_group
+        if group is None or group not in self._rules_by_group:
+            return RoutingDecision(next_module_id=None)
+
+        ratio = performance.correct_count / performance.total_count
+
+        rules = self._rules_by_group[group]
+        matching_rules = [r for r in rules if ratio >= r.min_ratio]
+        if not matching_rules:
+            return RoutingDecision(next_module_id=None)
+        winning_rule = max(matching_rules, key=lambda r: r.min_ratio)
+
+        for candidate in candidates:
+            if candidate.routing_group == group and candidate.routing_variant == winning_rule.variant:
+                return RoutingDecision(next_module_id=candidate.module_id)
+
+        # A rule matched, but no candidate module actually carries that
+        # variant — this is a caller configuration mismatch, not
+        # something this strategy should paper over with a guess.
+        return RoutingDecision(next_module_id=None)
 
 
 class ModuleAccessDeniedException(Exception):
