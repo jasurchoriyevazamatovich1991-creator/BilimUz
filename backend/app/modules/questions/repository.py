@@ -91,6 +91,15 @@ class QuestionRepository:
         (paginated, for the content-authoring browse view) on purpose:
         an attempt must never silently miss a question because it fell
         on 'page 2'."""
+        stmt = select(Question).where(Question.test_id == test_id, Question.deleted_at.is_(None))
+        return list(self.db.scalars(stmt).all())
+
+    def list_by_module(self, module_id: uuid.UUID) -> list[Question]:
+        """Sprint 50 — module-scoped equivalent of list_all_for_test(),
+        same unpaginated reasoning: a modular attempt must never
+        silently miss a question."""
+        stmt = select(Question).where(Question.module_id == module_id, Question.deleted_at.is_(None))
+        return list(self.db.scalars(stmt).all())
         stmt = (
             select(Question)
             .where(Question.test_id == test_id, Question.deleted_at.is_(None))

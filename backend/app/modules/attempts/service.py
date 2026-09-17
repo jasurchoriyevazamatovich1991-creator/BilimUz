@@ -48,12 +48,23 @@ class AttemptService:
         test_repository: TestRepository,
         question_repository: QuestionRepository,
         option_repository: OptionRepository,
+        module_execution_service: "ModuleExecutionService | None" = None,
+        module_repository: "ExamModuleRepository | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
         self.test_repo = test_repository
         self.question_repo = question_repository
         self.option_repo = option_repository
+        # Sprint 50 — both optional, default None. Every existing
+        # caller (all pre-Sprint-50 tests, and any future caller that
+        # doesn't need module execution) that constructs AttemptService
+        # with only the original 5 arguments is completely unaffected —
+        # module_execution/is_modular_test() below is the only place
+        # that ever reads these, and it degrades to the exact legacy
+        # (non-modular) behavior when they're None.
+        self.module_execution = module_execution_service
+        self.module_repo = module_repository
 
     # --- Start ---------------------------------------------------------
 
@@ -83,6 +94,18 @@ class AttemptService:
             question_order=question_ids, status=AttemptStatus.IN_PROGRESS,
         )
         self.repo.create(attempt)
+
+        # Sprint 50 — the ONLY branch point in this method. A Test with
+        # zero ExamModule rows (every existing Physics/generic test)
+        # never reaches this block's body: has_modules() returns False,
+        # and self.module_repo/self.module_execution being None (the
+        # legacy AttemptService construction) short-circuits the same
+        # way. TestAttempt.question_order above is still populated
+        # exactly as before regardless — existing endpoints/tests that
+        # read it are unaffected either way.
+        if self.module_repo is not None and self.module_execution is not None and self.module_repo.has_modules(test_id):
+            self.module_execution.initialize_first_module(attempt)
+
         log_action(self.repo.db, action="attempt.started", user_id=user_id, entity_type="test_attempt", entity_id=attempt.id)
         self.repo.commit()
         return attempt
@@ -126,6 +149,16 @@ class AttemptService:
         if question_id not in (attempt.question_order or []):
             raise InvalidQuestionReferenceException("Bu savol ushbu urinishga tegishli emas")
 
+        # Sprint 50 — additional, module-scoped validation. A complete
+        # no-op for non-modular attempts (self.module_execution is None,
+        # or this attempt simply has no active module progress row —
+        # the legacy TestAttempt.question_order check above already
+        # covers everything for those).
+        if self.module_execution is not None:
+            active_progress = self.module_execution.get_active_module_progress(attempt_id)
+            if active_progress is not None:
+                self.module_execution.validate_question_in_module(active_progress, question_id)
+
         question = self.question_repo.get_by_id(question_id)
         if question is not None and question.question_type == "multiple_choice":
             # Sprint 30 — the only new branch. single_choice/true_false
@@ -166,6 +199,32 @@ class AttemptService:
         if attempt.status in ACTIVE_STATUSES:
             raise ResultNotAvailableException("Urinish hali yakunlanmagan")
         return self._build_result(attempt)
+
+    # --- Sprint 50: modular execution ---------------------------------
+
+    def submit_module(self, attempt_id: uuid.UUID, module_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """Requires self.module_execution to be configured (see
+        get_attempt_service's Sprint 50 wiring) — this method has no
+        meaning for a non-modular AttemptService construction and is
+        never called for one (no router path reaches it without a
+        module_id in the URL)."""
+        attempt = self._get_owned_attempt(attempt_id, user_id)
+        self._auto_finish_if_expired(attempt)
+        if attempt.status not in ACTIVE_STATUSES:
+            raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
+
+        progress = self.module_execution.get_owned_module_progress(attempt, module_id)
+        outcome = self.module_execution.submit_module(attempt, progress)
+
+        if outcome["completed"]:
+            self._finalize(attempt, AttemptStatus.SUBMITTED)
+            log_action(self.repo.db, action="attempt.submitted", user_id=user_id, entity_type="test_attempt", entity_id=attempt_id)
+            self.repo.commit()
+            result = self._build_result(attempt)
+            return {"completed": True, "next_module_id": None, "result": result}
+
+        self.repo.commit()
+        return {"completed": False, "next_module_id": outcome["next_module_id"], "result": None}
 
     # --- Internal helpers --------------------------------------------------
 

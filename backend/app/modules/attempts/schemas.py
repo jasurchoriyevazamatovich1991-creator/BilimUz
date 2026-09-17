@@ -87,3 +87,13 @@ class AttemptListParams(BaseModel):
     per_page: int = Field(default=20, ge=1, le=100)
     test_id: uuid.UUID | None = None
     status: str | None = None
+
+
+class SubmitModuleResultOut(BaseModel):
+    """Sprint 50 — response for POST /attempts/{id}/modules/{module_id}/submit.
+    result is populated ONLY when completed is True (the submitted
+    module was the exam's last one) — mirrors SubmitResultOut's own
+    "never leak result data early" rule from the whole-attempt flow."""
+    completed: bool
+    next_module_id: uuid.UUID | None
+    result: SubmitResultOut | None

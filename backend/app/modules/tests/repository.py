@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.tests.models import Test
+from app.modules.tests.models import Test, ExamModule, ExamSection
 from app.modules.tests.schemas import TestListParams
 
 
@@ -76,3 +76,41 @@ class TestRepository:
 
     def commit(self) -> None:
         self.db.commit()
+
+
+class ExamModuleRepository:
+    """Sprint 50 — new, minimal repository for module execution. Reads
+    ExamModule/ExamSection only; ExamSection/ExamModule creation is out
+    of this sprint's scope (they're already created by whoever
+    configures the exam — Sprint 45/46's own scope)."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_id(self, module_id: uuid.UUID) -> ExamModule | None:
+        return self.db.get(ExamModule, module_id)
+
+    def list_for_test(self, test_id: uuid.UUID) -> list[ExamModule]:
+        """All modules across all of a Test's sections, ordered by
+        (section.order_number, module.order_number) — the deterministic
+        execution order Sprint 45/46's own UNIQUE(section_id/test_id,
+        order_number) constraints already guarantee is well-defined."""
+        stmt = (
+            select(ExamModule)
+            .join(ExamSection, ExamModule.section_id == ExamSection.id)
+            .where(ExamSection.test_id == test_id, ExamModule.deleted_at.is_(None), ExamSection.deleted_at.is_(None))
+            .order_by(ExamSection.order_number, ExamModule.order_number)
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def has_modules(self, test_id: uuid.UUID) -> bool:
+        """Backward-compatibility gate: a Test with zero ExamModule rows
+        (every existing Physics/generic test) must take the legacy,
+        unmodified execution path — see AttemptService.start_attempt()."""
+        stmt = (
+            select(ExamModule.id)
+            .join(ExamSection, ExamModule.section_id == ExamSection.id)
+            .where(ExamSection.test_id == test_id, ExamModule.deleted_at.is_(None), ExamSection.deleted_at.is_(None))
+            .limit(1)
+        )
+        return self.db.scalars(stmt).first() is not None

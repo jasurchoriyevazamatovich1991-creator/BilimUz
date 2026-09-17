@@ -20,6 +20,7 @@ from app.modules.attempts.schemas import (
     AttemptOut,
     SaveAnswerRequest,
     StartAttemptRequest,
+    SubmitModuleResultOut,
     SubmitResultOut,
 )
 from app.modules.attempts.service import AttemptService
@@ -129,3 +130,25 @@ def get_result(
 ):
     result: SubmitResultOut = service.get_result(attempt_id, user_id=user.id)
     return success_response(result, "Natija.")
+
+
+@router.post(
+    "/{attempt_id}/modules/{module_id}/submit",
+    summary="Submit the active module of a modular attempt",
+    description="Sprint 50. Only meaningful for attempts against a Test that has ExamModule rows — "
+                "scores the module, asks the AdaptiveRoutingStrategy for the next module, and either "
+                "creates the next AttemptModuleProgress or (if this was the exam's last module) "
+                "finalizes the whole attempt exactly like POST /submit does. 404 if the module doesn't "
+                "belong to this attempt (same not-found-or-not-yours shape as every other attempt "
+                "endpoint — no IDOR signal). 409 if the module isn't currently active.",
+)
+def submit_module(
+    attempt_id: uuid.UUID,
+    module_id: uuid.UUID,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    outcome = service.submit_module(attempt_id, module_id, user_id=user.id)
+    result_out = SubmitModuleResultOut(**outcome)
+    message = "Imtihon yakunlandi." if outcome["completed"] else "Modul yakunlandi, keyingi modulga o'tildi."
+    return success_response(result_out, message)

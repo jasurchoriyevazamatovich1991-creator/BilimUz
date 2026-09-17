@@ -48,3 +48,19 @@ class ResultNotAvailableException(AppException):
     be revealed before submit/auto-finish, per platform-wide policy."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "RESULT_NOT_AVAILABLE"
+
+
+class ModuleNotFoundForAttemptException(AppException):
+    """Sprint 50. Also raised for 'module belongs to someone else's
+    attempt' — same status/message for both, mirroring
+    AttemptNotFoundException's own resource-enumeration defense."""
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "MODULE_NOT_FOUND"
+
+
+class ModuleNotActiveException(AppException):
+    """Sprint 50. Raised when trying to submit a module that's already
+    submitted or whose own expires_at has passed — mirrors
+    AttemptNotActiveException's own 409 convention at module scope."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "MODULE_NOT_ACTIVE"
