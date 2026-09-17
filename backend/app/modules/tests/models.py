@@ -108,6 +108,17 @@ class ExamModule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # separate routing-rule concept) to decide which Module 2 variant
     # an attempt is routed to.
     difficulty_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Sprint 48 — additive, generic metadata only. NULL for every
+    # existing module (unchanged). No routing DECISION logic reads
+    # these yet (out of scope — see AdaptiveRoutingStrategy in
+    # attempts/adaptive_routing.py) — they only let a future routing
+    # strategy identify "which modules are alternatives for the same
+    # position" (routing_group) and "which specific alternative this
+    # is" (routing_variant). No SAT/GRE-specific values are hardcoded
+    # anywhere in production code; these fields only carry whatever a
+    # caller assigns them.
+    routing_group: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    routing_variant: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
 class QuestionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -129,3 +140,12 @@ class QuestionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     stimulus_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Sprint 48 — additive. NULL for every existing QuestionGroup
+    # (unchanged) — a group that operates at section level without a
+    # module (e.g. an IELTS Reading passage with no module concept)
+    # stays exactly as before. Optional DB-level scoping to a specific
+    # ExamModule, so a group's questions can be unambiguously tied to
+    # one module when adaptive module structure is in use — SET NULL
+    # on module delete, matching Question.module_id/.section_id/
+    # .group_id's own established pattern.
+    module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_modules.id", ondelete="SET NULL"), nullable=True)
