@@ -1,12 +1,14 @@
 # BilimUz
 
-Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun.
+Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun. Dastlab fizika fani uchun yaratilgan test tizimi sifatida boshlangan, Sprint 44-49 davomida **generic (universal) imtihon dvigateli fundamenti**ga aylantirilmoqda — bu fundament kelajakda IELTS, SAT, GRE kabi standartlashtirilgan imtihonlarni qo'llab-quvvatlash uchun mo'ljallangan (hozircha **faqat fundament**, to'liq ishlaydigan implementatsiya emas — pastdagi "Joriy imtihon qo'llab-quvvatlashi" bo'limiga qarang).
 
 ## Arxitektura
-- **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`) + Layered Architecture (Router → Service → Repository → Database), Clean Architecture tamoyillari bilan
-- **Frontend**: React + TypeScript (Pages → Components → Services → API → Backend) — hali qurilmagan
-- **Database**: PostgreSQL, 54 jadval, 25 modul, Alembic migratsiyalari bilan boshqariladi
+- **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`, 27 modul) + Layered Architecture (Router → Service → Repository → Database), Clean Architecture tamoyillari bilan
+- **Frontend**: React + TypeScript (Pages → Components → Services → API → Backend)
+- **Database**: PostgreSQL, 61 jadval, Alembic migratsiyalari bilan boshqariladi (joriy holat: `0015`)
 - **Xavfsizlik**: Argon2 (parol xeshlash), JWT (`nbf` claim bilan) — `backend/app/core/security/`da markazlashgan yagona amalga oshirish (Sprint 4 Auth Cutover)
+- **Fayl saqlash**: Cloudflare R2 (private, presigned upload/download, 2GB'gacha multipart) — Lesson video, Question media, Certificate PDF uchun qayta ishlatiladi
+- **Cache/Rate-limit**: Redis (auth va AI endpointlarida rate-limiting uchun)
 
 Batafsil: [`docs/00_Folder_Architecture.md`](docs/00_Folder_Architecture.md)
 
@@ -70,32 +72,45 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 36 — Student Progress (Lesson Completion) | Yangi, additive `app/modules/progress/` moduli — mavjud `notifications`ning "own record" naqshiga mos (`GET /progress/me`). `POST /lessons/{id}/complete` — **idempotent**, `lessons/router.py`da (REST konventsiyasi). Yangi `lesson_progress` jadvali (`UNIQUE(user_id, lesson_id)`, ikkalasi ham `CASCADE`). `user_id` har doim JWT'dan — boshqa talaba progressini o'qib bo'lmaydi. Dashboard'da real progress karta (X/Y, Z%), LessonDetailPage'da "Tugatilgan deb belgilash" tugmasi (haqiqiy backend holatidan, `localStorage`siz). Migratsiya `0009`. Backend 417 passed (408+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 295/295, TypeScript/build PASS | ✅ Yakunlandi |
 | Sprint 37 — Result Analysis | `GET /results/{id}` kengaytirildi (**yangi endpoint emas**) — `ResultDetailOut(ResultOut)` meros orqali, to'liq orqaga moslik. Real `Answer`/`TestAttempt`/`Question` ma'lumotidan hisoblangan: to'g'ri/noto'g'ri/javobsiz soni, sarflangan vaqt (`finish_time - start_time`, mavjud bo'lsa), savol-savol sharh (matn, variantlar, tanlangan javob, to'g'ri javob, izoh). Sprint 30'ning `selected_options` (ko'p tanlovli) to'g'ri qo'llab-quvvatlanadi. Jarayonda muhim regressiya topildi va tuzatildi: yangi `QuestionRepository` importi `results`ning o'z testlarini buzgan edi — string forward-reference orqali hal qilindi. Backend 426 passed (417+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 305/305, TypeScript/build PASS | ✅ Yakunlandi |
 | Sprint 38 — Lesson Ordering | `Lesson.order_number` — `Topic.order_number` naqshiga aynan mos (Integer, `default=0`), lekin qo'shimcha ravishda haqiqiy DB-darajasidagi `UNIQUE(topic_id, order_number)` cheklovi bilan (Topic'ning o'zida bu yo'q). Migratsiya `0010` — SQL window function orqali **deterministik backfill** (har bir mavzu ichida `created_at` bo'yicha 0,1,2...), so'ng UNIQUE cheklov qo'llanildi. Yangi dars yaratilganda `order_number` berilmasa, backend avtomatik "shu mavzudagi eng katta raqam+1"ni beradi. `GET /lessons` default tartibi `-created_at`dan `order_number`ga o'zgartirildi — **deterministik tartib**. Admin/Teacher `LessonFormPage`da tahrir qiladi, Student `TopicLessonsPage`da hech qanday frontend o'zgarishisiz to'g'ri tartibda ko'radi (backend default o'zgargani sababli). Backend 435 passed (426+9 yangi, 6 bazaviy xato o'zgarishsiz), frontend 311/311 (305+6 yangi), TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 39 — Real PostgreSQL Foundation | Real PostgreSQL 16 + Redis 7 bootstrap, Super Admin seed script (`scripts/seed_admin.py`, idempotent), `alembic upgrade head` real bazada tasdiqlangan. Jarayonda ikkita real, oldindan mavjud xato topilib tuzatildi: `alembic/env.py`da `progress` modeli import qilinmagan edi; `questions/repository.py`da `list` metod nomi `list[X]` type hintini bloklagan edi. `email-validator` dependency qo'shildi (hech qachon `requirements.txt`da bo'lmagan, faqat mock testlar buni yashirgan edi) | ✅ Yakunlandi |
+| Sprint 40 — Real PostgreSQL Integration Test Infrastructure | `backend/conftest.py` — real PostgreSQL bilan ishlaydigan test infratuzilmasi (`pg_session` fixture, savepoint-asoslangan tranzaksiya izolyatsiyasi). 17 ta real integration test (Lesson Order, Lesson Progress, Attempt/Result, Auth/RBAC). Migratsiya `0011` — jarayonda haqiqiy production bug topildi: `LessonProgress.deleted_at` migratsiyada yo'q edi (model↔migratsiya nomuvofiqligi, faqat real DB orqali aniqlangan) | ✅ Yakunlandi |
+| Sprint 41 — Subject/Grade/Topic Architecture Audit | Faqat audit. Dynamic Subject Management arxitekturasi tekshirildi — xulosa: **tayyor**, kod o'zgarishisiz yangi Subject qo'shish mumkin. Fizika-maxsus hardcoding topilmadi | ✅ Yakunlandi (audit) |
+| Sprint 42 — Test Debt Cleanup | `MediaService` test fixture'i eski, 2-argumentli chaqiruvdan foydalanayotgan edi (production konstruktor 4 argument talab qilar edi, Sprint 32'dan beri). Faqat test fayli tuzatildi, production kod o'zgarishsiz. Backend 486 passed (3 ta oldingi "error" yo'qoldi), 0 errors | ✅ Yakunlandi |
+| Sprint 43 — Certificate PDF Generation | `reportlab` (PDF) + `qrcode[pil]` (verification QR) — sof, izolyatsiyalangan `pdf_generator.py`. Mavjud R2/`StorageBackend` qayta ishlatildi (yangi storage tizimi yo'q), deterministik object key (`certificates/{id}.pdf`) — idempotentlik uchun. Yangi `GET /certificates/{id}/download` — ownership tekshiruvi, signed URL, PDF yo'q bo'lsa on-demand generatsiya. Backend 496 passed, frontend 312/312 (53 fayl), TypeScript/build PASS | ✅ Yakunlandi |
+| Sprint 44 — Generic Exam Engine Architecture Audit | Faqat audit. Xulosa: SAT/IELTS/GRE uchun alohida uchta tizim qurish shart emas — mavjud Test/Question/Attempt/Result arxitekturasi (Option D: alohida, backward-compatible qatlam) generic imtihon dvigateli sifatida kengaytirilishi mumkin | ✅ Yakunlandi (audit) |
+| Sprint 45 — Generic Exam Engine Foundation | `Test.max_attempts` (nullable, hardcode'dan chiqarildi), `Answer.text_answer` (matn javob saqlash foundation'i), `ExamSection` (generic bo'lim), `ScoringStrategy`/`PercentageScoringStrategy` (pluggable, mavjud hisoblashning sof ekstraktsiyasi). Migratsiya `0012` | ✅ Yakunlandi |
+| Sprint 46 — Generic Exam Module Foundation | `ExamModule` (Section ichidagi ikkinchi ierarxiya darajasi — masalan SAT'ning Module 1/2), `Question.module_id`, `AttemptModuleProgress` (`question_order` snapshot, mavjud `TestAttempt.question_order` naqshiga mos). Migratsiya `0013` | ✅ Yakunlandi |
+| Sprint 47 — IELTS Engine Foundation | `Test.exam_variant` (generic, IELTS-maxsus enum emas), `QuestionGroup` (`title`/`stimulus_text` — umumiy stimul/passage foundation'i, IELTS-maxsus "Passage" modeli emas), `Question.group_id`, `ResultSection` (generic section-darajasidagi ball saqlash, IELTS-maxsus ustunlarsiz). Migratsiya `0014` | ✅ Yakunlandi |
+| Sprint 48 — Generic Adaptive Routing Foundation | `ExamModule.routing_group`/`routing_variant` (faqat metadata, hech qanday routing mantig'i hali o'qimaydi), `QuestionGroup.module_id`, `AdaptiveRoutingStrategy` (Protocol) + `SequentialRoutingStrategy` (deterministik default), `ModuleAccessGuard` (server-side foundation, hali public endpoint yo'q). Migratsiya `0015` | ✅ Yakunlandi |
+| Sprint 49 — Performance-Based Adaptive Routing | `PerformanceThresholdRoutingStrategy` — `AdaptiveRoutingStrategy`ning birinchi haqiqiy (sequential bo'lmagan) implementatsiyasi, sof Python, DB/HTTP'ga bog'liq emas, hech qanday imtihon-maxsus nom qattiq kodlanmagan. Migratsiya yo'q (mavjud `routing_group`/`routing_variant` yetarli) | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-**Ochiq eslatma (Sprint 28-38 auditlari va real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
+**Ochiq eslatma (Sprint 49'gacha bo'lgan real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
 
-- Test to'plami (430+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
-- Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q).
-- Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan, Question Editor UI (muallif tomonidan to'g'ri javob belgilash) Sprint 33'da qurilgan. Student Attempt UI (`AttemptPage.tsx`)ning o'zi bu sprintlar davomida o'zgartirilmagan.
+- Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q) — bu hali ham amal qiladi.
+- Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan, Question Editor UI Sprint 33'da qurilgan. Student Attempt UI (`AttemptPage.tsx`) bu sprintlar davomida o'zgartirilmagan.
 - **Teacher Media/File UI** — `FileUploader` komponenti tayyor (Lesson video yuklashda ishlatiladi, Sprint 35), lekin alohida "Fayllar" boshqaruv sahifasi Teacher paneliga hali ulanmagan.
-- **Certificate PDF** — hech qachon generatsiya qilinmaydi (`pdf_url` doim `null`).
 - **Rate limiting** — faqat `auth` va `ai` endpointlarida, boshqa modullarda kengaytirilmagan.
-- **Performance/code splitting** — frontend bitta ~810KB chunk (Sprint 33'da KaTeX qo'shilgani sababli o'sgan), `React.lazy` qo'llanilmagan.
-- **`Test.max_attempts`** — konfiguratsiya qilinmaydi, backend konstantasi orqali qattiq `1`ga belgilangan.
-- **Result Analysis'da skill/domain taqsimoti** — savol-savol sharh mavjud (Sprint 37), lekin fan/ko'nikma bo'yicha guruhlashtirish yo'q (bunday taksonomiya backendda umuman yo'q).
+- **Performance/code splitting** — frontend bitta ~820KB chunk, `React.lazy` qo'llanilmagan.
+- **Result Analysis'da skill/domain taqsimoti** — savol-savol sharh mavjud (Sprint 37), lekin fan/ko'nikma bo'yicha guruhlashtirish yo'q.
+- **Generic Exam Engine (Sprint 44-49) — hali faqat fundament (DB/model/strategiya darajasida)**: real modul-darajasidagi imtihon topshirish workflow'i (submit→lock→keyingi modul o'tishi), server-side enforce qilingan hierarxik timing, `PerformanceThresholdRoutingStrategy`ni haqiqiy servis/endpoint bilan bog'lash, IELTS matching/writing/speaking javob turlari, GRE/SAT-maxsus scoring (scaled/band score konversiyasi) — **hech biri hali implement qilinmagan**. Frontend'da generic exam UI (section/module navigator, question group ko'rsatish, adaptive transition) — hali yo'q.
+- **Test infratuzilmasi**: Sprint 40'dan beri real PostgreSQL integration testlar mavjud (55 ta, `backend/conftest.py` orqali), lekin backend testlarining ko'pchiligi hali ham mock-asoslangan (unit darajasida).
+- **Bilinadigan, oldindan mavjud test bazaviy xatolari** (Sprint 45-49 auditlarida qayta-qayta tasdiqlangan, ushbu ishlarga aloqasi yo'q): `profiles` (4), `roles` (2), `test_submit_computes_score_correctly` (1) — jami 7. Shuningdek, `app/core/security.py` (fayl) va `app/core/security/` (papka) bir vaqtda mavjudligi sababli `auth/login`, `auth/refresh`, `auth/registration` sub-modul testlari import xatosi bilan ishlamaydi (Sprint 2/4'dan qolgan, hali tuzatilmagan).
 
 **Loyiha holati — qisqa xulosa**:
 
 | Sohasi | Holat |
 |---|---|
-| Backend | Barqaror, modulli, 435+ test (mock-asoslangan), 26 modul |
-| Frontend | Admin/Student panellari to'liq, Teacher qisman (fayl boshqaruvi yo'q), Question Editor to'liq |
-| Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; Lesson va Question media ikkalasi ham R2'ga bog'langan; real E2E sinov yo'q |
+| Backend | Barqaror, modulli, 27 modul, 61 jadval, ~530 test (asosan mock-asoslangan) + 55 real PostgreSQL integration test |
+| Frontend | Admin/Student panellari to'liq, Teacher qisman (fayl boshqaruvi yo'q), Question Editor to'liq, generic exam UI yo'q |
+| Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; Lesson, Question media va Certificate PDF barchasi R2'ga bog'langan; real E2E sinov yo'q |
 | Question Engine | Multi-answer (backend+authoring UI) + rich-text/formula/media editor — to'liq |
-| Student Progress | Dars tugatish (Sprint 36) — ishlaydi; video-kuzatish/vaqt kuzatuvi yo'q (ataylab, oddiy saqlangan) |
+| Student Progress | Dars tugatish (Sprint 36) — ishlaydi |
 | Result Analysis | To'g'ri/xato/javobsiz, vaqt, savol-savol sharh — ishlaydi; skill/domain taqsimoti yo'q |
-| International Exams (SAT/IELTS/GRE) | Rejalashtirilmagan, kod darajasida mavjud emas |
-| Student/Teacher/Admin | Student — to'liq oqim (Video, Progress, Results History, Result Analysis); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
+| Certificate | PDF generatsiyasi (Sprint 43) — ishlaydi, signed download, QR verification |
+| Generic Exam Engine | **Fundament** (Sprint 44-49): section/module/group struktura, scoring/routing strategiyalari — DB va model darajasida tayyor; ijro workflow'i, frontend UI, imtihon-maxsus qoidalar — hali yo'q |
+| International Exams (SAT/IELTS/GRE) | To'liq implementatsiya emas — faqat generic fundament ustida qurilishi mumkin bo'lgan zamin mavjud (yuqoriga qarang) |
+| Student/Teacher/Admin | Student — to'liq oqim (Video, Progress, Results History, Result Analysis, Certificate); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
