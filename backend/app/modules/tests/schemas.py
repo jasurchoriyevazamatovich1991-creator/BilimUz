@@ -195,3 +195,35 @@ class ExamModuleOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- Sprint 53: QuestionGroup / Stimulus Admin CRUD ---
+
+class QuestionGroupCreateRequest(BaseModel):
+    test_id: uuid.UUID
+    module_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=255)
+    stimulus_text: str | None = None
+    order_number: int = Field(default=0, ge=0)
+
+
+class QuestionGroupUpdateRequest(BaseModel):
+    # test_id is deliberately NOT here — a group can never be moved to
+    # another test through PATCH (Sprint 53's explicit rule).
+    module_id: uuid.UUID | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    stimulus_text: str | None = None
+    order_number: int | None = Field(default=None, ge=0)
+
+
+class QuestionGroupOut(BaseModel):
+    id: uuid.UUID
+    test_id: uuid.UUID
+    module_id: uuid.UUID | None
+    title: str
+    stimulus_text: str | None
+    order_number: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

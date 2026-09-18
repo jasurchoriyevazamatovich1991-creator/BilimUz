@@ -44,3 +44,8 @@ class DuplicateOrderNumberException(AppException):
     clean 409 instead of a raw IntegrityError."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "DUPLICATE_ORDER_NUMBER"
+
+
+class QuestionGroupNotFoundException(AppException):
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "QUESTION_GROUP_NOT_FOUND"

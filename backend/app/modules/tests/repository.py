@@ -164,13 +164,40 @@ class ExamSectionRepository:
 
 
 class QuestionGroupRepository:
-    """Sprint 52 — new, minimal (Sprint 47 created the QuestionGroup
-    model but no repository ever used it directly — Sprint 47's own
-    tests read/write it via the raw SQLAlchemy session). Only get_by_id
-    is needed for this sprint's cross-test ownership validation."""
+    """Sprint 47/52/53. Sprint 47 created the QuestionGroup model but
+    no repository ever used it directly. Sprint 52 added get_by_id for
+    cross-test ownership validation. Sprint 53 (this) adds the full
+    CRUD surface for the Admin API, mirroring ExamSectionRepository's
+    own shape exactly."""
 
     def __init__(self, db: Session):
         self.db = db
 
     def get_by_id(self, group_id: uuid.UUID) -> QuestionGroup | None:
         return self.db.get(QuestionGroup, group_id)
+
+    def list_for_test(self, test_id: uuid.UUID) -> list[QuestionGroup]:
+        stmt = (
+            select(QuestionGroup)
+            .where(QuestionGroup.test_id == test_id, QuestionGroup.deleted_at.is_(None))
+            .order_by(QuestionGroup.order_number)
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def create(self, group: QuestionGroup) -> QuestionGroup:
+        self.db.add(group)
+        self.db.flush()
+        return group
+
+    def update(self, group: QuestionGroup, data: dict) -> QuestionGroup:
+        for field, value in data.items():
+            setattr(group, field, value)
+        self.db.flush()
+        return group
+
+    def soft_delete(self, group: QuestionGroup) -> None:
+        group.deleted_at = datetime.now(timezone.utc)
+        self.db.flush()
+
+    def commit(self) -> None:
+        self.db.commit()

@@ -17,15 +17,18 @@ from app.modules.tests.exceptions import (
     ExamSectionNotFoundException,
     InvalidStatusTransitionException,
     InvalidTestReferenceException,
+    QuestionGroupNotFoundException,
     TestNotFoundException,
 )
-from app.modules.tests.models import ExamModule, ExamSection, Test, TestStatus
-from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, TestRepository
+from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, Test, TestStatus
+from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, QuestionGroupRepository, TestRepository
 from app.modules.tests.schemas import (
     ExamModuleCreateRequest,
     ExamModuleUpdateRequest,
     ExamSectionCreateRequest,
     ExamSectionUpdateRequest,
+    QuestionGroupCreateRequest,
+    QuestionGroupUpdateRequest,
     TestCreateRequest,
     TestListParams,
     TestUpdateRequest,
@@ -224,3 +227,82 @@ class ExamModuleService:
         log_action(self.repo.db, action="exam_module.updated", user_id=actor_id, entity_type="exam_module", entity_id=module.id)
         self.repo.commit()
         return module
+
+
+class QuestionGroupService:
+    """Sprint 53 — Admin Configuration API for QuestionGroup (Sprint 47).
+    Mirrors ExamSectionService's own shape exactly — same duplicate-order
+    guard style, same module-ownership validation logic Sprint 52 already
+    established for Question assignment (module must exist, must belong
+    to a section, that section must belong to the target test)."""
+
+    def __init__(self, repo: QuestionGroupRepository, test_repo: TestRepository, module_repo: ExamModuleRepository, section_repo: ExamSectionRepository):
+        self.repo = repo
+        self.test_repo = test_repo
+        self.module_repo = module_repo
+        self.section_repo = section_repo
+
+    def _ensure_no_duplicate_order(self, test_id: uuid.UUID, order_number: int, exclude_id: uuid.UUID | None = None) -> None:
+        for existing in self.repo.list_for_test(test_id):
+            if existing.order_number == order_number and existing.id != exclude_id:
+                raise DuplicateOrderNumberException(f"Bu test uchun order_number={order_number} allaqachon band")
+
+    def _validate_module_belongs_to_test(self, module_id: uuid.UUID, test_id: uuid.UUID) -> None:
+        module = self.module_repo.get_by_id(module_id)
+        if module is None:
+            raise ExamModuleNotFoundException("Ko'rsatilgan modul (module_id) mavjud emas")
+        section = self.section_repo.get_by_id(module.section_id)
+        if section is None or section.test_id != test_id:
+            raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) bu guruhning testiga tegishli emas")
+
+    def create_group(self, data: QuestionGroupCreateRequest, actor_id: uuid.UUID) -> QuestionGroup:
+        if self.test_repo.get_by_id(data.test_id) is None:
+            raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
+        if data.module_id is not None:
+            self._validate_module_belongs_to_test(data.module_id, data.test_id)
+        self._ensure_no_duplicate_order(data.test_id, data.order_number)
+
+        group = QuestionGroup(
+            test_id=data.test_id, module_id=data.module_id, title=data.title,
+            stimulus_text=data.stimulus_text, order_number=data.order_number,
+        )
+        self.repo.create(group)
+        log_action(self.repo.db, action="question_group.created", user_id=actor_id, entity_type="question_group", entity_id=group.id)
+        self.repo.commit()
+        return group
+
+    def list_groups(self, test_id: uuid.UUID) -> list[QuestionGroup]:
+        if self.test_repo.get_by_id(test_id) is None:
+            raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
+        return self.repo.list_for_test(test_id)
+
+    def get_group(self, group_id: uuid.UUID) -> QuestionGroup:
+        group = self.repo.get_by_id(group_id)
+        if group is None or group.deleted_at is not None:
+            raise QuestionGroupNotFoundException("Guruh topilmadi")
+        return group
+
+    def update_group(self, group_id: uuid.UUID, data: QuestionGroupUpdateRequest, actor_id: uuid.UUID) -> QuestionGroup:
+        group = self.get_group(group_id)
+        payload = data.model_dump(exclude_unset=True)
+        # test_id is never in QuestionGroupUpdateRequest at all — a
+        # group can never be moved to another test through PATCH.
+        if "module_id" in payload and payload["module_id"] is not None:
+            self._validate_module_belongs_to_test(payload["module_id"], group.test_id)
+        if "order_number" in payload:
+            self._ensure_no_duplicate_order(group.test_id, payload["order_number"], exclude_id=group.id)
+        self.repo.update(group, payload)
+        log_action(self.repo.db, action="question_group.updated", user_id=actor_id, entity_type="question_group", entity_id=group.id)
+        self.repo.commit()
+        return group
+
+    def delete_group(self, group_id: uuid.UUID, actor_id: uuid.UUID) -> None:
+        """Soft delete — matches ExamSection/ExamModule's own
+        convention. Question.group_id's ON DELETE SET NULL FK means a
+        future hard-delete would be safe too, but this sprint follows
+        the established soft-delete pattern rather than introducing a
+        second deletion semantics."""
+        group = self.get_group(group_id)
+        self.repo.soft_delete(group)
+        log_action(self.repo.db, action="question_group.deleted", user_id=actor_id, entity_type="question_group", entity_id=group.id)
+        self.repo.commit()

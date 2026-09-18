@@ -12,6 +12,7 @@ from app.modules.auth.dependencies import require_roles
 from app.modules.tests.dependencies import (
     get_exam_module_service,
     get_exam_section_service,
+    get_question_group_service,
     get_test_service,
 )
 from app.modules.tests.schemas import (
@@ -21,13 +22,16 @@ from app.modules.tests.schemas import (
     ExamSectionCreateRequest,
     ExamSectionOut,
     ExamSectionUpdateRequest,
+    QuestionGroupCreateRequest,
+    QuestionGroupOut,
+    QuestionGroupUpdateRequest,
     TestCreateRequest,
     TestListParams,
     TestOut,
     TestPublishRequest,
     TestUpdateRequest,
 )
-from app.modules.tests.service import ExamModuleService, ExamSectionService, TestService
+from app.modules.tests.service import ExamModuleService, ExamSectionService, QuestionGroupService, TestService
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/tests", tags=["Tests"])
@@ -188,6 +192,90 @@ def update_exam_module(
     module = service.update_module(module_id, data, actor_id=user.id)
     return success_response(ExamModuleOut.model_validate(module), "Modul yangilandi.")
 
+
+# --- Sprint 53: QuestionGroup / Stimulus Admin CRUD ---
+# IMPORTANT: these static routes MUST be registered before the dynamic
+# /{test_id} route below (see Sprint 51's own route-collision fix —
+# FastAPI matches routes in registration order, and a dynamic
+# /{test_id}: uuid.UUID path parameter would otherwise 422 on
+# "question-groups" before ever reaching these handlers).
+
+@router.post(
+    "/question-groups",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a question group (shared stimulus)",
+    description="Sprint 47's generic QuestionGroup — a shared stimulus (e.g. a reading passage or "
+                "listening audio transcript) a set of Questions can be grouped under. Deliberately "
+                "generic, not exam-specific. 422 if test_id doesn't exist. 404 if module_id doesn't "
+                "exist. 422 if module_id doesn't belong to test_id. 409 if order_number is already "
+                "used by a sibling group of the same test.",
+)
+def create_question_group(
+    data: QuestionGroupCreateRequest,
+    service: QuestionGroupService = Depends(get_question_group_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    group = service.create_group(data, actor_id=user.id)
+    return success_response(QuestionGroupOut.model_validate(group), "Guruh yaratildi.")
+
+
+@router.get(
+    "/question-groups",
+    summary="List question groups for a test",
+    description="Ordered by order_number. Excludes soft-deleted groups. 422 if test_id doesn't exist.",
+)
+def list_question_groups(
+    test_id: uuid.UUID = Query(...),
+    service: QuestionGroupService = Depends(get_question_group_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    groups = service.list_groups(test_id)
+    return success_response([QuestionGroupOut.model_validate(g) for g in groups], "Guruhlar ro'yxati.")
+
+
+@router.get(
+    "/question-groups/{group_id}",
+    summary="Get a question group by ID",
+    description="404 if not found or soft-deleted.",
+)
+def get_question_group(
+    group_id: uuid.UUID,
+    service: QuestionGroupService = Depends(get_question_group_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    group = service.get_group(group_id)
+    return success_response(QuestionGroupOut.model_validate(group), "Guruh topildi.")
+
+
+@router.patch(
+    "/question-groups/{group_id}",
+    summary="Update a question group",
+    description="test_id can never be changed — a group cannot be moved to another test. "
+                "409 if the new order_number is already used by a sibling group of the same test.",
+)
+def update_question_group(
+    group_id: uuid.UUID,
+    data: QuestionGroupUpdateRequest,
+    service: QuestionGroupService = Depends(get_question_group_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    group = service.update_group(group_id, data, actor_id=user.id)
+    return success_response(QuestionGroupOut.model_validate(group), "Guruh yangilandi.")
+
+
+@router.delete(
+    "/question-groups/{group_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Soft-delete a question group",
+    description="Sets deleted_at. Does NOT delete Questions assigned to this group — "
+                "Question.group_id is set to NULL (existing ON DELETE SET NULL FK behavior).",
+)
+def delete_question_group(
+    group_id: uuid.UUID,
+    service: QuestionGroupService = Depends(get_question_group_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    service.delete_group(group_id, actor_id=user.id)
 
 
 @router.get(
