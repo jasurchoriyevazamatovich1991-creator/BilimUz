@@ -18,6 +18,7 @@ from app.modules.questions.exceptions import (
     UploadNotFoundForMediaException,
 )
 from app.modules.questions.models import Question, QuestionMedia, QuestionOption
+from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, QuestionGroupRepository, TestRepository
 from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
 from app.modules.questions.schemas import (
     MediaCreateRequest,
@@ -27,14 +28,75 @@ from app.modules.questions.schemas import (
     QuestionListParams,
     QuestionUpdateRequest,
 )
-from app.modules.tests.repository import TestRepository
 from app.modules.uploads.repository import UploadRepository
 
 
 class QuestionService:
-    def __init__(self, repository: QuestionRepository, test_repository: TestRepository):
+    def __init__(
+        self,
+        repository: QuestionRepository,
+        test_repository: TestRepository,
+        section_repository: "ExamSectionRepository | None" = None,
+        module_repository: "ExamModuleRepository | None" = None,
+        group_repository: "QuestionGroupRepository | None" = None,
+    ):
         self.repo = repository
         self.test_repo = test_repository
+        # Sprint 52 — all three optional, default None. The existing
+        # test construction QuestionService(mock_repo, mock_test_repo)
+        # (2 positional args) is completely unaffected; these are only
+        # read by _validate_assignment_fields() below, and only when
+        # the caller actually supplies section_id/module_id/group_id.
+        self.section_repo = section_repository
+        self.module_repo = module_repository
+        self.group_repo = group_repository
+
+    def _validate_assignment_fields(self, question: Question, updates: dict) -> None:
+        """Sprint 52. Validates that any of section_id/module_id/group_id
+        present in `updates` (explicitly supplied by the caller, per
+        exclude_unset semantics — a None value here means an explicit
+        unassignment, which needs no relationship validation) actually
+        belongs to the SAME Test as `question` — the cross-tenant/IDOR
+        boundary this sprint exists to enforce. Also validates internal
+        consistency when multiple fields are supplied together (e.g. a
+        module whose own section doesn't match the supplied section_id)."""
+        has_section = "section_id" in updates
+        has_module = "module_id" in updates
+        has_group = "group_id" in updates
+        if not (has_section or has_module or has_group):
+            return
+
+        section = None
+        if has_section and updates["section_id"] is not None:
+            section = self.section_repo.get_by_id(updates["section_id"])
+            if section is None or section.test_id != question.test_id:
+                raise InvalidTestReferenceException("Ko'rsatilgan bo'lim (section_id) bu savolning testiga tegishli emas")
+
+        module = None
+        if has_module and updates["module_id"] is not None:
+            module = self.module_repo.get_by_id(updates["module_id"])
+            if module is None:
+                raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) mavjud emas")
+            module_section = self.section_repo.get_by_id(module.section_id)
+            if module_section is None or module_section.test_id != question.test_id:
+                raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) bu savolning testiga tegishli emas")
+
+        group = None
+        if has_group and updates["group_id"] is not None:
+            group = self.group_repo.get_by_id(updates["group_id"])
+            if group is None or group.test_id != question.test_id:
+                raise InvalidTestReferenceException("Ko'rsatilgan guruh (group_id) bu savolning testiga tegishli emas")
+
+        # Cross-relationship consistency — only meaningful when BOTH
+        # sides of a pair were explicitly supplied together in this
+        # same request (per Sprint 52's exact requirement).
+        if section is not None and module is not None and module.section_id != section.id:
+            raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) ko'rsatilgan bo'limga (section_id) tegishli emas")
+        if group is not None and module is not None and group.module_id is not None and group.module_id != module.id:
+            raise InvalidTestReferenceException("Ko'rsatilgan guruh (group_id) ko'rsatilgan modulga (module_id) tegishli emas")
+        # group.module_id is None -> the group remains test-scoped; the
+        # question being assigned to a module while the group stays
+        # test-scoped is explicitly valid per Sprint 52's own rule.
 
     def get_question(self, question_id: uuid.UUID) -> Question:
         question = self.repo.get_by_id(question_id)
@@ -72,6 +134,7 @@ class QuestionService:
     def update_question(self, question_id: uuid.UUID, data: QuestionUpdateRequest, actor_id: uuid.UUID) -> Question:
         question = self.get_question(question_id)
         updates = data.model_dump(exclude_unset=True)
+        self._validate_assignment_fields(question, updates)
         updates["updated_by"] = actor_id
         self.repo.update(question, updates)
         log_action(

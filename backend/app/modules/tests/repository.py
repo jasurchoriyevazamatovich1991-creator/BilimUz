@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.tests.models import Test, ExamModule, ExamSection
+from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup
 from app.modules.tests.schemas import TestListParams
 
 
@@ -161,3 +161,16 @@ class ExamSectionRepository:
 
     def commit(self) -> None:
         self.db.commit()
+
+
+class QuestionGroupRepository:
+    """Sprint 52 — new, minimal (Sprint 47 created the QuestionGroup
+    model but no repository ever used it directly — Sprint 47's own
+    tests read/write it via the raw SQLAlchemy session). Only get_by_id
+    is needed for this sprint's cross-test ownership validation."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_id(self, group_id: uuid.UUID) -> QuestionGroup | None:
+        return self.db.get(QuestionGroup, group_id)

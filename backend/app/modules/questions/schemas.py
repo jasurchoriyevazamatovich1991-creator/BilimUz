@@ -148,6 +148,17 @@ class QuestionUpdateRequest(BaseModel):
     score: float | None = None
     explanation: str | None = None
     status: str | None = None
+    # Sprint 52 — optional assignment of an EXISTING question to the
+    # generic exam engine's structure (Sprint 45-47). All three remain
+    # optional and independent of each other — omitting a field leaves
+    # that relationship unchanged (exclude_unset=True in
+    # update_question() already gives this for free); explicitly
+    # passing null unassigns it. Cross-Test/cross-relationship
+    # consistency is validated in QuestionService.update_question(),
+    # not here — Pydantic alone cannot check a database relationship.
+    section_id: uuid.UUID | None = None
+    module_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = None
 
     @field_validator("question_text")
     @classmethod
