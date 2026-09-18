@@ -131,3 +131,67 @@ class TestListParams(BaseModel):
     difficulty: str | None = None
     status: str | None = None
     sort: str = "-created_at"
+
+
+# --- Sprint 51: ExamSection / ExamModule Admin Configuration API ---
+
+class ExamSectionCreateRequest(BaseModel):
+    test_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=255)
+    order_number: int = Field(default=0, ge=0)
+    duration: int | None = Field(default=None, gt=0)
+
+
+class ExamSectionUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    order_number: int | None = Field(default=None, ge=0)
+    duration: int | None = Field(default=None, gt=0)
+
+
+class ExamSectionOut(BaseModel):
+    id: uuid.UUID
+    test_id: uuid.UUID
+    name: str
+    order_number: int
+    duration: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ExamModuleCreateRequest(BaseModel):
+    section_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=255)
+    order_number: int = Field(default=0, ge=0)
+    duration: int | None = Field(default=None, gt=0)
+    difficulty_tier: str | None = Field(default=None, max_length=20)
+    # Sprint 48/51 — generic metadata only, no exam-specific validation.
+    # Any string value is accepted; this schema never checks against
+    # SAT/GRE/IELTS-specific names.
+    routing_group: str | None = Field(default=None, max_length=50)
+    routing_variant: str | None = Field(default=None, max_length=50)
+
+
+class ExamModuleUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    order_number: int | None = Field(default=None, ge=0)
+    duration: int | None = Field(default=None, gt=0)
+    difficulty_tier: str | None = Field(default=None, max_length=20)
+    routing_group: str | None = Field(default=None, max_length=50)
+    routing_variant: str | None = Field(default=None, max_length=50)
+
+
+class ExamModuleOut(BaseModel):
+    id: uuid.UUID
+    section_id: uuid.UUID
+    name: str
+    order_number: int
+    duration: int | None
+    difficulty_tier: str | None
+    routing_group: str | None
+    routing_variant: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

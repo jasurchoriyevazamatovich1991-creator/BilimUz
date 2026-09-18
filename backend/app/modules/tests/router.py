@@ -9,15 +9,25 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.schemas import success_response
 from app.modules.auth.dependencies import require_roles
-from app.modules.tests.dependencies import get_test_service
+from app.modules.tests.dependencies import (
+    get_exam_module_service,
+    get_exam_section_service,
+    get_test_service,
+)
 from app.modules.tests.schemas import (
+    ExamModuleCreateRequest,
+    ExamModuleOut,
+    ExamModuleUpdateRequest,
+    ExamSectionCreateRequest,
+    ExamSectionOut,
+    ExamSectionUpdateRequest,
     TestCreateRequest,
     TestListParams,
     TestOut,
     TestPublishRequest,
     TestUpdateRequest,
 )
-from app.modules.tests.service import TestService
+from app.modules.tests.service import ExamModuleService, ExamSectionService, TestService
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/tests", tags=["Tests"])
@@ -51,6 +61,133 @@ def list_tests(
         "meta": {"page": page, "per_page": per_page, "total": total, "total_pages": (total + per_page - 1) // per_page},
     }
     return success_response(data, "Testlar ro'yxati.")
+
+
+# --- Sprint 51: ExamSection Admin Configuration API ---
+
+@router.post(
+    "/exam-sections",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an exam section",
+    description="Sprint 45's generic ExamSection — optional grouping of Questions within a Test "
+                "(e.g. SAT's 'Reading and Writing' / 'Math'). 422 if test_id doesn't exist. "
+                "409 if order_number is already used by a sibling section of the same test.",
+)
+def create_exam_section(
+    data: ExamSectionCreateRequest,
+    service: ExamSectionService = Depends(get_exam_section_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    section = service.create_section(data, actor_id=user.id)
+    return success_response(ExamSectionOut.model_validate(section), "Bo'lim yaratildi.")
+
+
+@router.get(
+    "/exam-sections",
+    summary="List exam sections for a test",
+    description="Ordered by order_number. 422 if test_id doesn't exist.",
+)
+def list_exam_sections(
+    test_id: uuid.UUID = Query(...),
+    service: ExamSectionService = Depends(get_exam_section_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    sections = service.list_sections(test_id)
+    return success_response([ExamSectionOut.model_validate(s) for s in sections], "Bo'limlar ro'yxati.")
+
+
+@router.get(
+    "/exam-sections/{section_id}",
+    summary="Get an exam section by ID",
+    description="404 if not found.",
+)
+def get_exam_section(
+    section_id: uuid.UUID,
+    service: ExamSectionService = Depends(get_exam_section_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    section = service.get_section(section_id)
+    return success_response(ExamSectionOut.model_validate(section), "Bo'lim topildi.")
+
+
+@router.patch(
+    "/exam-sections/{section_id}",
+    summary="Update an exam section",
+    description="409 if the new order_number is already used by a sibling section of the same test.",
+)
+def update_exam_section(
+    section_id: uuid.UUID,
+    data: ExamSectionUpdateRequest,
+    service: ExamSectionService = Depends(get_exam_section_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    section = service.update_section(section_id, data, actor_id=user.id)
+    return success_response(ExamSectionOut.model_validate(section), "Bo'lim yangilandi.")
+
+
+# --- Sprint 51: ExamModule Admin Configuration API ---
+
+@router.post(
+    "/exam-modules",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an exam module",
+    description="Sprint 46's generic ExamModule — second hierarchy level under ExamSection "
+                "(e.g. SAT's 'Module 1'/'Module 2' within 'Math'). routing_group/routing_variant "
+                "(Sprint 48) are generic metadata only — any string value is accepted, no "
+                "exam-specific validation. 404 if section_id doesn't exist. 409 if order_number "
+                "is already used by a sibling module of the same section.",
+)
+def create_exam_module(
+    data: ExamModuleCreateRequest,
+    service: ExamModuleService = Depends(get_exam_module_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    module = service.create_module(data, actor_id=user.id)
+    return success_response(ExamModuleOut.model_validate(module), "Modul yaratildi.")
+
+
+@router.get(
+    "/exam-modules",
+    summary="List exam modules for a section",
+    description="Ordered by order_number. 404 if section_id doesn't exist.",
+)
+def list_exam_modules(
+    section_id: uuid.UUID = Query(...),
+    service: ExamModuleService = Depends(get_exam_module_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    modules = service.list_modules(section_id)
+    return success_response([ExamModuleOut.model_validate(m) for m in modules], "Modullar ro'yxati.")
+
+
+@router.get(
+    "/exam-modules/{module_id}",
+    summary="Get an exam module by ID",
+    description="404 if not found.",
+)
+def get_exam_module(
+    module_id: uuid.UUID,
+    service: ExamModuleService = Depends(get_exam_module_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    module = service.get_module(module_id)
+    return success_response(ExamModuleOut.model_validate(module), "Modul topildi.")
+
+
+@router.patch(
+    "/exam-modules/{module_id}",
+    summary="Update an exam module",
+    description="409 if the new order_number is already used by a sibling module of the same section.",
+)
+def update_exam_module(
+    module_id: uuid.UUID,
+    data: ExamModuleUpdateRequest,
+    service: ExamModuleService = Depends(get_exam_module_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    module = service.update_module(module_id, data, actor_id=user.id)
+    return success_response(ExamModuleOut.model_validate(module), "Modul yangilandi.")
+
 
 
 @router.get(

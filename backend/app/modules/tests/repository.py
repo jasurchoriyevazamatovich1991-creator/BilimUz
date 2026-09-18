@@ -114,3 +114,50 @@ class ExamModuleRepository:
             .limit(1)
         )
         return self.db.scalars(stmt).first() is not None
+
+    def list_for_section(self, section_id: uuid.UUID) -> list[ExamModule]:
+        stmt = select(ExamModule).where(ExamModule.section_id == section_id, ExamModule.deleted_at.is_(None)).order_by(ExamModule.order_number)
+        return list(self.db.scalars(stmt).all())
+
+    def create(self, module: ExamModule) -> ExamModule:
+        self.db.add(module)
+        self.db.flush()
+        return module
+
+    def update(self, module: ExamModule, data: dict) -> ExamModule:
+        for field, value in data.items():
+            setattr(module, field, value)
+        self.db.flush()
+        return module
+
+    def commit(self) -> None:
+        self.db.commit()
+
+
+class ExamSectionRepository:
+    """Sprint 51 — new, for the Admin Configuration API. Mirrors
+    ExamModuleRepository's own shape exactly."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_id(self, section_id: uuid.UUID) -> ExamSection | None:
+        return self.db.get(ExamSection, section_id)
+
+    def list_for_test(self, test_id: uuid.UUID) -> list[ExamSection]:
+        stmt = select(ExamSection).where(ExamSection.test_id == test_id, ExamSection.deleted_at.is_(None)).order_by(ExamSection.order_number)
+        return list(self.db.scalars(stmt).all())
+
+    def create(self, section: ExamSection) -> ExamSection:
+        self.db.add(section)
+        self.db.flush()
+        return section
+
+    def update(self, section: ExamSection, data: dict) -> ExamSection:
+        for field, value in data.items():
+            setattr(section, field, value)
+        self.db.flush()
+        return section
+
+    def commit(self) -> None:
+        self.db.commit()
