@@ -100,6 +100,15 @@ class QuestionRepository:
         silently miss a question."""
         stmt = select(Question).where(Question.module_id == module_id, Question.deleted_at.is_(None))
         return list(self.db.scalars(stmt).all())
+
+    def list_by_section(self, section_id: uuid.UUID) -> list[Question]:
+        """Sprint 54 — section-scoped equivalent of list_all_for_test()/
+        list_by_module(), same unpaginated reasoning: section-level
+        scoring must never silently miss a question. Question.section_id
+        is a direct, independent column (Sprint 45) — not derived via
+        module — so this is a flat filter, same shape as list_by_module."""
+        stmt = select(Question).where(Question.section_id == section_id, Question.deleted_at.is_(None))
+        return list(self.db.scalars(stmt).all())
         stmt = (
             select(Question)
             .where(Question.test_id == test_id, Question.deleted_at.is_(None))

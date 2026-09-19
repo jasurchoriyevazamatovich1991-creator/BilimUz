@@ -12,11 +12,12 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.audit import log_action
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
+from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
-from app.modules.results.models import Result, Statistics
-from app.modules.results.repository import RankingRepository, ResultRepository, StatisticsRepository
+from app.modules.results.models import Result, ResultSection, Statistics
+from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams
-from app.modules.tests.repository import TestRepository
+from app.modules.tests.repository import ExamSectionRepository, TestRepository
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
 
@@ -30,6 +31,16 @@ class ResultService:
         answer_repository: AnswerRepository,
         test_repository: TestRepository,
         question_repository: "QuestionRepository",
+        # Sprint 54 — both optional, default None, same backward-compat
+        # reasoning already established for AttemptService's
+        # module_execution_service/module_repository (Sprint 50): every
+        # existing caller (this module's own unit tests, and any future
+        # caller with no need for section scoring) that constructs
+        # ResultService with only the original 6 arguments is completely
+        # unaffected — create_result() below degrades to the exact
+        # legacy (no-ResultSection) behavior when these are None.
+        exam_section_repository: ExamSectionRepository | None = None,
+        result_section_repository: ResultSectionRepository | None = None,
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
@@ -37,6 +48,8 @@ class ResultService:
         self.answer_repo = answer_repository
         self.test_repo = test_repository
         self.question_repo = question_repository
+        self.section_repo = exam_section_repository
+        self.result_section_repo = result_section_repository
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -44,6 +57,28 @@ class ResultService:
             raise ResultNotFoundException("Urinish topilmadi")
         if attempt.status not in _FINISHED_ATTEMPT_STATUSES:
             raise AttemptNotFinishedException("Urinish hali yakunlanmagan")
+
+        # Sprint 54 — acquired here, BEFORE the existing-Result check
+        # and BEFORE creating Result/ResultSection below (ownership/
+        # status validation above is unaffected — it only ever reads
+        # immutable-once-set attempt fields, so it doesn't need the
+        # lock). Real PostgreSQL row-lock (SELECT ... FOR UPDATE +
+        # populate_existing=True) — the identical pattern Sprint 50's
+        # CRITICAL-1 fix established for AttemptModuleProgress. A
+        # second, concurrent create_result() call for the SAME
+        # attempt_id blocks here until the first call's transaction
+        # commits and releases the lock; it then re-checks for an
+        # already-created Result under that same lock immediately
+        # below, so it reliably observes the first call's now-committed
+        # Result instead of racing past an unlocked existence check and
+        # hitting Result.attempt_id's UNIQUE constraint as an unhandled
+        # IntegrityError. Every existing caller (this module's own unit
+        # tests, which mock attempt_repo and only ever stub get_by_id())
+        # is unaffected: get_by_id_locked() is called here for its
+        # locking side-effect only — attempt's already-read fields
+        # (user_id/status/test_id/score/percentage) don't change
+        # between the two calls within this same transaction.
+        self.attempt_repo.get_by_id_locked(attempt_id)
 
         existing = self.repo.get_by_attempt_id(attempt_id)
         if existing:
@@ -59,10 +94,67 @@ class ResultService:
             score=float(attempt.score or 0), percentage=float(attempt.percentage or 0), is_passed=is_passed,
         )
         self.repo.create(result)
+        self._create_result_sections(result, attempt)
         self._update_statistics(user_id, test.subject_id if test else None, attempt_id, float(attempt.percentage or 0))
         log_action(self.repo.db, action="result.created", user_id=user_id, entity_type="result", entity_id=result.id)
         self.repo.commit()
         return result
+
+    def _create_result_sections(self, result: Result, attempt) -> None:
+        """Sprint 54 — generic section-level raw scoring foundation.
+        A complete no-op for a non-modular test (self.section_repo is
+        None — legacy ResultService construction — or the Test simply
+        has zero ExamSection rows, every existing Physics/National
+        Certificate test): zero ResultSection rows are created, and
+        Result creation behaves byte-for-byte as before this sprint.
+
+        Only ever called from create_result(), after that method has
+        already acquired the locked TestAttempt row and confirmed no
+        Result exists yet for this attempt — so this always runs
+        exactly once per attempt, inside the same transaction as the
+        Result insert above (both flushed here, committed together by
+        create_result()'s own self.repo.commit()).
+
+        Sections come ONLY from ExamSectionRepository.list_for_test(
+        attempt.test_id) — never from any client-supplied section_id —
+        so every section this loop ever sees already belongs to the
+        correct test by construction. The explicit section.test_id
+        check below is a defensive, not load-bearing, assertion of
+        that invariant (never trust an ID without re-verifying its
+        ownership, even one this method itself just fetched)."""
+        if self.section_repo is None or self.result_section_repo is None:
+            return
+
+        sections = self.section_repo.list_for_test(attempt.test_id)
+        if not sections:
+            return
+
+        answers = self.answer_repo.list_for_attempt(attempt.id)
+        answers_by_question = {a.question_id: a for a in answers}
+
+        for section in sections:
+            if section.test_id != result.test_id:
+                # Defensive only — see docstring above. Can't actually
+                # happen since list_for_test() already scoped by
+                # attempt.test_id == result.test_id, but a ResultSection
+                # is never created for a section outside this Result's
+                # own test, no matter what.
+                continue
+
+            questions = self.question_repo.list_by_section(section.id)
+            section_answers = [answers_by_question[q.id] for q in questions if q.id in answers_by_question]
+
+            # Same generic ScoringStrategy already used for the
+            # whole-attempt score (AttemptService._finalize()) and for
+            # module-scoped routing performance
+            # (ModuleExecutionService.submit_module()) — no new
+            # weighting formula, no exam-specific scoring.
+            scoring_result = DEFAULT_SCORING_STRATEGY.calculate(questions, section_answers)
+
+            self.result_section_repo.create(ResultSection(
+                result_id=result.id, section_id=section.id,
+                raw_score=scoring_result.score, scaled_score=None,
+            ))
 
     def get_result(self, result_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         result = self.repo.get_by_id(result_id)

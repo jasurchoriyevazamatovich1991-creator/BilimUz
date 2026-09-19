@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.results.models import Ranking, Result, Statistics
+from app.modules.results.models import Ranking, Result, ResultSection, Statistics
 
 
 class ResultRepository:
@@ -74,6 +74,50 @@ class ResultRepository:
 
     def commit(self) -> None:
         self.db.commit()
+
+
+class ResultSectionRepository:
+    """Sprint 54 — ResultSection creation during Result creation
+    (generic section-level raw scoring foundation). Mirrors
+    ResultRepository's own shape exactly, same cohesive-module
+    reasoning as the other repositories in this file.
+
+    No update()/delete() — ResultSection rows are write-once per
+    (result, section) by design (a Result is itself immutable once
+    created; re-running create_result() for an already-existing
+    attempt returns the existing Result and never touches its
+    sections again, see ResultService.create_result())."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_result_and_section(self, result_id: uuid.UUID, section_id: uuid.UUID) -> ResultSection | None:
+        stmt = select(ResultSection).where(
+            ResultSection.result_id == result_id, ResultSection.section_id == section_id, ResultSection.deleted_at.is_(None)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def list_for_result(self, result_id: uuid.UUID) -> list[ResultSection]:
+        stmt = select(ResultSection).where(ResultSection.result_id == result_id, ResultSection.deleted_at.is_(None))
+        return list(self.db.execute(stmt).scalars().all())
+
+    def create(self, result_section: ResultSection) -> ResultSection:
+        # Safe/idempotent under concurrency by construction, not by a
+        # try/except here: the caller (ResultService.create_result())
+        # only ever reaches this method while holding the locked
+        # TestAttempt row (AttemptRepository.get_by_id_locked) acquired
+        # BEFORE the Result-existence check — see that method's own
+        # docstring. A second concurrent request for the same attempt
+        # blocks on that lock and, once unblocked, finds the Result
+        # (and therefore its ResultSection rows) already committed, so
+        # it returns the existing Result instead of ever calling this
+        # method again for the same (result_id, section_id) pair. The
+        # UNIQUE(result_id, section_id) DB constraint remains as the
+        # final backstop, exactly as Result.attempt_id's UNIQUE
+        # constraint backstops Result creation.
+        self.db.add(result_section)
+        self.db.flush()
+        return result_section
 
 
 class StatisticsRepository:

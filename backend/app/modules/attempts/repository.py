@@ -17,6 +17,26 @@ class AttemptRepository:
         stmt = select(TestAttempt).where(TestAttempt.id == attempt_id, TestAttempt.deleted_at.is_(None))
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def get_by_id_locked(self, attempt_id: uuid.UUID) -> TestAttempt | None:
+        """Sprint 54 — same real PostgreSQL row-lock pattern as Sprint
+        50's AttemptModuleProgressRepository.get_for_attempt_and_module_locked
+        (SELECT ... FOR UPDATE + populate_existing=True). Used by
+        ResultService.create_result() to serialize concurrent
+        Result-creation requests for the SAME attempt: the second
+        concurrent caller blocks here until the first one's transaction
+        commits (releasing the lock), then re-reads the attempt's
+        current state and — critically — re-checks for an
+        already-created Result under this same lock, so it observes
+        the first caller's now-committed Result instead of racing past
+        an earlier unlocked existence check."""
+        stmt = (
+            select(TestAttempt)
+            .where(TestAttempt.id == attempt_id, TestAttempt.deleted_at.is_(None))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
     def count_for_user_and_test(self, user_id: uuid.UUID, test_id: uuid.UUID) -> int:
         """Every attempt ever started counts toward the limit, including
         abandoned in_progress ones — matches the platform's max-attempts
