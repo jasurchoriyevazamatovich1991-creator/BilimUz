@@ -16,7 +16,7 @@ from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
 from app.modules.results.models import Result, ResultSection, Statistics
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
-from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams
+from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams, ResultSectionOut
 from app.modules.tests.repository import ExamSectionRepository, TestRepository
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
@@ -169,6 +169,7 @@ class ResultService:
         are all derived from THIS already-ownership-verified result,
         never from a client-supplied id)."""
         result = self.get_result(result_id, user_id)
+        section_outs = self._get_result_sections(result)
         attempt = self.attempt_repo.get_by_id(result.attempt_id)
         answers = self.answer_repo.list_for_attempt(result.attempt_id)
         answers_by_question = {a.question_id: a for a in answers}
@@ -219,7 +220,45 @@ class ResultService:
             total_questions=len(question_ids), correct_answers=correct_count,
             incorrect_answers=incorrect_count, unanswered=unanswered_count,
             time_spent_seconds=time_spent_seconds, questions=question_reviews,
+            sections=section_outs,
         )
+
+    def _get_result_sections(self, result: Result) -> list[ResultSectionOut]:
+        """Sprint 55 — read-only exposure of Sprint 54's ResultSection
+        rows. Called from get_result_detail() ONLY after
+        get_result()'s own ownership check has already passed — every
+        row this method returns is scoped strictly to `result.id`
+        (ResultSectionRepository.list_for_result()), never to a
+        client-supplied section_id, so there is no way for a caller to
+        pull another Result's sections through this method.
+
+        A no-op ([]) for a legacy ResultService construction
+        (self.result_section_repo is None) and for any Result with zero
+        ResultSection rows (every non-modular result, exactly as
+        before this sprint) — GET /results/{id}'s existing fields and
+        behavior are completely unchanged either way.
+
+        Ordering: by the owning Test's ExamSection.order_number when
+        available (ExamSectionRepository.list_for_test() already
+        returns sections in that deterministic order — reused here
+        rather than inventing a new ordering column, per this sprint's
+        own constraint), falling back to ResultSection.id ordering if
+        section_repo isn't wired (defensive; in practice both repos
+        are always wired together by get_result_service())."""
+        if self.result_section_repo is None:
+            return []
+
+        rows = self.result_section_repo.list_for_result(result.id)
+        if not rows:
+            return []
+
+        if self.section_repo is not None:
+            order_by_section_id = {s.id: s.order_number for s in self.section_repo.list_for_test(result.test_id)}
+            rows = sorted(rows, key=lambda r: order_by_section_id.get(r.section_id, 0))
+        else:
+            rows = sorted(rows, key=lambda r: r.id)
+
+        return [ResultSectionOut.model_validate(r) for r in rows]
 
     def list_my_results(self, user_id: uuid.UUID, params: ResultListParams) -> tuple[list[Result], int]:
         return self.repo.list_for_user(user_id, params.page, params.per_page, params.test_id, params.sort)

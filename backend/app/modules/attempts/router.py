@@ -99,7 +99,17 @@ def save_answer(
     service: AttemptService = Depends(get_attempt_service),
     user: User = Depends(get_current_user),
 ):
-    service.save_answer(attempt_id, user_id=user.id, question_id=data.question_id, selected_option=data.selected_option)
+    # Sprint 55 bugfix — data.selected_options (the multiple_choice
+    # payload field, present on SaveAnswerRequest since Sprint 30) was
+    # never forwarded here, so every real HTTP multiple_choice answer
+    # was silently treated as unanswered by the service (which defaults
+    # selected_options to None). save_answer()'s own multiple_choice
+    # branch and scoring were always correct — only this call site was
+    # missing the argument.
+    service.save_answer(
+        attempt_id, user_id=user.id, question_id=data.question_id,
+        selected_option=data.selected_option, selected_options=data.selected_options,
+    )
     return success_response(None, "Javob saqlandi.")
 
 

@@ -51,6 +51,21 @@ class QuestionReviewOut(BaseModel):
     is_correct: bool | None
 
 
+class ResultSectionOut(BaseModel):
+    """Sprint 55 — read-only exposure of Sprint 54's ResultSection rows.
+    Deliberately exposes only the fields a result consumer needs
+    (id, section_id, raw_score, scaled_score) — no result_id (redundant,
+    the client already has it from the enclosing ResultDetailOut),
+    no timestamps/deleted_at (internal bookkeeping, not part of any
+    other *Out schema's public shape in this module either)."""
+    id: uuid.UUID
+    section_id: uuid.UUID
+    raw_score: float | None
+    scaled_score: float | None
+
+    model_config = {"from_attributes": True}
+
+
 class ResultDetailOut(ResultOut):
     total_questions: int
     correct_answers: int
@@ -61,6 +76,13 @@ class ResultDetailOut(ResultOut):
     # historical/edge-case data is handled safely rather than assumed).
     time_spent_seconds: int | None
     questions: list[QuestionReviewOut]
+    # Sprint 55 — additive. Empty list for a non-modular result (every
+    # result created before this sprint, and any result for a Test with
+    # zero ExamSection rows) — existing clients that don't read this
+    # field are completely unaffected; ResultOut (used by
+    # GET /results/me's list view) is untouched, so that contract
+    # doesn't change at all.
+    sections: list[ResultSectionOut] = []
 
 
 class ResultListParams(BaseModel):
