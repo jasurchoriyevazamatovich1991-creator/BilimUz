@@ -1,8 +1,8 @@
 """
-HTTP layer for /api/v1/questions/*. List/get require authentication (not
-fully public like tests/topics — a question's correct answer must never
-be exposed to an unauthenticated caller); write endpoints require Admin,
-Super Admin, or Teacher.
+HTTP layer for /api/v1/questions/*. Every endpoint — reads and writes —
+requires Admin, Super Admin, or Teacher (Sprint 56: list/get used to
+accept any authenticated user, which let a Student read the answer key
+directly; see the security fix on list_questions()/get_question() below).
 
 IMPORTANT: this router's QuestionOut includes is_correct on every option
 — it is for CONTENT AUTHORING only (Admin/Teacher browsing their own
@@ -15,7 +15,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 
 from app.core.schemas import success_response
-from app.modules.auth.dependencies import get_current_user, require_roles
+from app.modules.auth.dependencies import require_roles
 from app.modules.questions.dependencies import (
     get_media_service,
     get_option_service,
@@ -42,7 +42,7 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
     "",
     summary="List questions",
     description="Paginated, filterable (by test_id, difficulty, status) list of questions, "
-                "INCLUDING correct answers — content-authoring view only. Requires authentication.",
+                "INCLUDING correct answers — content-authoring view only. Requires Admin, Super Admin, or Teacher.",
 )
 def list_questions(
     page: int = Query(default=1, ge=1),
@@ -52,7 +52,13 @@ def list_questions(
     status_filter: str | None = Query(default=None, alias="status"),
     sort: str = Query(default="created_at"),
     service: QuestionService = Depends(get_question_service),
-    _user: User = Depends(get_current_user),
+    # Sprint 56 security fix — this response includes is_correct on every
+    # option (content-authoring view, see module docstring above), so a
+    # plain "any authenticated user" check was wrong: it let a Student
+    # read the answer key for every question directly, bypassing the
+    # entire attempt-flow answer-hiding design. Restricted to the same
+    # roles already required by every write endpoint in this router.
+    _user: User = Depends(require_roles("Admin", "Super Admin", "Teacher")),
 ):
     params = QuestionListParams(page=page, per_page=per_page, test_id=test_id, difficulty=difficulty, status=status_filter, sort=sort)
     items, total = service.list_questions(params)
@@ -66,12 +72,13 @@ def list_questions(
 @router.get(
     "/{question_id}",
     summary="Get a question by ID",
-    description="Returns a question with its options (including is_correct) and media. Requires authentication.",
+    description="Returns a question with its options (including is_correct) and media. Requires Admin, Super Admin, or Teacher.",
 )
 def get_question(
     question_id: uuid.UUID,
     service: QuestionService = Depends(get_question_service),
-    _user: User = Depends(get_current_user),
+    # Sprint 56 security fix — see list_questions() above for the reason.
+    _user: User = Depends(require_roles("Admin", "Super Admin", "Teacher")),
 ):
     question = service.get_question(question_id)
     return success_response(QuestionOut.model_validate(question), "Savol topildi.")
