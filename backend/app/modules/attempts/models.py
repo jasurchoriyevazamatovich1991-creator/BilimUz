@@ -43,6 +43,20 @@ class TestAttempt(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "answers"
+    # Sprint 58 — added to the ORM model (NOT a new migration: this
+    # constraint has existed in the database since the very first
+    # schema, migration 0001_initial_schema.py line ~535 — "CONSTRAINT
+    # uq_answers_attempt_question UNIQUE (attempt_id, question_id)" —
+    # but the SQLAlchemy model never declared it, a model/DB drift
+    # discovered while implementing this sprint's audited fix. Because
+    # the constraint was always there, a duplicate Answer row was never
+    # actually possible; what save_answer()'s old check-then-act
+    # (get() then create()/update()) could actually produce was an
+    # UNHANDLED IntegrityError (a 500) for the losing side of a race,
+    # since create() never expected the insert to be rejected. See
+    # AnswerRepository.upsert(), which now handles the conflict
+    # gracefully via this exact constraint instead of crashing.
+    __table_args__ = (UniqueConstraint("attempt_id", "question_id", name="uq_answers_attempt_question"),)
 
     attempt_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("test_attempts.id", ondelete="CASCADE"), nullable=False)
     question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("questions.id"), nullable=False)

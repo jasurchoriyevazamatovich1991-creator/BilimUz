@@ -23,7 +23,7 @@ from app.modules.attempts.exceptions import (
     TestNotPublishedException,
 )
 from app.modules.attempts.constants import ACTIVE_STATUSES, DEFAULT_MAX_ATTEMPTS
-from app.modules.attempts.models import Answer, AttemptStatus, TestAttempt
+from app.modules.attempts.models import AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.attempts.schemas import (
@@ -182,20 +182,19 @@ class AttemptService:
             # Sprint 30 — the only new branch. single_choice/true_false
             # below is byte-for-byte the original Sprint 6 logic.
             is_correct = self._check_options(question_id, selected_options or [])
-            existing = self.answer_repo.get(attempt_id, question_id)
-            if existing:
-                self.answer_repo.update(existing, {"selected_options": selected_options, "selected_option": None, "is_correct": is_correct})
-            else:
-                self.answer_repo.create(Answer(attempt_id=attempt_id, question_id=question_id, selected_options=selected_options, is_correct=is_correct))
+            # Sprint 58 — a single atomic upsert replaces the old
+            # get()-then-create()/update() check-then-act. The old code
+            # had no path that expected the losing side's INSERT to be
+            # rejected by uq_answers_attempt_question — a UNIQUE
+            # constraint on (attempt_id, question_id) that has existed
+            # in the database since migration 0001 (never a new
+            # migration for this sprint; see AnswerRepository.upsert()).
+            self.answer_repo.upsert(attempt_id, question_id, {"selected_options": selected_options, "selected_option": None, "is_correct": is_correct})
             self.repo.commit()
             return
 
         is_correct = self._check_option(question_id, selected_option)
-        existing = self.answer_repo.get(attempt_id, question_id)
-        if existing:
-            self.answer_repo.update(existing, {"selected_option": selected_option, "is_correct": is_correct})
-        else:
-            self.answer_repo.create(Answer(attempt_id=attempt_id, question_id=question_id, selected_option=selected_option, is_correct=is_correct))
+        self.answer_repo.upsert(attempt_id, question_id, {"selected_option": selected_option, "is_correct": is_correct})
         self.repo.commit()
 
     # --- Submit / result -----------------------------------------------------

@@ -3,6 +3,7 @@ file, same cohesive-module reasoning as questions/repository.py."""
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.modules.attempts.models import Answer, AttemptModuleProgress, TestAttempt
@@ -99,6 +100,39 @@ class AnswerRepository:
             setattr(answer, field, value)
         self.db.flush()
         return answer
+
+    def upsert(self, attempt_id: uuid.UUID, question_id: uuid.UUID, values: dict) -> Answer:
+        """Sprint 58 — replaces the old get()-then-create()/update()
+        check-then-act call sites in AttemptService.save_answer().
+
+        uq_answers_attempt_question (on (attempt_id, question_id)) has
+        existed in the database since migration 0001 — so a duplicate
+        Answer row was never actually possible. The real bug was that
+        the old check-then-act had no way to know that: two concurrent
+        PATCH /attempts/{id}/answer calls for the same question could
+        both find no existing row via get(), both call create(), and
+        the LOSING side's INSERT would raise an unhandled
+        IntegrityError (a 500) instead of succeeding as an update.
+
+        A single INSERT ... ON CONFLICT DO UPDATE is atomic — Postgres
+        itself resolves the conflict against that exact constraint, so
+        the losing side becomes a graceful UPDATE of the winning row
+        instead of a crash. `values` carries exactly the fields the two
+        save_answer() branches already computed (selected_option/
+        selected_options/is_correct) — unchanged from the old
+        create()/update() call sites; text_answer is untouched either
+        way, same as before."""
+        stmt = (
+            pg_insert(Answer)
+            .values(attempt_id=attempt_id, question_id=question_id, **values)
+            .on_conflict_do_update(
+                constraint="uq_answers_attempt_question",
+                set_={**values, "updated_at": func.now()},
+            )
+        )
+        self.db.execute(stmt)
+        self.db.flush()
+        return self.get(attempt_id, question_id)
 
 
 class AttemptModuleProgressRepository:

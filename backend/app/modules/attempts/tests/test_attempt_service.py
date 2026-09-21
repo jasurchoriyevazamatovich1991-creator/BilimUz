@@ -163,9 +163,14 @@ def test_save_answer_succeeds_and_computes_correctness(service, mock_repo, mock_
 
     service.save_answer(attempt.id, user_id, question_id, option_id)
 
-    mock_answer_repo.create.assert_called_once()
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is True
+    # Sprint 58 — save_answer() now calls the atomic
+    # AnswerRepository.upsert(attempt_id, question_id, values) instead of
+    # the old get()-then-create()/update() check-then-act; asserting on
+    # upsert()'s `values` dict is the equivalent check for this mocked
+    # unit test.
+    mock_answer_repo.upsert.assert_called_once()
+    values = mock_answer_repo.upsert.call_args[0][2]
+    assert values["is_correct"] is True
     mock_repo.commit.assert_called_once()
 
 
@@ -265,9 +270,9 @@ def test_save_answer_multiple_choice_correct_when_selection_exactly_matches_corr
 
     service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1, correct_2])
 
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is True
-    assert created_answer.selected_options == [correct_1, correct_2]
+    values = mock_answer_repo.upsert.call_args[0][2]  # Sprint 58 — upsert() replaces create()
+    assert values["is_correct"] is True
+    assert values["selected_options"] == [correct_1, correct_2]
 
 
 def test_save_answer_multiple_choice_incorrect_when_missing_a_correct_option(
@@ -288,8 +293,8 @@ def test_save_answer_multiple_choice_incorrect_when_missing_a_correct_option(
 
     service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1])  # missing correct_2
 
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is False
+    values = mock_answer_repo.upsert.call_args[0][2]  # Sprint 58 — upsert() replaces create()
+    assert values["is_correct"] is False
 
 
 def test_save_answer_multiple_choice_incorrect_when_extra_wrong_option_included(
@@ -310,8 +315,8 @@ def test_save_answer_multiple_choice_incorrect_when_extra_wrong_option_included(
 
     service.save_answer(attempt.id, user_id, question_id, None, selected_options=[correct_1, wrong_1])
 
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is False
+    values = mock_answer_repo.upsert.call_args[0][2]  # Sprint 58 — upsert() replaces create()
+    assert values["is_correct"] is False
 
 
 def test_save_answer_multiple_choice_rejects_option_from_wrong_question(
@@ -343,8 +348,8 @@ def test_save_answer_multiple_choice_empty_selection_is_unanswered_not_incorrect
 
     service.save_answer(attempt.id, user_id, question_id, None, selected_options=[])
 
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is None
+    values = mock_answer_repo.upsert.call_args[0][2]  # Sprint 58 — upsert() replaces create()
+    assert values["is_correct"] is None
 
 
 def test_save_answer_single_choice_path_completely_unaffected_by_multiple_choice_addition(
@@ -365,7 +370,7 @@ def test_save_answer_single_choice_path_completely_unaffected_by_multiple_choice
 
     service.save_answer(attempt.id, user_id, question_id, option_id)
 
-    created_answer = mock_answer_repo.create.call_args[0][0]
-    assert created_answer.is_correct is True
-    assert created_answer.selected_option == option_id
+    values = mock_answer_repo.upsert.call_args[0][2]  # Sprint 58 — upsert() replaces create()
+    assert values["is_correct"] is True
+    assert values["selected_option"] == option_id
     mock_option_repo.list_for_question.assert_not_called()  # the multi-select path was never entered
