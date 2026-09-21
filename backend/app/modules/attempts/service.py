@@ -119,7 +119,25 @@ class AttemptService:
 
     def get_attempt_detail(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> AttemptDetailOut:
         attempt = self.get_attempt(attempt_id, user_id)
-        questions = [self.question_repo.get_by_id(qid) for qid in (attempt.question_order or [])]
+
+        # Sprint 57 — question DELIVERY now follows the same
+        # active-module boundary that save_answer() already enforces via
+        # validate_question_in_module() (see below). Before this fix,
+        # this method always used the whole-test attempt.question_order
+        # regardless of which module was active, so a modular attempt
+        # leaked every future module's question content immediately
+        # after start_attempt. Non-modular attempts (module_execution is
+        # None) and the same edge case save_answer() already tolerates
+        # (module execution configured but no active AttemptModuleProgress
+        # row right now) are completely unaffected — both fall through to
+        # the original attempt.question_order behavior, unchanged.
+        effective_question_order = attempt.question_order or []
+        if self.module_execution is not None:
+            active_progress = self.module_execution.get_active_module_progress(attempt_id)
+            if active_progress is not None:
+                effective_question_order = active_progress.question_order or []
+
+        questions = [self.question_repo.get_by_id(qid) for qid in effective_question_order]
         answers = {a.question_id: a for a in self.answer_repo.list_for_attempt(attempt_id)}
 
         question_views = [self._to_question_view(q) for q in questions if q is not None]
@@ -129,7 +147,7 @@ class AttemptService:
                 selected_option=answers[qid].selected_option if qid in answers else None,
                 selected_options=answers[qid].selected_options if qid in answers else None,
             )
-            for qid in (attempt.question_order or [])
+            for qid in effective_question_order
         ]
         return AttemptDetailOut(**AttemptOut.model_validate(attempt).model_dump(), questions=question_views, answered=answered_states)
 
