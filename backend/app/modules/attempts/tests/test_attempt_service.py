@@ -21,7 +21,17 @@ from app.modules.attempts.service import AttemptService
 
 @pytest.fixture
 def mock_repo():
-    return MagicMock()
+    """Sprint 59 — _lock_attempt() (see service.py) now calls
+    repo.get_by_id_locked() on every finalize-triggering path. These are
+    pure unit tests with no real PostgreSQL row to lock, so
+    get_by_id_locked() is wired to hand back whatever the test already
+    configured get_by_id() to return, keeping every existing
+    `mock_repo.get_by_id.return_value = attempt` line in this file
+    accurate for the locked call too, without editing each test
+    individually."""
+    repo = MagicMock()
+    repo.get_by_id_locked.side_effect = lambda attempt_id: repo.get_by_id.return_value
+    return repo
 
 
 @pytest.fixture

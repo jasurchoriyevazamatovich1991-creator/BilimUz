@@ -202,6 +202,16 @@ class AttemptService:
     def submit_attempt(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> SubmitResultOut:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+
+        # Sprint 59 — the attempt row is locked BEFORE the active-status
+        # check and BEFORE _finalize()'s score/percentage write, closing
+        # the race the unlocked _get_owned_attempt() left open: two
+        # concurrent submit_attempt() calls (or this call racing
+        # _auto_finish_if_expired(), now itself lock-safe below) could
+        # both observe ACTIVE_STATUSES and both finalize/commit,
+        # producing duplicate "attempt.submitted" audit-log rows and a
+        # last-write-wins race on score/percentage. See _lock_attempt().
+        attempt = self._lock_attempt(attempt)
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
 
@@ -234,8 +244,24 @@ class AttemptService:
         outcome = self.module_execution.submit_module(attempt, progress)
 
         if outcome["completed"]:
-            self._finalize(attempt, AttemptStatus.SUBMITTED)
-            log_action(self.repo.db, action="attempt.submitted", user_id=user_id, entity_type="test_attempt", entity_id=attempt_id)
+            # Sprint 59 — same lock as submit_attempt()/_auto_finish_if_expired(),
+            # applied to the final-module completion path. Unlike
+            # submit_attempt() (which raises when the lock reveals the
+            # attempt was already finalized by a genuine race), this
+            # branch must NOT raise here: module_execution.submit_module()
+            # above has already committed the module's own submission —
+            # an exception at this later step would leave the module
+            # marked submitted while the outer call fails, an
+            # inconsistent partial state. If a concurrent submit_attempt()
+            # (or another completion path) already finalized the attempt
+            # by the time this lock is acquired, we simply skip
+            # re-finalizing/re-logging and return the already-committed
+            # result — the same idempotent-return pattern
+            # ResultService.create_result() uses for its own race.
+            attempt = self._lock_attempt(attempt)
+            if attempt.status in ACTIVE_STATUSES:
+                self._finalize(attempt, AttemptStatus.SUBMITTED)
+                log_action(self.repo.db, action="attempt.submitted", user_id=user_id, entity_type="test_attempt", entity_id=attempt_id)
             self.repo.commit()
             result = self._build_result(attempt)
             return {"completed": True, "next_module_id": None, "result": result}
@@ -279,10 +305,43 @@ class AttemptService:
     def _auto_finish_if_expired(self, attempt: TestAttempt) -> None:
         """Lazy expiration — see docs/Sprint6_TestEngine_Architecture.md
         Section 6. Designed so a future Celery task could call _finalize()
-        proactively without changing this method's public callers."""
+        proactively without changing this method's public callers.
+
+        Sprint 59 — expires_at is immutable once an attempt is created,
+        so checking it here, before locking, is safe (mirrors
+        ResultService.create_result()'s own pre-lock reads of
+        immutable-once-set fields). status is NOT immutable, so it is
+        re-checked under the lock immediately below before finalizing —
+        this closes the race where this method could run concurrently
+        with submit_attempt()/submit_module()'s own finalize path and
+        both observe ACTIVE_STATUSES before either commits."""
         if attempt.status in ACTIVE_STATUSES and is_expired(attempt.expires_at):
-            self._finalize(attempt, AttemptStatus.AUTO_FINISHED)
-            self.repo.commit()
+            attempt = self._lock_attempt(attempt)
+            if attempt.status in ACTIVE_STATUSES:
+                self._finalize(attempt, AttemptStatus.AUTO_FINISHED)
+                self.repo.commit()
+
+    def _lock_attempt(self, attempt: TestAttempt) -> TestAttempt:
+        """Sprint 59 — CRITICAL fix for the attempt-finalize race
+        identified in the Sprint 59 audit (S59-A). Reuses
+        AttemptRepository.get_by_id_locked() exactly as introduced for
+        Sprint 54 (SELECT ... FOR UPDATE + populate_existing=True) —
+        no new locking mechanism. Every finalize-triggering call site
+        (submit_attempt(), _auto_finish_if_expired(), submit_module()'s
+        final-module completion branch) must call this BEFORE checking
+        whether the attempt is already finalized/submitted/auto-finished
+        and BEFORE _finalize()'s score/percentage write, so a second
+        concurrent caller blocks here until the first's transaction
+        commits, then re-reads the now-current status under the same
+        lock instead of racing past an earlier unlocked check.
+
+        populate_existing=True refreshes the same identity-mapped
+        TestAttempt object in place (same session, same primary key) —
+        the returned object is the caller's own `attempt` reference with
+        its attributes brought current, so callers can keep using their
+        existing variable after reassigning it from this call's return
+        value."""
+        return self.repo.get_by_id_locked(attempt.id)
 
     def _finalize(self, attempt: TestAttempt, new_status: AttemptStatus) -> None:
         answers = self.answer_repo.list_for_attempt(attempt.id)
