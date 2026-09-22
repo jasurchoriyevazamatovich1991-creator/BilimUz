@@ -80,6 +80,18 @@ class AttemptService:
         # max_attempts = NULL, so this is byte-identical behavior to
         # before this sprint for all of them.
         effective_max_attempts = test.max_attempts if test.max_attempts is not None else DEFAULT_MAX_ATTEMPTS
+
+        # Sprint 60 — S60-A. Serializes the count -> check -> create
+        # critical section below for this exact (user_id, test_id) pair
+        # via a transaction-scoped PostgreSQL advisory lock (released
+        # automatically at self.repo.commit() below, or on rollback if
+        # MaxAttemptsExceededException is raised and the session is
+        # closed without committing). Without this, two concurrent
+        # start_attempt() calls could both read the same
+        # count_for_user_and_test() value before either commits its
+        # create(), letting both through even when only one attempt
+        # remains. See AttemptRepository.acquire_start_attempt_lock().
+        self.repo.acquire_start_attempt_lock(user_id, test_id)
         existing = self.repo.count_for_user_and_test(user_id, test_id)
         if existing >= effective_max_attempts:
             raise MaxAttemptsExceededException(f"Bu test uchun maksimal urinishlar soni ({effective_max_attempts}) tugagan")

@@ -2,7 +2,7 @@
 file, same cohesive-module reasoning as questions/repository.py."""
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,43 @@ class AttemptRepository:
             .execution_options(populate_existing=True)
         )
         return self.db.execute(stmt).scalar_one_or_none()
+
+    def acquire_start_attempt_lock(self, user_id: uuid.UUID, test_id: uuid.UUID) -> None:
+        """Sprint 60 — S60-A. Transaction-scoped PostgreSQL advisory lock
+        serializing concurrent AttemptService.start_attempt() calls for
+        the SAME (user_id, test_id) pair, closing the check-then-act race
+        between count_for_user_and_test() and create() that previously
+        let concurrent requests exceed Test.max_attempts (two requests
+        could both observe count < max_attempts before either commits
+        its INSERT).
+
+        Unlike Sprint 50/54/59's SELECT ... FOR UPDATE row locks (which
+        need an existing row to lock), there is no natural row to lock
+        here before the very first attempt for a (user, test) pair
+        exists — a PostgreSQL advisory lock keyed on the pair itself is
+        the standard mechanism for this shape of problem, and is a pure
+        synchronization primitive: it does not touch or validate any
+        row, so it cannot bypass ownership, max_attempts, soft-delete,
+        or status checks, which remain exactly where they already were.
+
+        pg_advisory_xact_lock(key1, key2) takes two 32-bit integers and
+        is held only for the current transaction, releasing automatically
+        on COMMIT or ROLLBACK — never needs an explicit unlock call and
+        never outlives the connection — matching this codebase's existing
+        lock-for-the-duration-of-one-transaction idiom (the FOR UPDATE
+        locks above release the same way). hashtext(...) is PostgreSQL's
+        own deterministic string hash returning a signed int4; using it
+        instead of converting the UUIDs in Python sidesteps any
+        Python-side integer overflow/sign-conversion pitfalls, and
+        keeping user_id/test_id as two independent keys (rather than
+        hashing their concatenation into one key) means two different
+        (user, test) pairs essentially never contend with each other —
+        only two calls for the exact same pair do, which is exactly the
+        critical section that needs serializing."""
+        self.db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:user_id), hashtext(:test_id))"),
+            {"user_id": str(user_id), "test_id": str(test_id)},
+        )
 
     def count_for_user_and_test(self, user_id: uuid.UUID, test_id: uuid.UUID) -> int:
         """Every attempt ever started counts toward the limit, including
