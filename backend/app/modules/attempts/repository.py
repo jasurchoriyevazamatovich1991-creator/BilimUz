@@ -224,7 +224,20 @@ class AttemptModuleProgressRepository:
         return self.db.scalars(stmt).first()
 
     def list_for_attempt(self, attempt_id: uuid.UUID) -> list[AttemptModuleProgress]:
-        stmt = select(AttemptModuleProgress).where(AttemptModuleProgress.attempt_id == attempt_id)
+        """Sprint 61 — S61-C. Explicit ORDER BY created_at added: this
+        method's callers now include ModuleExecutionService.get_effective_question_ids()
+        (module_execution_service.py), which relies on the returned
+        rows being in the order the student actually traversed modules
+        (each module's progress row is created immediately when the
+        student is routed into it) so that a dedup-on-first-occurrence
+        pass produces deterministic question ordering. Postgres never
+        guaranteed a stable row order without an explicit ORDER BY —
+        this makes an already-implicit ordering assumption explicit.
+        The two pre-existing callers (_route_to_next_module's
+        already_progressed_ids set, and is_exam_complete's
+        submitted_module_ids set) are order-independent and are
+        unaffected."""
+        stmt = select(AttemptModuleProgress).where(AttemptModuleProgress.attempt_id == attempt_id).order_by(AttemptModuleProgress.created_at)
         return list(self.db.scalars(stmt).all())
 
     def create(self, progress: AttemptModuleProgress) -> AttemptModuleProgress:

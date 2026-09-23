@@ -16,6 +16,7 @@ from app.core.audit import log_action
 from app.modules.attempts.exceptions import (
     AttemptNotActiveException,
     AttemptNotFoundException,
+    ExamNotCompleteException,
     InvalidOptionReferenceException,
     InvalidQuestionReferenceException,
     MaxAttemptsExceededException,
@@ -227,6 +228,18 @@ class AttemptService:
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
 
+        # Sprint 61 — S61-C. A modular attempt must go through
+        # submit_module()'s own per-module completion flow, not finalize
+        # early via this whole-attempt endpoint while modules remain.
+        # is_exam_complete() (module_execution_service.py) already
+        # returns True vacuously for a non-modular test (it has no
+        # ExamModule rows to be incomplete), so this never affects any
+        # non-modular attempt or any AttemptService built without a
+        # module_execution_service (the pre-Sprint-50 5-arg legacy
+        # construction still used by existing unit tests).
+        if self.module_execution is not None and not self.module_execution.is_exam_complete(attempt):
+            raise ExamNotCompleteException("Barcha modullar yakunlanmaguncha butun urinishni yakunlab bo'lmaydi")
+
         self._finalize(attempt, AttemptStatus.SUBMITTED)
         log_action(self.repo.db, action="attempt.submitted", user_id=user_id, entity_type="test_attempt", entity_id=attempt_id)
         self.repo.commit()
@@ -355,15 +368,41 @@ class AttemptService:
         value."""
         return self.repo.get_by_id_locked(attempt.id)
 
+    def _effective_scoring_question_ids(self, attempt: TestAttempt) -> list[uuid.UUID]:
+        """Sprint 61 — S61-C. The single source of truth for "which
+        questions count toward this attempt's final score/total", used
+        by both _finalize() and _build_result() so they can never
+        disagree with each other.
+
+        For a modular attempt (module_execution configured AND this
+        attempt actually has module-progress rows), delegates to
+        ModuleExecutionService.get_effective_question_ids() — the
+        deduplicated union of every module's delivered question_order.
+        Falls back to the original whole-test attempt.question_order in
+        every other case: a non-modular attempt (module_execution is
+        None, or the attempt genuinely has zero progress rows — the
+        defensive edge case where get_effective_question_ids() returns
+        None rather than an empty list). This fallback is byte-identical
+        to this method's pre-Sprint-61 behavior in both of those cases,
+        so non-modular scoring is completely unaffected."""
+        if self.module_execution is not None:
+            effective_ids = self.module_execution.get_effective_question_ids(attempt.id)
+            if effective_ids is not None:
+                return effective_ids
+        return list(attempt.question_order or [])
+
     def _finalize(self, attempt: TestAttempt, new_status: AttemptStatus) -> None:
         answers = self.answer_repo.list_for_attempt(attempt.id)
-        questions = [self.question_repo.get_by_id(qid) for qid in (attempt.question_order or [])]
+        question_ids = self._effective_scoring_question_ids(attempt)
+        questions = [self.question_repo.get_by_id(qid) for qid in question_ids]
         questions = [q for q in questions if q is not None]
 
         # Sprint 45 — delegates to the Scoring Strategy foundation
         # (scoring.py). DEFAULT_SCORING_STRATEGY.calculate() is the
         # exact same arithmetic this method used to do inline —
-        # extracted, not changed.
+        # extracted, not changed. Sprint 61 — S61-C changed only WHICH
+        # questions are passed in (see _effective_scoring_question_ids
+        # above); the scoring arithmetic itself is untouched.
         result = DEFAULT_SCORING_STRATEGY.calculate(questions, answers)
 
         self.repo.update(attempt, {
@@ -374,14 +413,27 @@ class AttemptService:
     def _build_result(self, attempt: TestAttempt) -> SubmitResultOut:
         test = self.test_repo.get_by_id(attempt.test_id)
         answers = self.answer_repo.list_for_attempt(attempt.id)
-        correct_count = sum(1 for a in answers if a.is_correct is True)
+        # Sprint 61 — S61-C. total_questions/correct_count must reflect
+        # the SAME effective question set _finalize() scored against,
+        # not the whole-test attempt.question_order — otherwise a
+        # modular attempt's reported total_questions would still (as
+        # before this sprint) overcount modules the student never saw,
+        # even though score/percentage were already fixed. Filtering
+        # correct_count by effective_question_ids is a no-op for every
+        # existing (non-modular) case: save_answer() already only ever
+        # creates an Answer for a question in attempt.question_order,
+        # so answers and the non-modular effective set were always the
+        # same set already.
+        effective_question_ids = self._effective_scoring_question_ids(attempt)
+        effective_id_set = set(effective_question_ids)
+        correct_count = sum(1 for a in answers if a.is_correct is True and a.question_id in effective_id_set)
         is_passed = None
         if test is not None and test.passing_score is not None and attempt.percentage is not None:
             is_passed = float(attempt.percentage) >= float(test.passing_score)
 
         return SubmitResultOut(
             attempt_id=attempt.id, score=float(attempt.score or 0), percentage=float(attempt.percentage or 0),
-            is_passed=is_passed, total_questions=len(attempt.question_order or []),
+            is_passed=is_passed, total_questions=len(effective_question_ids),
             correct_count=correct_count, status=attempt.status,
         )
 

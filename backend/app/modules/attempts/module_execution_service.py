@@ -211,6 +211,54 @@ class ModuleExecutionService:
         decision = self.routing_strategy.decide_next_module(completed_module, performance, candidates)
         return decision.next_module_id
 
+    def get_effective_question_ids(self, attempt_id: uuid.UUID) -> list[uuid.UUID] | None:
+        """Sprint 61 — S61-C. The set of questions actually DELIVERED to
+        this student across every module they were ever routed into —
+        the correct scoring/total_questions scope for a modular attempt,
+        replacing the old whole-test TestAttempt.question_order snapshot
+        that AttemptService._finalize()/_build_result() used to use
+        unconditionally (see the Sprint 61 audit finding S61-C: that
+        snapshot silently included questions from modules a student was
+        routed away from, and any orphan module_id=NULL question,
+        scoring both as permanently wrong).
+
+        Built from the deduplicated, order-preserving union of every
+        AttemptModuleProgress.question_order row this attempt has —
+        i.e. every module a progress row was ever created for, whether
+        still in_progress (e.g. the attempt is being finalized early by
+        auto-finish-on-expiry mid-module) or already submitted. A module
+        the student was routed away from, or never reached, never gets a
+        progress row (see _route_to_next_module's already_progressed_ids
+        exclusion and initialize_first_module/‌_create_module_progress,
+        which only ever create one when the student is actually routed
+        into that module) — so its questions are naturally excluded
+        without any extra filtering. A question with module_id = NULL
+        is, by the same construction, never a member of ANY module's
+        question_order (list_by_module() only returns questions whose
+        module_id matches), so it is likewise excluded automatically.
+
+        Returns None — not an empty list — when this attempt has NO
+        module-progress rows at all. That is the "no/empty module
+        progress" edge case (Sprint 61 audit Section 4.F): rather than
+        inventing a new product rule for it (e.g. scoring zero
+        questions), the caller falls back to the original, safe,
+        already-established whole-test attempt.question_order behavior
+        — the exact same fallback a non-modular attempt already uses,
+        since a non-modular attempt also has zero progress rows by
+        construction."""
+        progress_rows = self.progress_repo.list_for_attempt(attempt_id)
+        if not progress_rows:
+            return None
+
+        seen: set[uuid.UUID] = set()
+        ordered_ids: list[uuid.UUID] = []
+        for progress in progress_rows:
+            for question_id in (progress.question_order or []):
+                if question_id not in seen:
+                    seen.add(question_id)
+                    ordered_ids.append(question_id)
+        return ordered_ids
+
     def is_exam_complete(self, attempt: TestAttempt) -> bool:
         """True once every ExamModule for this test has a submitted
         AttemptModuleProgress row — the generic completion rule Sprint

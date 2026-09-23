@@ -64,3 +64,21 @@ class ModuleNotActiveException(AppException):
     AttemptNotActiveException's own 409 convention at module scope."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "MODULE_NOT_ACTIVE"
+
+
+class ExamNotCompleteException(AppException):
+    """Sprint 61 — S61-C. Raised by submit_attempt() when a modular
+    attempt's module lifecycle isn't finished yet (per
+    ModuleExecutionService.is_exam_complete()) — closes the gap where
+    a student could call POST /attempts/{id}/submit directly at any
+    point mid-exam and finalize against only the modules visited so
+    far, bypassing the remaining routed modules entirely instead of
+    going through submit_module()'s own per-module completion flow.
+    Never raised for a non-modular attempt, or any attempt whose
+    module_execution service isn't configured — is_exam_complete()
+    itself returns True vacuously when the test has no ExamModule
+    rows, so this exception can only fire for a genuinely incomplete
+    modular exam. Mirrors AttemptNotActiveException/ModuleNotActiveException's
+    existing 409 convention rather than inventing a new status code."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "EXAM_NOT_COMPLETE"
