@@ -11,7 +11,7 @@ first place either one is actually wired into a runnable endpoint.
 import uuid
 
 from app.core.exceptions import UserAlreadyExistsException
-from app.core.security import hash_refresh_token
+from app.core.security.jwt_service import hash_refresh_token
 from app.modules.auth.exceptions import WeakPasswordException
 from app.modules.auth.jwt.jwt_service import JWTService
 from app.modules.auth.jwt.schemas import TokenPair

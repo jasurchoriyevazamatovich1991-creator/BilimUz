@@ -12,7 +12,7 @@ from passlib.exc import UnknownHashError
 
 from app.core.audit import log_action
 from app.core.exceptions import InvalidCredentialsException
-from app.core.security import hash_refresh_token
+from app.core.security.jwt_service import hash_refresh_token
 from app.modules.auth.jwt.jwt_service import JWTService
 from app.modules.auth.login.schemas import LoginResponse
 from app.modules.auth.models import LoginHistory, RefreshToken

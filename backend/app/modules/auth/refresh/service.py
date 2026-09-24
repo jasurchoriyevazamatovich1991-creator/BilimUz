@@ -20,7 +20,7 @@ import jwt
 from pydantic import ValidationError
 
 from app.core.exceptions import InvalidTokenException
-from app.core.security import hash_refresh_token
+from app.core.security.jwt_service import hash_refresh_token
 from app.modules.auth.jwt.jwt_service import JWTService
 from app.modules.auth.jwt.schemas import TokenPayload, TokenType
 from app.modules.auth.models import RefreshToken
