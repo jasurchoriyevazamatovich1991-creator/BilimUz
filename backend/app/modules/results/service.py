@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.core.audit import log_action
+from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
@@ -41,6 +42,15 @@ class ResultService:
         # legacy (no-ResultSection) behavior when these are None.
         exam_section_repository: ExamSectionRepository | None = None,
         result_section_repository: ResultSectionRepository | None = None,
+        # Sprint 63 — optional, default None, same backward-compat
+        # reasoning already established above for
+        # exam_section_repository/result_section_repository (Sprint 54):
+        # every existing caller (this module's own unit tests) that
+        # constructs ResultService with only the original 6 arguments is
+        # completely unaffected — get_result_detail() below degrades to
+        # the exact legacy (attempt.question_order) behavior when this
+        # is None, identical to how it always behaved before this sprint.
+        module_execution_service: ModuleExecutionService | None = None,
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
@@ -50,6 +60,7 @@ class ResultService:
         self.question_repo = question_repository
         self.section_repo = exam_section_repository
         self.result_section_repo = result_section_repository
+        self.module_execution = module_execution_service
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -162,23 +173,62 @@ class ResultService:
             raise ResultNotFoundException("Natija topilmadi")
         return result
 
+    def _effective_result_question_ids(self, attempt) -> list[uuid.UUID]:
+        """Sprint 63 — S63-A. Mirrors
+        AttemptService._effective_scoring_question_ids() exactly (same
+        module, same algorithm, no second implementation): delegates to
+        ModuleExecutionService.get_effective_question_ids(), the single
+        Sprint 61 helper that returns the deduplicated, order-preserving
+        union of every AttemptModuleProgress.question_order row for this
+        attempt, or None when there are no progress rows at all (a
+        non-modular attempt, or a legacy ResultService construction with
+        no module_execution_service wired) — in which case this falls
+        back to the pre-Sprint-61 attempt.question_order, byte-for-byte
+        the same value get_result_detail() always used before this
+        sprint, so non-modular results are completely unaffected.
+
+        Fixes the exact gap Sprint 61 left open: AttemptService's own
+        _finalize()/_build_result() already used this effective scope,
+        but ResultService.get_result_detail() (a separate, student-
+        reachable endpoint, GET /results/{id}) kept using the raw,
+        un-scoped attempt.question_order — so a modular attempt where a
+        student was routed through only some modules could show a
+        different total_questions/unanswered count here than on
+        GET /attempts/{id}/result. This method is the only change
+        needed to close that gap; Result.score/percentage themselves
+        were already correct (copied verbatim from the already-fixed
+        attempt.score/attempt.percentage at create_result() time,
+        untouched by this sprint)."""
+        if self.module_execution is not None:
+            effective_ids = self.module_execution.get_effective_question_ids(attempt.id)
+            if effective_ids is not None:
+                return effective_ids
+        return list(attempt.question_order or [])
+
     def get_result_detail(self, result_id: uuid.UUID, user_id: uuid.UUID) -> ResultDetailOut:
         """Sprint 37 — Result Analysis. Reuses get_result()'s own
         ownership check (a student can only ever reach their own
         attempt/answers from here, since attempt_id/question_ids below
         are all derived from THIS already-ownership-verified result,
-        never from a client-supplied id)."""
+        never from a client-supplied id).
+
+        Sprint 63 — S63-A: question_ids now comes from
+        _effective_result_question_ids() (the same Sprint 61 effective
+        scope AttemptService already uses for finalization/scoring)
+        instead of the raw attempt.question_order, so this endpoint's
+        total_questions/unanswered/review-list agree with
+        GET /attempts/{id}/result for the same modular attempt. Order
+        is still the real, persisted delivery order (question_order
+        itself for non-modular attempts; the module-traversal order
+        AttemptModuleProgress rows were created in for modular ones) —
+        never an arbitrary re-sort."""
         result = self.get_result(result_id, user_id)
         section_outs = self._get_result_sections(result)
         attempt = self.attempt_repo.get_by_id(result.attempt_id)
         answers = self.answer_repo.list_for_attempt(result.attempt_id)
         answers_by_question = {a.question_id: a for a in answers}
 
-        # question_order (Sprint 20) is the real, persisted order the
-        # student actually saw this question set in — reused here
-        # rather than an arbitrary re-sort, so review order matches
-        # the attempt itself.
-        question_ids = list(attempt.question_order or []) if attempt else list(answers_by_question.keys())
+        question_ids = self._effective_result_question_ids(attempt) if attempt else list(answers_by_question.keys())
         questions = self.question_repo.list_by_ids(question_ids)
         questions_by_id = {q.id: q for q in questions}
 
