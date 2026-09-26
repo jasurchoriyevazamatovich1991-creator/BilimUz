@@ -90,6 +90,21 @@ class ExamModuleRepository:
     def get_by_id(self, module_id: uuid.UUID) -> ExamModule | None:
         return self.db.get(ExamModule, module_id)
 
+    def get_active_by_id(self, module_id: uuid.UUID) -> ExamModule | None:
+        """Sprint 64 — C1. Same lookup as get_by_id(), but excludes a
+        soft-deleted row (None if module_id doesn't exist OR is
+        soft-deleted) — for the specific case of validating a NEW
+        active-parent reference (a child being created/updated to point
+        at this module), where a soft-deleted row must never be
+        accepted as valid. get_by_id() itself is left untouched: its
+        existing callers (ModuleExecutionService's execution-flow reads
+        of an already-assigned module, and ExamModuleService.get_module/
+        update_module, which already re-check .deleted_at themselves
+        right after calling it) are outside this fix's scope and must
+        keep their current behavior exactly."""
+        stmt = select(ExamModule).where(ExamModule.id == module_id, ExamModule.deleted_at.is_(None))
+        return self.db.scalars(stmt).first()
+
     def list_for_test(self, test_id: uuid.UUID) -> list[ExamModule]:
         """All modules across all of a Test's sections, ordered by
         (section.order_number, module.order_number) — the deterministic
@@ -144,6 +159,14 @@ class ExamSectionRepository:
     def get_by_id(self, section_id: uuid.UUID) -> ExamSection | None:
         return self.db.get(ExamSection, section_id)
 
+    def get_active_by_id(self, section_id: uuid.UUID) -> ExamSection | None:
+        """Sprint 64 — C1. Same reasoning as ExamModuleRepository's own
+        get_active_by_id() above: excludes a soft-deleted row, for
+        validating a NEW active-parent reference only. get_by_id() is
+        left untouched for its other existing callers."""
+        stmt = select(ExamSection).where(ExamSection.id == section_id, ExamSection.deleted_at.is_(None))
+        return self.db.scalars(stmt).first()
+
     def list_for_test(self, test_id: uuid.UUID) -> list[ExamSection]:
         stmt = select(ExamSection).where(ExamSection.test_id == test_id, ExamSection.deleted_at.is_(None)).order_by(ExamSection.order_number)
         return list(self.db.scalars(stmt).all())
@@ -175,6 +198,14 @@ class QuestionGroupRepository:
 
     def get_by_id(self, group_id: uuid.UUID) -> QuestionGroup | None:
         return self.db.get(QuestionGroup, group_id)
+
+    def get_active_by_id(self, group_id: uuid.UUID) -> QuestionGroup | None:
+        """Sprint 64 — C1. Same reasoning as ExamModuleRepository's own
+        get_active_by_id() above: excludes a soft-deleted row, for
+        validating a NEW active-parent reference only. get_by_id() is
+        left untouched for its other existing callers."""
+        stmt = select(QuestionGroup).where(QuestionGroup.id == group_id, QuestionGroup.deleted_at.is_(None))
+        return self.db.scalars(stmt).first()
 
     def list_for_test(self, test_id: uuid.UUID) -> list[QuestionGroup]:
         stmt = (

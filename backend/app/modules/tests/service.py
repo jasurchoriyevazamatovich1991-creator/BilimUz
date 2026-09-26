@@ -194,7 +194,11 @@ class ExamModuleService:
                 raise DuplicateOrderNumberException(f"Bu bo'lim uchun order_number={order_number} allaqachon band")
 
     def create_module(self, data: ExamModuleCreateRequest, actor_id: uuid.UUID) -> ExamModule:
-        if self.section_repo.get_by_id(data.section_id) is None:
+        # Sprint 64 — C1. get_active_by_id() (not get_by_id()) so a
+        # soft-deleted ExamSection is rejected exactly like a
+        # nonexistent one, closing the gap where a new active module
+        # could be attached to a logically-deleted section.
+        if self.section_repo.get_active_by_id(data.section_id) is None:
             raise ExamSectionNotFoundException("Ko'rsatilgan bo'lim (section_id) mavjud emas")
         self._ensure_no_duplicate_order(data.section_id, data.order_number)
 
@@ -248,10 +252,15 @@ class QuestionGroupService:
                 raise DuplicateOrderNumberException(f"Bu test uchun order_number={order_number} allaqachon band")
 
     def _validate_module_belongs_to_test(self, module_id: uuid.UUID, test_id: uuid.UUID) -> None:
-        module = self.module_repo.get_by_id(module_id)
+        # Sprint 64 — C1. get_active_by_id() on both the module and its
+        # section — a soft-deleted ExamModule or a soft-deleted parent
+        # ExamSection must both be rejected exactly like a nonexistent
+        # one, closing the gap where a new QuestionGroup could be
+        # attached to a logically-deleted module/section.
+        module = self.module_repo.get_active_by_id(module_id)
         if module is None:
             raise ExamModuleNotFoundException("Ko'rsatilgan modul (module_id) mavjud emas")
-        section = self.section_repo.get_by_id(module.section_id)
+        section = self.section_repo.get_active_by_id(module.section_id)
         if section is None or section.test_id != test_id:
             raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) bu guruhning testiga tegishli emas")
 

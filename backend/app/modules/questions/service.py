@@ -66,24 +66,29 @@ class QuestionService:
         if not (has_section or has_module or has_group):
             return
 
+        # Sprint 64 — C1. get_active_by_id() (not get_by_id()) on all
+        # three lookups below: a soft-deleted ExamSection/ExamModule/
+        # QuestionGroup must be rejected exactly like a nonexistent one,
+        # closing the gap where an active Question could be assigned to
+        # a logically-deleted parent.
         section = None
         if has_section and updates["section_id"] is not None:
-            section = self.section_repo.get_by_id(updates["section_id"])
+            section = self.section_repo.get_active_by_id(updates["section_id"])
             if section is None or section.test_id != question.test_id:
                 raise InvalidTestReferenceException("Ko'rsatilgan bo'lim (section_id) bu savolning testiga tegishli emas")
 
         module = None
         if has_module and updates["module_id"] is not None:
-            module = self.module_repo.get_by_id(updates["module_id"])
+            module = self.module_repo.get_active_by_id(updates["module_id"])
             if module is None:
                 raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) mavjud emas")
-            module_section = self.section_repo.get_by_id(module.section_id)
+            module_section = self.section_repo.get_active_by_id(module.section_id)
             if module_section is None or module_section.test_id != question.test_id:
                 raise InvalidTestReferenceException("Ko'rsatilgan modul (module_id) bu savolning testiga tegishli emas")
 
         group = None
         if has_group and updates["group_id"] is not None:
-            group = self.group_repo.get_by_id(updates["group_id"])
+            group = self.group_repo.get_active_by_id(updates["group_id"])
             if group is None or group.test_id != question.test_id:
                 raise InvalidTestReferenceException("Ko'rsatilgan guruh (group_id) bu savolning testiga tegishli emas")
 

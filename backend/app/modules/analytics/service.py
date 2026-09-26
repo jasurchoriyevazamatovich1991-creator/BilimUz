@@ -49,17 +49,25 @@ class AnalyticsService:
 
     def recompute_daily(self, start: date, end: date) -> int:
         """Delete-and-rebuild for the window — always correct on re-run,
-        no double-counting regardless of how many times it's called."""
+        no double-counting regardless of how many times it's called.
+
+        Sprint 64 — C6: the per-bucket write below now goes through
+        DailyStatisticsRepository.upsert() (atomic INSERT ... ON
+        CONFLICT DO UPDATE) instead of a plain create(). delete_for_range()
+        is unchanged (recompute is still delete-and-rebuild for the
+        window), but two overlapping concurrent recomputes racing their
+        writes for the same (user_id, subject_id, stat_date) bucket now
+        resolve as a graceful UPDATE via the existing
+        uq_daily_statistics_user_subject_date constraint instead of an
+        unhandled IntegrityError — see DailyStatisticsRepository.upsert()
+        for the full rationale and its NULL-subject_id caveat."""
         results = self.result_repo.list_in_date_range(start, end)
         subject_by_test = self._build_subject_cache(results)
         buckets = self._group_by_day(results, subject_by_test)
 
         self.daily_repo.delete_for_range(start, end)
         for (user_id, subject_id, stat_date), counts in buckets.items():
-            self.daily_repo.create(DailyStatistics(
-                user_id=user_id, subject_id=subject_id, stat_date=stat_date,
-                tests_taken=counts["tests_taken"], correct_answers=counts["correct"], wrong_answers=counts["wrong"],
-            ))
+            self.daily_repo.upsert(user_id, subject_id, stat_date, counts["tests_taken"], counts["correct"], counts["wrong"])
         self.daily_repo.commit()
         return len(buckets)
 

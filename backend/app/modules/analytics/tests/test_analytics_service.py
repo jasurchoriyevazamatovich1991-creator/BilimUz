@@ -56,8 +56,11 @@ def test_recompute_daily_groups_by_user_subject_date(service, mock_result_repo, 
     count = service.recompute_daily(today.date(), today.date())
 
     assert count == 1  # both results fall in the same (user, subject, day) bucket
-    created_row = mock_daily_repo.create.call_args[0][0]
-    assert created_row.tests_taken == 2
+    # Sprint 64 — C6: the per-bucket write is now an atomic upsert() call
+    # (positional args: user_id, subject_id, stat_date, tests_taken,
+    # correct_answers, wrong_answers), not a create(DailyStatistics(...)).
+    tests_taken_arg = mock_daily_repo.upsert.call_args[0][3]
+    assert tests_taken_arg == 2
 
 
 def test_recompute_daily_counts_correct_and_wrong_answers(service, mock_result_repo, mock_test_repo, mock_answer_repo, mock_daily_repo):
@@ -71,9 +74,11 @@ def test_recompute_daily_counts_correct_and_wrong_answers(service, mock_result_r
 
     service.recompute_daily(today.date(), today.date())
 
-    created_row = mock_daily_repo.create.call_args[0][0]
-    assert created_row.correct_answers == 2
-    assert created_row.wrong_answers == 1
+    # Sprint 64 — C6: upsert(user_id, subject_id, stat_date, tests_taken,
+    # correct_answers, wrong_answers) — positions 4 and 5.
+    call_args = mock_daily_repo.upsert.call_args[0]
+    assert call_args[4] == 2
+    assert call_args[5] == 1
 
 
 def test_recompute_daily_is_delete_and_rebuild(service, mock_result_repo, mock_test_repo, mock_answer_repo, mock_daily_repo):
@@ -132,4 +137,5 @@ def test_empty_results_produce_zero_buckets(service, mock_result_repo, mock_dail
     mock_result_repo.list_in_date_range.return_value = []
     count = service.recompute_daily(date(2026, 1, 1), date(2026, 1, 31))
     assert count == 0
-    mock_daily_repo.create.assert_not_called()
+    # Sprint 64 — C6: the write call is now upsert(), not create().
+    mock_daily_repo.upsert.assert_not_called()
