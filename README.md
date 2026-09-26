@@ -1,6 +1,6 @@
 # BilimUz
 
-Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun. Dastlab fizika fani uchun yaratilgan test tizimi sifatida boshlangan, Sprint 44-49 davomida **generic (universal) imtihon dvigateli fundamenti**ga aylantirilmoqda — bu fundament kelajakda IELTS, SAT, GRE kabi standartlashtirilgan imtihonlarni qo'llab-quvvatlash uchun mo'ljallangan (hozircha **faqat fundament**, to'liq ishlaydigan implementatsiya emas — pastdagi "Joriy imtihon qo'llab-quvvatlashi" bo'limiga qarang).
+Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun. Dastlab fizika fani uchun yaratilgan test tizimi sifatida boshlangan, Sprint 44-50 davomida **generic (universal) imtihon dvigateli**ga aylantirildi — Sprint 50'dan boshlab haqiqiy modul-darajasidagi topshirish workflow'i (submit→routing→keyingi modul) ishlaydi, Sprint 57-61 davomida bir qator concurrency/scoring xatolari tuzatildi. Bu dvigatel kelajakda IELTS, SAT, GRE kabi standartlashtirilgan imtihonlarni qo'llab-quvvatlash uchun mo'ljallangan, lekin imtihon-maxsus qoidalar (adaptive routing haqiqiy servisga ulanishi, IELTS matching/writing/speaking javob turlari, GRE/SAT scaled/band-score konversiyasi, frontend generic exam UI) hali implement qilinmagan — pastdagi "Ochiq eslatma" bo'limiga qarang.
 
 ## Arxitektura
 - **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`, 27 modul) + Layered Architecture (Router → Service → Repository → Database), Clean Architecture tamoyillari bilan
@@ -83,10 +83,25 @@ Kod yozish boshlangan va faol davom etmoqda.
 | Sprint 47 — IELTS Engine Foundation | `Test.exam_variant` (generic, IELTS-maxsus enum emas), `QuestionGroup` (`title`/`stimulus_text` — umumiy stimul/passage foundation'i, IELTS-maxsus "Passage" modeli emas), `Question.group_id`, `ResultSection` (generic section-darajasidagi ball saqlash, IELTS-maxsus ustunlarsiz). Migratsiya `0014` | ✅ Yakunlandi |
 | Sprint 48 — Generic Adaptive Routing Foundation | `ExamModule.routing_group`/`routing_variant` (faqat metadata, hech qanday routing mantig'i hali o'qimaydi), `QuestionGroup.module_id`, `AdaptiveRoutingStrategy` (Protocol) + `SequentialRoutingStrategy` (deterministik default), `ModuleAccessGuard` (server-side foundation, hali public endpoint yo'q). Migratsiya `0015` | ✅ Yakunlandi |
 | Sprint 49 — Performance-Based Adaptive Routing | `PerformanceThresholdRoutingStrategy` — `AdaptiveRoutingStrategy`ning birinchi haqiqiy (sequential bo'lmagan) implementatsiyasi, sof Python, DB/HTTP'ga bog'liq emas, hech qanday imtihon-maxsus nom qattiq kodlanmagan. Migratsiya yo'q (mavjud `routing_group`/`routing_variant` yetarli) | ✅ Yakunlandi |
+| Sprint 50 — Generic Exam Execution Engine | Birinchi haqiqiy modul-darajasidagi ijro workflow'i: `ModuleExecutionService` (`submit_module`, `get_effective_question_ids`, `is_exam_complete`), `POST /attempts/{id}/modules/{module_id}/submit` endpoint, modul-darajasidagi `expires_at` (server-side timing enforcement, `module.duration`dan). Routing hozircha `SequentialRoutingStrategy` orqali (Sprint 49'ning `PerformanceThresholdRoutingStrategy`si hali ulanmagan). CRITICAL-1: bir vaqtda ikki marta submit qilish concurrency xavfsizligi | ✅ Yakunlandi |
+| Sprint 51 — Admin Exam Configuration API | `ExamSection`/`ExamModule` uchun to'liq Admin CRUD (`ExamSectionService`/`ExamModuleService`), order_number takrorlanishini oldini olish | ✅ Yakunlandi |
+| Sprint 52 — Question Assignment API | `Question.section_id`/`module_id`/`group_id`ni PATCH orqali belgilash, cross-test/cross-parent tegishlilik tekshiruvi | ✅ Yakunlandi |
+| Sprint 53 — QuestionGroup Admin CRUD | `QuestionGroup` (stimulus/passage fundamenti) uchun to'liq Admin CRUD, module-tegishlilik tekshiruvi | ✅ Yakunlandi |
+| Sprint 54 — ResultSection Creation | Generic section-darajasidagi ball saqlash fundamenti — `ResultSection` yaratish workflow'i | ✅ Yakunlandi |
+| Sprint 55 — ResultSection API + Multiple-Choice Router Fix | `ResultSection` ma'lumotlari API orqali chiqarildi, multiple_choice router xatosi tuzatildi | ✅ Yakunlandi |
+| Sprint 56 — Question Answer-Key Access Control | To'g'ri javob (`is_correct`) ma'lumoti endi faqat Admin/Super Admin/Teacher uchun ochiq (xavfsizlik tuzatishi) | ✅ Yakunlandi |
+| Sprint 57 — Modular Question Delivery Scoping | Talaba faqat joriy faol moduldagi savollarni ko'radi — modular imtihonlarda savol yetkazishning aniqligi tuzatildi | ✅ Yakunlandi |
+| Sprint 58 — Answer Race Condition Fix | `AnswerRepository.upsert()` — atomik `INSERT ... ON CONFLICT DO UPDATE` (`uq_answers_attempt_question`), bir vaqtda ikki marta javob saqlashda crash o'rniga graceful update | ✅ Yakunlandi |
+| Sprint 59 — Attempt Finalize Race Condition Fix | Attempt yakunlashda row-level locking — bir vaqtda ikki marta finalize qilishning oldini oladi | ✅ Yakunlandi |
+| Sprint 60 — Max Attempts Concurrency Race Fix | PostgreSQL advisory lock orqali `max_attempts` limiti bir vaqtdagi so'rovlarda ham to'g'ri hisoblanadi | ✅ Yakunlandi |
+| Sprint 61 — Modular Exam Finalization Scoring Scope Fix | Modular imtihonlarda yakuniy ballash faqat haqiqatda topshirilgan modullar savollari asosida hisoblanadi (`get_effective_question_ids()`), butun attemptni qayta topshirishdan himoya qo'shildi | ✅ Yakunlandi |
+| Sprint 62 — `app.core.security` Import Conflict Fix | Eski, o'lik `app/core/security.py` fayli o'chirildi (Sprint 4'dan qolgan, `security/` paketi bilan nom to'qnashuvi) — 4 ta import tuzatildi. Natijada `auth/login`/`refresh`/`registration` submodul testlaridagi eski import xatosi ham tuzatildi | ✅ Yakunlandi |
+| Sprint 63 — Result Detail Scoring Scope Fix | `ResultService.get_result_detail()` endi Sprint 61'ning bir xil samarali savol doirasidan foydalanadi — natija tafsilotlari va yakuniy ball endi bir xil hisoblanadi | ✅ Yakunlandi |
+| Sprint 64 — Soft-Delete Parent Validation + Statistics Atomic Upsert | Yumshoq o'chirilgan (soft-deleted) ExamSection/ExamModule/QuestionGroup'ga yangi bola yozuv bog'lanishi bloklandi (`get_active_by_id()`); `MonthlyStatisticsRepository.upsert()` va kunlik statistika qayta hisoblash yo'li atomik `ON CONFLICT DO UPDATE`ga o'tkazildi (race-xavfsiz) | ✅ Yakunlandi |
 
 To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-**Ochiq eslatma (Sprint 49'gacha bo'lgan real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
+**Ochiq eslatma (Sprint 64'gacha bo'lgan real kod holatiga asoslangan, hali bajarilmagan ishlar)**:
 
 - Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q) — bu hali ham amal qiladi.
 - Multiple-choice multi-answer backend support Sprint 30'da qo'shilgan, Question Editor UI Sprint 33'da qurilgan. Student Attempt UI (`AttemptPage.tsx`) bu sprintlar davomida o'zgartirilmagan.
@@ -94,23 +109,23 @@ To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-
 - **Rate limiting** — faqat `auth` va `ai` endpointlarida, boshqa modullarda kengaytirilmagan.
 - **Performance/code splitting** — frontend bitta ~820KB chunk, `React.lazy` qo'llanilmagan.
 - **Result Analysis'da skill/domain taqsimoti** — savol-savol sharh mavjud (Sprint 37), lekin fan/ko'nikma bo'yicha guruhlashtirish yo'q.
-- **Generic Exam Engine (Sprint 44-49) — hali faqat fundament (DB/model/strategiya darajasida)**: real modul-darajasidagi imtihon topshirish workflow'i (submit→lock→keyingi modul o'tishi), server-side enforce qilingan hierarxik timing, `PerformanceThresholdRoutingStrategy`ni haqiqiy servis/endpoint bilan bog'lash, IELTS matching/writing/speaking javob turlari, GRE/SAT-maxsus scoring (scaled/band score konversiyasi) — **hech biri hali implement qilinmagan**. Frontend'da generic exam UI (section/module navigator, question group ko'rsatish, adaptive transition) — hali yo'q.
-- **Test infratuzilmasi**: Sprint 40'dan beri real PostgreSQL integration testlar mavjud (55 ta, `backend/conftest.py` orqali), lekin backend testlarining ko'pchiligi hali ham mock-asoslangan (unit darajasida).
-- **Bilinadigan, oldindan mavjud test bazaviy xatolari** (Sprint 45-49 auditlarida qayta-qayta tasdiqlangan, ushbu ishlarga aloqasi yo'q): `profiles` (4), `roles` (2), `test_submit_computes_score_correctly` (1) — jami 7. Shuningdek, `app/core/security.py` (fayl) va `app/core/security/` (papka) bir vaqtda mavjudligi sababli `auth/login`, `auth/refresh`, `auth/registration` sub-modul testlari import xatosi bilan ishlamaydi (Sprint 2/4'dan qolgan, hali tuzatilmagan).
+- **Generic Exam Engine — asosiy ijro workflow'i endi haqiqiy va ishlaydi** (Sprint 50: `submit_module`→routing→keyingi modul, server-side modul-darajasidagi timing enforcement; Sprint 57-61: modular yetkazish/scoring/race-condition tuzatishlari; Sprint 64: soft-delete parent validation). Shunga qaramay hali implement qilinmagan: `PerformanceThresholdRoutingStrategy` (Sprint 49) haqiqiy servisga ulanmagan — ijro hozircha faqat `SequentialRoutingStrategy` bilan ishlaydi; IELTS matching/writing/speaking javob turlari; GRE/SAT-maxsus scoring (scaled/band score konversiyasi); frontend'da generic exam UI (section/module navigator, question group ko'rsatish, adaptive transition).
+- **Test infratuzilmasi**: Sprint 40'dan beri real PostgreSQL integration testlar soni sezilarli o'sdi — hozir 189 ta (`backend/tests/integration/`, real cross-connection concurrency testlar ham shu qatorda), qolgan ~555 tasi mock-asoslangan (unit darajasida). Jami 744 test.
+- **Bilinadigan, oldindan mavjud test bazaviy xatolari** (Sprint 45-64 auditlarida qayta-qayta tasdiqlangan, ushbu ishlarga aloqasi yo'q, barchasi ushbu sprintlardan oldin mavjud bo'lgan): `profiles` (4), `roles` (2), `test_submit_computes_score_correctly` (1) — jami 7. (Eski `app/core/security.py`/`security/` nom to'qnashuvi va undan kelib chiqqan `auth/login`/`refresh`/`registration` submodul import xatosi Sprint 62'da tuzatildi.)
 
 **Loyiha holati — qisqa xulosa**:
 
 | Sohasi | Holat |
 |---|---|
-| Backend | Barqaror, modulli, 27 modul, 61 jadval, ~530 test (asosan mock-asoslangan) + 55 real PostgreSQL integration test |
+| Backend | Barqaror, modulli, 27 modul, 61 jadval, jami 744 test — ~555 mock-asoslangan + 189 real PostgreSQL integration test (concurrency testlar bilan) |
 | Frontend | Admin/Student panellari to'liq, Teacher qisman (fayl boshqaruvi yo'q), Question Editor to'liq, generic exam UI yo'q |
 | Media/R2 | Private R2, presigned+multipart (2GB), signed URL — ishlaydi; Lesson, Question media va Certificate PDF barchasi R2'ga bog'langan; real E2E sinov yo'q |
 | Question Engine | Multi-answer (backend+authoring UI) + rich-text/formula/media editor — to'liq |
 | Student Progress | Dars tugatish (Sprint 36) — ishlaydi |
 | Result Analysis | To'g'ri/xato/javobsiz, vaqt, savol-savol sharh — ishlaydi; skill/domain taqsimoti yo'q |
 | Certificate | PDF generatsiyasi (Sprint 43) — ishlaydi, signed download, QR verification |
-| Generic Exam Engine | **Fundament** (Sprint 44-49): section/module/group struktura, scoring/routing strategiyalari — DB va model darajasida tayyor; ijro workflow'i, frontend UI, imtihon-maxsus qoidalar — hali yo'q |
-| International Exams (SAT/IELTS/GRE) | To'liq implementatsiya emas — faqat generic fundament ustida qurilishi mumkin bo'lgan zamin mavjud (yuqoriga qarang) |
+| Generic Exam Engine | **Ijro workflow'i real va ishlaydi** (Sprint 50: submit→routing→keyingi modul, server-side modul-timing; Sprint 57-64: scoring/concurrency/soft-delete tuzatishlari qattiqlashtirdi). Hali yo'q: `PerformanceThresholdRoutingStrategy`ning haqiqiy ulanishi (hozir `SequentialRoutingStrategy` default), imtihon-maxsus qoidalar (IELTS/SAT/GRE), frontend generic exam UI |
+| International Exams (SAT/IELTS/GRE) | To'liq implementatsiya emas — generic ijro dvigateli ustida qurilishi mumkin bo'lgan ishlaydigan zamin mavjud (yuqoriga qarang) |
 | Student/Teacher/Admin | Student — to'liq oqim (Video, Progress, Results History, Result Analysis, Certificate); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
