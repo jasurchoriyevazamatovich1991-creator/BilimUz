@@ -70,14 +70,24 @@ export function useAttempt(attemptId: string | undefined) {
   return query;
 }
 
+// Sprint 67 (C2) — a single_choice/true_false caller passes
+// `selectedOption`; a multiple_choice caller passes `selectedOptions`.
+// Exactly one of the two is ever present, matching how
+// attemptsApi.saveAnswer() forwards the request below.
+type SaveAnswerVariables =
+  | { questionId: string; selectedOption: string | null }
+  | { questionId: string; selectedOptions: string[] };
+
 export function useSaveAnswer(attemptId: string) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
 
   return useMutation({
-    mutationFn: ({ questionId, selectedOption }: { questionId: string; selectedOption: string | null }) =>
-      attemptsApi.saveAnswer(attemptId, questionId, selectedOption),
-    onSuccess: (_data, { questionId, selectedOption }) => {
+    mutationFn: (variables: SaveAnswerVariables) =>
+      "selectedOptions" in variables
+        ? attemptsApi.saveAnswer(attemptId, variables.questionId, { selectedOptions: variables.selectedOptions })
+        : attemptsApi.saveAnswer(attemptId, variables.questionId, { selectedOption: variables.selectedOption }),
+    onSuccess: (_data, variables) => {
       // Patch the cached attempt detail directly instead of a full
       // refetch — every option click would otherwise trigger a network
       // round-trip just to re-read data we already know the new value
@@ -85,9 +95,13 @@ export function useSaveAnswer(attemptId: string) {
       // cache update matching what we just successfully persisted.
       queryClient.setQueryData(["attempts", "detail", attemptId], (old: import("@/api/attempts").AttemptDetailOut | undefined) => {
         if (!old) return old;
-        const answered = old.answered.map((a) =>
-          a.question_id === questionId ? { ...a, is_answered: selectedOption !== null, selected_option: selectedOption } : a,
-        );
+        const answered = old.answered.map((a) => {
+          if (a.question_id !== variables.questionId) return a;
+          if ("selectedOptions" in variables) {
+            return { ...a, is_answered: variables.selectedOptions.length > 0, selected_options: variables.selectedOptions, selected_option: null };
+          }
+          return { ...a, is_answered: variables.selectedOption !== null, selected_option: variables.selectedOption, selected_options: null };
+        });
         return { ...old, answered };
       });
     },

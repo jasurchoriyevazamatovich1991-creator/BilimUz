@@ -5,13 +5,12 @@
  * order, which are already answered) — nothing is read from
  * localStorage, so a refresh always recovers correctly.
  *
- * BACKEND GAP, confirmed directly against SaveAnswerRequest before
- * writing this file: `selected_option` is a single UUID, not a list —
- * even for a `multiple_choice` question, only ONE option can be saved
- * as the answer via this endpoint. This page therefore renders single-
- * select (radio) behavior for every question, regardless of
- * question_type — not a frontend limitation, a real backend one, not
- * papered over with invented multi-select answer-saving.
+ * Sprint 67 (C2) — `multiple_choice` questions render checkboxes and
+ * save `selected_options: string[]`; `single_choice`/`true_false`
+ * unchanged: radio buttons, `selected_option`. The backend request
+ * schema (SaveAnswerRequest) has supported `selected_options` since
+ * Sprint 30 — this was a frontend-only gap, not a backend one; no
+ * backend file changes in this sprint.
  *
  * Race condition (approved decision 2): both the Submit button and the
  * Timer's onExpire call the SAME mutation object's `.mutate()` — guarded
@@ -58,9 +57,17 @@ export function AttemptPage() {
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const hasFiredSubmitRef = useRef(false); // synchronous guard, belt-and-suspenders alongside isPending
 
+  // Sprint 67 (C2) — value is a single option id for single_choice/
+  // true_false (unchanged), or an array of option ids for
+  // multiple_choice. A multiple_choice question with no selections yet
+  // has no entry with a non-empty array — it falls back to
+  // selected_option, which is null for that question type, exactly
+  // preserving the "unanswered" convention below.
   const answeredMap = useMemo(() => {
-    const map = new Map<string, string | null>();
-    attempt?.answered.forEach((a) => map.set(a.question_id, a.selected_option));
+    const map = new Map<string, string | string[] | null>();
+    attempt?.answered.forEach((a) => {
+      map.set(a.question_id, a.selected_options && a.selected_options.length > 0 ? a.selected_options : a.selected_option);
+    });
     return map;
   }, [attempt]);
 
@@ -84,9 +91,15 @@ export function AttemptPage() {
   }
 
   const currentQuestion = attempt.questions[currentIndex];
+  // Sprint 67 (C2) — an empty multiple_choice selection (`[]`) is NOT
+  // "answered", matching the single_choice/true_false null convention
+  // already used here. Array.isArray narrows the string | string[] |
+  // null value from answeredMap above.
   const answeredIndices = new Set(
     attempt.questions.reduce<number[]>((acc, q, i) => {
-      if (answeredMap.get(q.id)) acc.push(i);
+      const value = answeredMap.get(q.id);
+      const isAnswered = Array.isArray(value) ? value.length > 0 : value != null;
+      if (isAnswered) acc.push(i);
       return acc;
     }, []),
   );
@@ -94,6 +107,30 @@ export function AttemptPage() {
   function handleSelectOption(optionId: string) {
     if (!currentQuestion) return;
     saveAnswer.mutate({ questionId: currentQuestion.id, selectedOption: optionId });
+  }
+
+  // Sprint 67 (C2) — multiple_choice toggle: add the id if not already
+  // selected, remove it if it is. Always an immutable array rebuild
+  // (spread/filter), never a mutation of the existing selection.
+  // KNOWN LIMITATION (documented, not fixed here — out of this sprint's
+  // minimal scope): `current` is read from the query cache, which
+  // useSaveAnswer only patches in onSuccess (after the request
+  // resolves). Two checkbox clicks fired before the first PATCH
+  // response returns would both read the same stale `current` and the
+  // second click's PATCH would not include the first click's id. This
+  // mirrors the existing save flow's behavior for every question type
+  // (no optimistic/local-only state anywhere in this page) and was not
+  // introduced by this change; fixing it (e.g. an optimistic
+  // onMutate cache patch) would be a broader mutation-architecture
+  // change, not the smallest change for C2.
+  function handleToggleOption(optionId: string) {
+    if (!currentQuestion) return;
+    const current = answeredMap.get(currentQuestion.id);
+    const currentIds = Array.isArray(current) ? current : [];
+    const next = currentIds.includes(optionId)
+      ? currentIds.filter((id) => id !== optionId)
+      : [...currentIds, optionId];
+    saveAnswer.mutate({ questionId: currentQuestion.id, selectedOptions: next });
   }
 
   function fireSubmit() {
@@ -138,22 +175,35 @@ export function AttemptPage() {
         <div className="mb-6 rounded-lg border border-border p-5">
           <p className="mb-4 text-foreground">{currentQuestion.question_text}</p>
           <div className="space-y-2">
-            {currentQuestion.options.map((option) => (
-              <label
-                key={option.id}
-                className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-primary/5"
-              >
-                <input
-                  type="radio"
-                  name={`question-${currentQuestion.id}`}
-                  checked={answeredMap.get(currentQuestion.id) === option.id}
-                  onChange={() => handleSelectOption(option.id)}
-                  disabled={saveAnswer.isPending}
-                  className="accent-primary"
-                />
-                <span className="text-sm text-foreground">{option.option_text}</span>
-              </label>
-            ))}
+            {(() => {
+              // Sprint 67 (C2) — the only question-option rendering
+              // change in this file: multiple_choice gets checkboxes and
+              // an array-membership check; single_choice/true_false keep
+              // the original radio-group behavior unchanged.
+              const isMultiple = currentQuestion.question_type === "multiple_choice";
+              const currentValue = answeredMap.get(currentQuestion.id);
+              return currentQuestion.options.map((option) => {
+                const isChecked = isMultiple
+                  ? Array.isArray(currentValue) && currentValue.includes(option.id)
+                  : currentValue === option.id;
+                return (
+                  <label
+                    key={option.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-primary/5"
+                  >
+                    <input
+                      type={isMultiple ? "checkbox" : "radio"}
+                      name={isMultiple ? undefined : `question-${currentQuestion.id}`}
+                      checked={isChecked}
+                      onChange={() => (isMultiple ? handleToggleOption(option.id) : handleSelectOption(option.id))}
+                      disabled={saveAnswer.isPending}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm text-foreground">{option.option_text}</span>
+                  </label>
+                );
+              });
+            })()}
           </div>
         </div>
       ) : null}
