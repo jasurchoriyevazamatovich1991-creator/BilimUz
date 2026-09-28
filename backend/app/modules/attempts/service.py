@@ -26,7 +26,7 @@ from app.modules.attempts.exceptions import (
 from app.modules.attempts.constants import ACTIVE_STATUSES, DEFAULT_MAX_ATTEMPTS
 from app.modules.attempts.models import AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
-from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
 from app.modules.attempts.schemas import (
     AnsweredQuestionState,
     AttemptDetailOut,
@@ -172,6 +172,7 @@ class AttemptService:
     def save_answer(
         self, attempt_id: uuid.UUID, user_id: uuid.UUID, question_id: uuid.UUID,
         selected_option: uuid.UUID | None, selected_options: list[uuid.UUID] | None = None,
+        text_answer: str | None = None,
     ) -> None:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
@@ -191,6 +192,18 @@ class AttemptService:
                 self.module_execution.validate_question_in_module(active_progress, question_id)
 
         question = self.question_repo.get_by_id(question_id)
+        # Sprint 66 — short_answer/essay have no automatic-correctness
+        # determination anywhere in the codebase (see scoring.py's
+        # AUTO_GRADABLE_QUESTION_TYPES). Persist the submitted free text
+        # via the same generic upsert path used by every other question
+        # type, leave is_correct NULL (not False — NULL means "awaiting
+        # grading", not "wrong"), and return before the choice-scoring
+        # branches below, which don't apply to this question type.
+        if question is not None and question.question_type not in AUTO_GRADABLE_QUESTION_TYPES:
+            self.answer_repo.upsert(attempt_id, question_id, {"text_answer": text_answer, "is_correct": None})
+            self.repo.commit()
+            return
+
         if question is not None and question.question_type == "multiple_choice":
             # Sprint 30 — the only new branch. single_choice/true_false
             # below is byte-for-byte the original Sprint 6 logic.
@@ -397,13 +410,28 @@ class AttemptService:
         questions = [self.question_repo.get_by_id(qid) for qid in question_ids]
         questions = [q for q in questions if q is not None]
 
+        # Sprint 66 — short_answer/essay can never be automatically
+        # correct (is_correct stays NULL forever for them — see
+        # save_answer()'s free-text branch above), so including them
+        # here would only ever inflate total_possible without ever being
+        # able to inflate total_score, silently deflating the automatic
+        # percentage of any exam that contains one. Filter to the
+        # automatically gradable subset BEFORE scoring — applied after
+        # the effective (modular-aware) question set above has already
+        # been resolved, so this does not touch or duplicate Sprint
+        # 61/63's effective-question-set algorithm, only narrows its
+        # output by question_type.
+        auto_scored_questions = [q for q in questions if q.question_type in AUTO_GRADABLE_QUESTION_TYPES]
+
         # Sprint 45 — delegates to the Scoring Strategy foundation
         # (scoring.py). DEFAULT_SCORING_STRATEGY.calculate() is the
         # exact same arithmetic this method used to do inline —
         # extracted, not changed. Sprint 61 — S61-C changed only WHICH
         # questions are passed in (see _effective_scoring_question_ids
-        # above); the scoring arithmetic itself is untouched.
-        result = DEFAULT_SCORING_STRATEGY.calculate(questions, answers)
+        # above); the scoring arithmetic itself is untouched. Sprint 66
+        # narrows the input further to auto_scored_questions (see above)
+        # — the strategy itself has no notion of question_type.
+        result = DEFAULT_SCORING_STRATEGY.calculate(auto_scored_questions, answers)
 
         self.repo.update(attempt, {
             "status": new_status.value, "finish_time": datetime.now(timezone.utc),
@@ -413,6 +441,20 @@ class AttemptService:
     def _build_result(self, attempt: TestAttempt) -> SubmitResultOut:
         test = self.test_repo.get_by_id(attempt.test_id)
         answers = self.answer_repo.list_for_attempt(attempt.id)
+        # Sprint 66 — deliberately UNCHANGED, documented semantic
+        # limitation: total_questions below still means "all effective
+        # exam questions" (auto-graded + short_answer/essay), NOT "the
+        # auto-scored denominator" that _finalize() now uses for
+        # score/percentage. correct_count needs no change either: it is
+        # already computed from is_correct is True, and short_answer/
+        # essay answers always have is_correct=None, so they were never
+        # counted here regardless. Distinguishing "total exam questions"
+        # from "auto-scored questions" as separate response fields would
+        # be a result-schema change, which is explicitly out of scope
+        # for this sprint (see scoring.py's AUTO_GRADABLE_QUESTION_TYPES
+        # for where that distinction now lives). A caller that wants the
+        # auto-scored denominator specifically has no field for it yet.
+        #
         # Sprint 61 — S61-C. total_questions/correct_count must reflect
         # the SAME effective question set _finalize() scored against,
         # not the whole-test attempt.question_order — otherwise a

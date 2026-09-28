@@ -23,6 +23,17 @@ class SaveAnswerRequest(BaseModel):
     # service, not here — this schema stays a plain, permissive DTO
     # matching the existing style).
     selected_options: list[uuid.UUID] | None = None
+    # Sprint 66 — additive, for short_answer/essay questions only. Free
+    # text the student submits for a question type that cannot be
+    # automatically graded. Persisted verbatim via the existing
+    # AnswerRepository.upsert() path (Answer.text_answer, present since
+    # Sprint 45); is_correct is left NULL for these until a future
+    # manual-grading feature exists — see scoring.py's
+    # AUTO_GRADABLE_QUESTION_TYPES for how this is kept out of the
+    # automatic scoring denominator. Like selected_option(s) above, this
+    # schema stays a plain, permissive DTO — which field is expected is
+    # decided by question_type in the service, not here.
+    text_answer: str | None = None
 
 
 class OptionForAttemptOut(BaseModel):

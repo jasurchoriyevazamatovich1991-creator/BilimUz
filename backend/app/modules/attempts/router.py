@@ -106,9 +106,13 @@ def save_answer(
     # selected_options to None). save_answer()'s own multiple_choice
     # branch and scoring were always correct — only this call site was
     # missing the argument.
+    # Sprint 66 — forward the new text_answer field (SaveAnswerRequest,
+    # schemas.py) the same way selected_option(s) already are; which one
+    # actually gets used is decided in the service by question_type.
     service.save_answer(
         attempt_id, user_id=user.id, question_id=data.question_id,
         selected_option=data.selected_option, selected_options=data.selected_options,
+        text_answer=data.text_answer,
     )
     return success_response(None, "Javob saqlandi.")
 

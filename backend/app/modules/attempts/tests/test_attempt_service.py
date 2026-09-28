@@ -152,22 +152,32 @@ def test_save_answer_rejects_question_not_in_attempt(service, mock_repo):
         service.save_answer(attempt.id, user_id, uuid.uuid4(), None)  # different question_id
 
 
-def test_save_answer_rejects_option_from_wrong_question(service, mock_repo, mock_option_repo):
+def test_save_answer_rejects_option_from_wrong_question(service, mock_repo, mock_option_repo, mock_question_repo):
     user_id = uuid.uuid4()
     question_id = uuid.uuid4()
     attempt = MagicMock(user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
     mock_repo.get_by_id.return_value = attempt
+    # Sprint 66 — save_answer() now branches on question.question_type
+    # before reaching the single_choice option check below, so this mock
+    # must be an explicit single_choice question (an unconfigured
+    # MagicMock's question_type is not in AUTO_GRADABLE_QUESTION_TYPES,
+    # which would wrongly divert into the new short_answer/essay branch
+    # and never raise the exception this test expects).
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="single_choice")
     mock_option_repo.get_by_id.return_value = MagicMock(question_id=uuid.uuid4())  # mismatched
     with pytest.raises(InvalidOptionReferenceException):
         service.save_answer(attempt.id, user_id, question_id, uuid.uuid4())
 
 
-def test_save_answer_succeeds_and_computes_correctness(service, mock_repo, mock_answer_repo, mock_option_repo):
+def test_save_answer_succeeds_and_computes_correctness(service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo):
     user_id = uuid.uuid4()
     question_id = uuid.uuid4()
     option_id = uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
     mock_repo.get_by_id.return_value = attempt
+    # Sprint 66 — see comment in the previous test: must be explicitly
+    # single_choice so save_answer() reaches the choice-scoring branch.
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="single_choice")
     mock_option_repo.get_by_id.return_value = MagicMock(question_id=question_id, is_correct=True)
     mock_answer_repo.get.return_value = None
 
@@ -191,7 +201,13 @@ def test_submit_computes_score_correctly(service, mock_repo, mock_answer_repo, m
     q1, q2 = uuid.uuid4(), uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[q1, q2])
     mock_repo.get_by_id.return_value = attempt
-    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5)
+    # Sprint 66 — _finalize() now filters questions to
+    # AUTO_GRADABLE_QUESTION_TYPES before scoring, so these mocked
+    # questions must declare an explicit auto-gradable question_type
+    # (an unconfigured MagicMock default would be filtered out,
+    # producing an empty auto-scored set and a 0% result instead of the
+    # value this test asserts).
+    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5, question_type="single_choice")
     mock_answer_repo.list_for_attempt.return_value = [
         MagicMock(question_id=q1, is_correct=True),
         MagicMock(question_id=q2, is_correct=False),
@@ -219,7 +235,8 @@ def test_unanswered_questions_score_zero(service, mock_repo, mock_answer_repo, m
     q1, q2 = uuid.uuid4(), uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[q1, q2])
     mock_repo.get_by_id.return_value = attempt
-    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5)
+    # Sprint 66 — see comment in test_submit_computes_score_correctly above.
+    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5, question_type="single_choice")
     mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=True)]  # q2 never answered
     mock_test_repo.get_by_id.return_value = MagicMock(passing_score=None)
 

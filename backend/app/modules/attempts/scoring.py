@@ -23,6 +23,27 @@ from typing import Protocol
 from app.modules.attempts.models import Answer
 from app.modules.questions.models import Question
 
+# Sprint 66 — the single source of truth for "which question types can
+# be automatically scored today". short_answer/essay are deliberately
+# excluded: Answer.text_answer (Sprint 45) has no automatic-correctness
+# determination anywhere in the codebase, so is_correct stays NULL for
+# them forever (see save_answer()'s free-text branch in service.py).
+# Before this sprint, AttemptService._finalize() still summed their
+# question.score into the scoring denominator (total_possible) even
+# though they could never contribute to the numerator — silently
+# deflating the automatic score of any exam containing one. This
+# constant is consumed by AttemptService._finalize() (the ONLY call
+# site changed this sprint) to filter the question list BEFORE handing
+# it to a ScoringStrategy — the strategy interface/arithmetic below is
+# untouched, and the other two existing callers of
+# DEFAULT_SCORING_STRATEGY.calculate() (ModuleExecutionService.
+# submit_module()'s own — currently unused — scoring_result, and
+# ResultService._create_result_sections()'s per-section raw_score) are
+# deliberately NOT filtered here, since neither was named in this
+# sprint's scope (ResultSection redesign is explicitly out of scope;
+# module-level scoring_result is presently a dead, unused local value).
+AUTO_GRADABLE_QUESTION_TYPES = frozenset({"single_choice", "multiple_choice", "true_false"})
+
 
 @dataclass(frozen=True)
 class ScoringResult:
