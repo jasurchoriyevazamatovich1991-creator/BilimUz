@@ -159,6 +159,10 @@ class AttemptService:
                 question_id=qid, is_answered=qid in answers,
                 selected_option=answers[qid].selected_option if qid in answers else None,
                 selected_options=answers[qid].selected_options if qid in answers else None,
+                # Sprint 68 — additive, see schemas.AnsweredQuestionState
+                # docstring. Needed so the student UI can resume a
+                # previously-typed short_answer/essay answer.
+                text_answer=answers[qid].text_answer if qid in answers else None,
             )
             for qid in effective_question_order
         ]

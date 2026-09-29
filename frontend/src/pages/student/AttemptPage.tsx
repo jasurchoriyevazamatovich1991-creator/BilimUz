@@ -12,13 +12,25 @@
  * Sprint 30 — this was a frontend-only gap, not a backend one; no
  * backend file changes in this sprint.
  *
+ * Sprint 68 — `short_answer`/`essay` questions render a text field
+ * (input for short_answer, textarea for essay) and save
+ * `text_answer: string`. Saved on blur, not on every keystroke (see
+ * handleBlurTextAnswer below) to avoid an autosave mutation storm,
+ * matching this file's existing "no debounce infrastructure unless
+ * genuinely required" convention. One additive backend change was
+ * required and is documented at the call site: AnsweredQuestionState
+ * did not return text_answer at all before this sprint, so a
+ * previously typed answer could not be resumed — see
+ * backend/app/modules/attempts/schemas.py's AnsweredQuestionState
+ * docstring for the exact justification.
+ *
  * Race condition (approved decision 2): both the Submit button and the
  * Timer's onExpire call the SAME mutation object's `.mutate()` — guarded
  * by `submitMutation.isPending` checked before either call fires, plus
  * a local ref as a synchronous belt-and-suspenders guard against the
  * rare case where two calls could otherwise land in the same tick.
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/layout/ErrorState";
@@ -63,13 +75,42 @@ export function AttemptPage() {
   // has no entry with a non-empty array — it falls back to
   // selected_option, which is null for that question type, exactly
   // preserving the "unanswered" convention below.
+  //
+  // Sprint 68 — falls back further to text_answer (string, possibly
+  // "") for short_answer/essay. Exactly one of selected_options/
+  // selected_option/text_answer is ever non-null for a given question,
+  // so the fallback chain never mixes values across question types.
   const answeredMap = useMemo(() => {
     const map = new Map<string, string | string[] | null>();
     attempt?.answered.forEach((a) => {
-      map.set(a.question_id, a.selected_options && a.selected_options.length > 0 ? a.selected_options : a.selected_option);
+      const value =
+        a.selected_options && a.selected_options.length > 0
+          ? a.selected_options
+          : a.text_answer ?? a.selected_option;
+      map.set(a.question_id, value);
     });
     return map;
   }, [attempt]);
+
+  // Sprint 68 — local draft for the currently-viewed short_answer/essay
+  // field. Kept as component state (not derived inline) so the input
+  // is a normal controlled field while typing, and only committed via
+  // saveAnswer on blur — see handleBlurTextAnswer below. Re-synced from
+  // the cache whenever the visible question changes (navigation or
+  // initial load), which is also how a previously saved answer resumes.
+  // Computed with optional chaining here (above the loading/error early
+  // returns, same pattern as answeredMap above) so the hook order stays
+  // stable regardless of load state.
+  const currentQuestionForDraft = attempt?.questions[currentIndex];
+  const [textDraft, setTextDraft] = useState("");
+  useEffect(() => {
+    if (!currentQuestionForDraft) return;
+    const isTextType = currentQuestionForDraft.question_type === "short_answer" || currentQuestionForDraft.question_type === "essay";
+    if (!isTextType) return;
+    const existing = answeredMap.get(currentQuestionForDraft.id);
+    setTextDraft(typeof existing === "string" ? existing : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestionForDraft?.id]);
 
   if (!testId || !attemptId) return null;
   if (isError) return <ErrorState title="Urinish" />;
@@ -95,10 +136,16 @@ export function AttemptPage() {
   // "answered", matching the single_choice/true_false null convention
   // already used here. Array.isArray narrows the string | string[] |
   // null value from answeredMap above.
+  //
+  // Sprint 68 — an empty/whitespace-only text_answer ("") is likewise
+  // NOT "answered". selected_option is always a non-empty option id, so
+  // checking for a non-empty trimmed string is safe for both that case
+  // and the short_answer/essay case without needing the question_type
+  // here.
   const answeredIndices = new Set(
     attempt.questions.reduce<number[]>((acc, q, i) => {
       const value = answeredMap.get(q.id);
-      const isAnswered = Array.isArray(value) ? value.length > 0 : value != null;
+      const isAnswered = Array.isArray(value) ? value.length > 0 : value != null && value.trim().length > 0;
       if (isAnswered) acc.push(i);
       return acc;
     }, []),
@@ -131,6 +178,17 @@ export function AttemptPage() {
       ? currentIds.filter((id) => id !== optionId)
       : [...currentIds, optionId];
     saveAnswer.mutate({ questionId: currentQuestion.id, selectedOptions: next });
+  }
+
+  // Sprint 68 — commits the local draft on blur only (not per keystroke).
+  // Chosen as the smallest safe implementation per this sprint's
+  // instructions: it avoids a mutation storm on every keystroke while
+  // adding no new infrastructure (no debounce timer, no extra library),
+  // consistent with how this file already only saves on an explicit
+  // user action (click) for every other question type.
+  function handleBlurTextAnswer() {
+    if (!currentQuestion) return;
+    saveAnswer.mutate({ questionId: currentQuestion.id, textAnswer: textDraft });
   }
 
   function fireSubmit() {
@@ -174,37 +232,64 @@ export function AttemptPage() {
       {currentQuestion ? (
         <div className="mb-6 rounded-lg border border-border p-5">
           <p className="mb-4 text-foreground">{currentQuestion.question_text}</p>
-          <div className="space-y-2">
-            {(() => {
-              // Sprint 67 (C2) — the only question-option rendering
-              // change in this file: multiple_choice gets checkboxes and
-              // an array-membership check; single_choice/true_false keep
-              // the original radio-group behavior unchanged.
-              const isMultiple = currentQuestion.question_type === "multiple_choice";
-              const currentValue = answeredMap.get(currentQuestion.id);
-              return currentQuestion.options.map((option) => {
-                const isChecked = isMultiple
-                  ? Array.isArray(currentValue) && currentValue.includes(option.id)
-                  : currentValue === option.id;
-                return (
-                  <label
-                    key={option.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-primary/5"
-                  >
-                    <input
-                      type={isMultiple ? "checkbox" : "radio"}
-                      name={isMultiple ? undefined : `question-${currentQuestion.id}`}
-                      checked={isChecked}
-                      onChange={() => (isMultiple ? handleToggleOption(option.id) : handleSelectOption(option.id))}
-                      disabled={saveAnswer.isPending}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm text-foreground">{option.option_text}</span>
-                  </label>
-                );
-              });
-            })()}
-          </div>
+          {currentQuestion.question_type === "short_answer" || currentQuestion.question_type === "essay" ? (
+            // Sprint 68 — short_answer gets a single-line text input,
+            // essay gets a multi-line textarea. Neither question type
+            // has options to render (currentQuestion.options is empty
+            // for both), so this branch replaces the options list
+            // entirely rather than rendering alongside it.
+            currentQuestion.question_type === "essay" ? (
+              <textarea
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                onBlur={handleBlurTextAnswer}
+                rows={6}
+                placeholder="Javobingizni shu yerga yozing..."
+                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
+              />
+            ) : (
+              <input
+                type="text"
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                onBlur={handleBlurTextAnswer}
+                placeholder="Javobingizni shu yerga yozing..."
+                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
+              />
+            )
+          ) : (
+            <div className="space-y-2">
+              {(() => {
+                // Sprint 67 (C2) — the only question-option rendering
+                // change in this file: multiple_choice gets checkboxes and
+                // an array-membership check; single_choice/true_false keep
+                // the original radio-group behavior unchanged.
+                const isMultiple = currentQuestion.question_type === "multiple_choice";
+                const currentValue = answeredMap.get(currentQuestion.id);
+                return currentQuestion.options.map((option) => {
+                  const isChecked = isMultiple
+                    ? Array.isArray(currentValue) && currentValue.includes(option.id)
+                    : currentValue === option.id;
+                  return (
+                    <label
+                      key={option.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-primary/5"
+                    >
+                      <input
+                        type={isMultiple ? "checkbox" : "radio"}
+                        name={isMultiple ? undefined : `question-${currentQuestion.id}`}
+                        checked={isChecked}
+                        onChange={() => (isMultiple ? handleToggleOption(option.id) : handleSelectOption(option.id))}
+                        disabled={saveAnswer.isPending}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm text-foreground">{option.option_text}</span>
+                    </label>
+                  );
+                });
+              })()}
+            </div>
+          )}
         </div>
       ) : null}
 

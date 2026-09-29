@@ -72,11 +72,13 @@ export function useAttempt(attemptId: string | undefined) {
 
 // Sprint 67 (C2) — a single_choice/true_false caller passes
 // `selectedOption`; a multiple_choice caller passes `selectedOptions`.
-// Exactly one of the two is ever present, matching how
+// Sprint 68 — a short_answer/essay caller passes `textAnswer`. Exactly
+// one of the three is ever present, matching how
 // attemptsApi.saveAnswer() forwards the request below.
 type SaveAnswerVariables =
   | { questionId: string; selectedOption: string | null }
-  | { questionId: string; selectedOptions: string[] };
+  | { questionId: string; selectedOptions: string[] }
+  | { questionId: string; textAnswer: string };
 
 export function useSaveAnswer(attemptId: string) {
   const queryClient = useQueryClient();
@@ -86,7 +88,9 @@ export function useSaveAnswer(attemptId: string) {
     mutationFn: (variables: SaveAnswerVariables) =>
       "selectedOptions" in variables
         ? attemptsApi.saveAnswer(attemptId, variables.questionId, { selectedOptions: variables.selectedOptions })
-        : attemptsApi.saveAnswer(attemptId, variables.questionId, { selectedOption: variables.selectedOption }),
+        : "textAnswer" in variables
+          ? attemptsApi.saveAnswer(attemptId, variables.questionId, { textAnswer: variables.textAnswer })
+          : attemptsApi.saveAnswer(attemptId, variables.questionId, { selectedOption: variables.selectedOption }),
     onSuccess: (_data, variables) => {
       // Patch the cached attempt detail directly instead of a full
       // refetch — every option click would otherwise trigger a network
@@ -98,9 +102,32 @@ export function useSaveAnswer(attemptId: string) {
         const answered = old.answered.map((a) => {
           if (a.question_id !== variables.questionId) return a;
           if ("selectedOptions" in variables) {
-            return { ...a, is_answered: variables.selectedOptions.length > 0, selected_options: variables.selectedOptions, selected_option: null };
+            return {
+              ...a,
+              is_answered: variables.selectedOptions.length > 0,
+              selected_options: variables.selectedOptions,
+              selected_option: null,
+              text_answer: null,
+            };
           }
-          return { ...a, is_answered: variables.selectedOption !== null, selected_option: variables.selectedOption, selected_options: null };
+          if ("textAnswer" in variables) {
+            // Sprint 68 — empty text is NOT "answered", matching the
+            // existing selected_option(s) unanswered convention.
+            return {
+              ...a,
+              is_answered: variables.textAnswer.trim().length > 0,
+              text_answer: variables.textAnswer,
+              selected_option: null,
+              selected_options: null,
+            };
+          }
+          return {
+            ...a,
+            is_answered: variables.selectedOption !== null,
+            selected_option: variables.selectedOption,
+            selected_options: null,
+            text_answer: null,
+          };
         });
         return { ...old, answered };
       });

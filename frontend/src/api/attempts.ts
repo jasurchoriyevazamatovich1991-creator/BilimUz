@@ -47,6 +47,11 @@ export interface AnsweredQuestionState {
   // selected_option is null for an unanswered/non-multiple_choice
   // question in the other direction.
   selected_options: string[] | null;
+  // Sprint 68 — additive. Backend field added this sprint (see backend
+  // AnsweredQuestionState docstring) specifically so a previously typed
+  // short_answer/essay answer can be resumed. null unless this question
+  // is short_answer/essay and has a saved answer.
+  text_answer: string | null;
 }
 
 export interface AttemptDetailOut extends AttemptOut {
@@ -89,16 +94,24 @@ export const attemptsApi = {
   // Same existing PATCH /attempts/{id}/answer endpoint — the backend
   // request schema (SaveAnswerRequest) already accepts both fields
   // (Sprint 30), this was purely a frontend gap.
+  //
+  // Sprint 68 — additive third variant: a short_answer/essay answer
+  // sends only text_answer, never selected_option or selected_options.
+  // The backend request schema has accepted text_answer since Sprint
+  // 66 (SaveAnswerRequest.text_answer); this too was purely a frontend
+  // gap.
   saveAnswer: (
     attemptId: string,
     questionId: string,
-    answer: { selectedOption: string | null } | { selectedOptions: string[] },
+    answer: { selectedOption: string | null } | { selectedOptions: string[] } | { textAnswer: string },
   ) =>
     httpClient.patch(`/attempts/${attemptId}/answer`, {
       question_id: questionId,
       ...("selectedOptions" in answer
         ? { selected_options: answer.selectedOptions }
-        : { selected_option: answer.selectedOption }),
+        : "textAnswer" in answer
+          ? { text_answer: answer.textAnswer }
+          : { selected_option: answer.selectedOption }),
     }),
 
   submit: (attemptId: string) => unwrap<SubmitResultOut>(httpClient.post(`/attempts/${attemptId}/submit`)),

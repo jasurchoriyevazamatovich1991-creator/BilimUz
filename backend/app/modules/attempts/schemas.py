@@ -62,6 +62,16 @@ class AnsweredQuestionState(BaseModel):
     is_answered: bool
     selected_option: uuid.UUID | None = None
     selected_options: list[uuid.UUID] | None = None
+    # Sprint 68 — additive. Discovered during Sprint 68's frontend
+    # implementation: text_answer was persisted since Sprint 66 but was
+    # never returned by get_attempt_detail(), making resume of a
+    # short_answer/essay answer technically impossible for the student
+    # UI (the value existed in the DB but never reached the client).
+    # Mirrors selected_option/selected_options exactly: null unless this
+    # question is short_answer/essay AND an Answer row exists for it.
+    # Does not touch scoring, AUTO_GRADABLE_QUESTION_TYPES, or any
+    # denominator logic.
+    text_answer: str | None = None
 
 
 class AttemptOut(BaseModel):
