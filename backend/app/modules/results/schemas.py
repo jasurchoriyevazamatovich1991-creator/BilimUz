@@ -49,6 +49,14 @@ class QuestionReviewOut(BaseModel):
     # None-for-unanswered convention (attempts/service.py), not a
     # separate "unanswered" flag.
     is_correct: bool | None
+    # Sprint 70 — additive. The student's submitted free-text answer for
+    # short_answer/essay questions (Answer.text_answer, Sprint 45/66).
+    # None both when unanswered and for choice-based question types
+    # (which never populate Answer.text_answer). short_answer/essay are
+    # never auto-graded (see AUTO_GRADABLE_QUESTION_TYPES), so is_correct
+    # stays None for them even when answered — this field is what lets a
+    # consumer tell "answered, not auto-graded" apart from "unanswered".
+    text_answer: str | None
 
 
 class ResultSectionOut(BaseModel):

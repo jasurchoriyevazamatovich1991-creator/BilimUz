@@ -257,6 +257,10 @@ class ResultService:
                 selected_option=answer.selected_option if answer else None,
                 selected_options=answer.selected_options if answer else None,
                 is_correct=answer.is_correct if answer else None,
+                # Sprint 70 — reuses the `answer` row already fetched
+                # above (answers_by_question, via list_for_attempt());
+                # zero additional queries.
+                text_answer=answer.text_answer if answer else None,
             ))
 
         time_spent_seconds = None

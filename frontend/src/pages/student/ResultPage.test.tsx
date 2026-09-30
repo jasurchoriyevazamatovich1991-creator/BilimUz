@@ -127,7 +127,7 @@ describe("ResultPage — Sprint 37 Result Analysis", () => {
       questions: [{
         question_id: "q1", question_text: "2+2 nechi?", question_type: "single_choice", explanation: "Oddiy qo'shish",
         options: [{ id: "o1", option_text: "4", is_correct: true }, { id: "o2", option_text: "5", is_correct: false }],
-        selected_option: "o1", selected_options: null, is_correct: true,
+        selected_option: "o1", selected_options: null, is_correct: true, text_answer: null,
       }],
     });
     renderResultPage();
@@ -142,7 +142,7 @@ describe("ResultPage — Sprint 37 Result Analysis", () => {
       questions: [{
         question_id: "q1", question_text: "Poytaxt qaysi?", question_type: "single_choice", explanation: null,
         options: [{ id: "o1", option_text: "Samarqand", is_correct: false }, { id: "o2", option_text: "Toshkent", is_correct: true }],
-        selected_option: "o1", selected_options: null, is_correct: false,
+        selected_option: "o1", selected_options: null, is_correct: false, text_answer: null,
       }],
     });
     renderResultPage();
@@ -157,7 +157,7 @@ describe("ResultPage — Sprint 37 Result Analysis", () => {
       questions: [{
         question_id: "q1", question_text: "Javob berilmagan savol", question_type: "single_choice", explanation: null,
         options: [{ id: "o1", option_text: "To'g'ri variant", is_correct: true }],
-        selected_option: null, selected_options: null, is_correct: null,
+        selected_option: null, selected_options: null, is_correct: null, text_answer: null,
       }],
     });
     renderResultPage();
@@ -174,7 +174,7 @@ describe("ResultPage — Sprint 37 Result Analysis", () => {
           { id: "o1", option_text: "A", is_correct: true }, { id: "o2", option_text: "B", is_correct: true },
           { id: "o3", option_text: "C", is_correct: false },
         ],
-        selected_option: null, selected_options: ["o1", "o2"], is_correct: true,
+        selected_option: null, selected_options: ["o1", "o2"], is_correct: true, text_answer: null,
       }],
     });
     renderResultPage();
@@ -199,5 +199,74 @@ describe("ResultPage — Sprint 37 Result Analysis", () => {
     renderResultPage();
     await waitFor(() => expect(screen.getByText("Javoblar taqsimoti")).toBeInTheDocument());
     expect(screen.queryByText("Savollarni ko'rib chiqish")).not.toBeInTheDocument();
+  });
+});
+
+// --- Sprint 70: Result Review Text Answer Visibility ---
+
+describe("ResultPage — Sprint 70 text answer visibility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(testsApi.get).mockResolvedValue({
+      id: "t1", subject_id: null, grade_id: null, topic_id: null, title: "Test 1", description: null,
+      difficulty: "medium", duration: 30, question_count: 10, passing_score: 60,
+      shuffle_questions: true, shuffle_answers: true, status: "published", created_at: "", updated_at: "",
+    });
+  });
+
+  it("TEST 6: shows the submitted text answer, not 'Javob berilmagan', when text_answer exists", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: false,
+      questions: [{
+        question_id: "q1", question_text: "Nyutonning ikkinchi qonuni nima?", question_type: "short_answer", explanation: null,
+        options: [], selected_option: null, selected_options: null, is_correct: null,
+        text_answer: "Kuch massa ko'paytirilgan tezlanishga teng",
+      }],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText(/Javobingiz: Kuch massa ko'paytirilgan tezlanishga teng/)).toBeInTheDocument());
+    expect(screen.queryByText("— Javob berilmagan")).not.toBeInTheDocument();
+  });
+
+  it("TEST 7: still shows 'Javob berilmagan' when text_answer is null", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: false,
+      questions: [{
+        question_id: "q1", question_text: "Javob berilmagan insho savoli", question_type: "essay", explanation: null,
+        options: [], selected_option: null, selected_options: null, is_correct: null, text_answer: null,
+      }],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText("— Javob berilmagan")).toBeInTheDocument());
+  });
+
+  it("TEST 8: is_correct === null with a non-empty text_answer never renders 'Javob berilmagan'", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: false,
+      questions: [{
+        question_id: "q1", question_text: "Insho yozing", question_type: "essay", explanation: null,
+        options: [], selected_option: null, selected_options: null, is_correct: null,
+        text_answer: "A long-form essay answer discussing the causes of...",
+      }],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText(/Javobingiz:/)).toBeInTheDocument());
+    expect(screen.queryByText("— Javob berilmagan")).not.toBeInTheDocument();
+    expect(screen.queryByText("✓ To'g'ri")).not.toBeInTheDocument();
+    expect(screen.queryByText("✗ Noto'g'ri")).not.toBeInTheDocument();
+  });
+
+  it("TEST 9: existing graded single_choice rendering is unaffected by the text_answer field", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: true,
+      questions: [{
+        question_id: "q1", question_text: "2+2 nechi?", question_type: "single_choice", explanation: "Oddiy qo'shish",
+        options: [{ id: "o1", option_text: "4", is_correct: true }, { id: "o2", option_text: "5", is_correct: false }],
+        selected_option: "o1", selected_options: null, is_correct: true, text_answer: null,
+      }],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText("✓ To'g'ri")).toBeInTheDocument());
+    expect(screen.queryByText(/Javobingiz:/)).not.toBeInTheDocument();
   });
 });

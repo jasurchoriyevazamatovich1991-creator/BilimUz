@@ -188,8 +188,8 @@ def test_correct_incorrect_unanswered_counts(service, mock_repo, mock_attempt_re
     attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2, q3], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
     mock_answer_repo.list_for_attempt.return_value = [
-        MagicMock(question_id=q1, is_correct=True, selected_option=uuid.uuid4(), selected_options=None),
-        MagicMock(question_id=q2, is_correct=False, selected_option=uuid.uuid4(), selected_options=None),
+        MagicMock(question_id=q1, is_correct=True, selected_option=uuid.uuid4(), selected_options=None, text_answer=None),
+        MagicMock(question_id=q2, is_correct=False, selected_option=uuid.uuid4(), selected_options=None, text_answer=None),
         # q3 has no Answer row at all -> unanswered
     ]
     mock_question_repo.list_by_ids.return_value = [_make_question(q1), _make_question(q2), _make_question(q3)]
@@ -213,7 +213,7 @@ def test_unanswered_via_null_is_correct_also_counts_as_unanswered(service, mock_
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
-    mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=None, selected_option=None, selected_options=None)]
+    mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=None, selected_option=None, selected_options=None, text_answer=None)]
     mock_question_repo.list_by_ids.return_value = [_make_question(q1)]
 
     detail = service.get_result_detail(result_id, user_id)
@@ -266,7 +266,7 @@ def test_multiple_choice_answer_shows_selected_options_array(service, mock_repo,
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
     mock_answer_repo.list_for_attempt.return_value = [
-        MagicMock(question_id=q1, is_correct=True, selected_option=None, selected_options=[opt_a, opt_b]),
+        MagicMock(question_id=q1, is_correct=True, selected_option=None, selected_options=[opt_a, opt_b], text_answer=None),
     ]
     mock_question_repo.list_by_ids.return_value = [_make_question(
         q1, qtype="multiple_choice",
@@ -289,7 +289,7 @@ def test_question_review_includes_text_options_and_explanation(service, mock_rep
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
-    mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=True, selected_option=opt_a, selected_options=None)]
+    mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=True, selected_option=opt_a, selected_options=None, text_answer=None)]
     mock_question_repo.list_by_ids.return_value = [_make_question(
         q1, text="2+2 nechi?", explanation="Oddiy qo'shish", options=[_make_option(opt_a, "4", True)],
     )]
@@ -339,3 +339,125 @@ def test_existing_result_fields_remain_present_and_compatible(service, mock_repo
     assert detail.percentage == 75.0
     assert detail.is_passed is True
     assert detail.status == "final"
+
+
+# --- Sprint 70: Result Review Text Answer Visibility ---
+
+def test_short_answer_text_answer_appears_in_question_review(service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo):
+    """TEST 1 — a short_answer Answer.text_answer is exposed on the
+    corresponding QuestionReviewOut."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = [
+        MagicMock(question_id=q1, is_correct=None, selected_option=None, selected_options=None, text_answer="Newton's second law"),
+    ]
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, qtype="short_answer")]
+
+    detail = service.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.text_answer == "Newton's second law"
+    assert review.is_correct is None
+
+
+def test_essay_text_answer_appears_in_question_review(service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo):
+    """TEST 2 — same as above, for essay."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    essay_text = "A long-form essay answer discussing the causes of..."
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = [
+        MagicMock(question_id=q1, is_correct=None, selected_option=None, selected_options=None, text_answer=essay_text),
+    ]
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, qtype="essay")]
+
+    detail = service.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.text_answer == essay_text
+    assert review.is_correct is None
+
+
+def test_question_with_no_answer_has_null_text_answer(service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo):
+    """TEST 3 — no Answer row at all -> text_answer is null, same as
+    every other per-question field."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = []
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, qtype="short_answer")]
+
+    detail = service.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.text_answer is None
+
+
+def test_text_answer_does_not_alter_scoring_counts(service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo):
+    """TEST 4 — exposing text_answer must not change the existing
+    correct/incorrect/unanswered counting logic (still driven solely by
+    Answer.is_correct, per Sprint 66's own exclusion of short_answer/
+    essay from auto-grading)."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1, q2 = uuid.uuid4(), uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=50, is_passed=False, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = [
+        MagicMock(question_id=q1, is_correct=True, selected_option=uuid.uuid4(), selected_options=None, text_answer=None),
+        MagicMock(question_id=q2, is_correct=None, selected_option=None, selected_options=None, text_answer="an essay answer"),
+    ]
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1), _make_question(q2, qtype="essay")]
+
+    detail = service.get_result_detail(result_id, user_id)
+    # q2 has a non-null text_answer but is_correct=None (never auto-graded)
+    # -> still counted as unanswered, exactly as before Sprint 70.
+    assert detail.correct_answers == 1
+    assert detail.incorrect_answers == 0
+    assert detail.unanswered == 1
+    assert detail.questions[1].text_answer == "an essay answer"
+
+
+def test_existing_choice_type_review_unchanged_by_text_answer_field(service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo):
+    """TEST 5 — single_choice/multiple_choice/true_false answers keep
+    their existing selected_option(s)/is_correct behavior; text_answer
+    is simply null for these since Answer.text_answer is never populated
+    for choice-based types (attempts/service.py's save_answer())."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1, q2, q3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    opt_a = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=2, percentage=67, is_passed=True, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2, q3], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = [
+        MagicMock(question_id=q1, is_correct=True, selected_option=opt_a, selected_options=None, text_answer=None),
+        MagicMock(question_id=q2, is_correct=True, selected_option=None, selected_options=[opt_a], text_answer=None),
+        MagicMock(question_id=q3, is_correct=False, selected_option=opt_a, selected_options=None, text_answer=None),
+    ]
+    mock_question_repo.list_by_ids.return_value = [
+        _make_question(q1, qtype="single_choice"),
+        _make_question(q2, qtype="multiple_choice"),
+        _make_question(q3, qtype="true_false"),
+    ]
+
+    detail = service.get_result_detail(result_id, user_id)
+    for review in detail.questions:
+        assert review.text_answer is None
+    assert detail.questions[0].selected_option == opt_a
+    assert detail.questions[0].is_correct is True
+    assert detail.questions[1].selected_options == [opt_a]
+    assert detail.questions[2].is_correct is False

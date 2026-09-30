@@ -26,10 +26,21 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
   const selectedIds = isMultiple ? (question.selected_options ?? []) : question.selected_option ? [question.selected_option] : [];
   const correctIds = question.options.filter((o) => o.is_correct).map((o) => o.id);
   const hasOptions = question.options.length > 0;
+  // Sprint 70 — short_answer/essay submissions are never auto-graded, so
+  // is_correct stays null for them even when the student answered.
+  // text_answer (trimmed, matching Sprint 68's AttemptPage convention)
+  // is what tells a genuinely-unanswered question apart from an
+  // answered-but-ungraded one; this check must run before the
+  // is_correct === null branch below, or a submitted answer would be
+  // shown as "Javob berilmagan".
+  const hasTextAnswer = (question.text_answer ?? "").trim().length > 0;
 
   let statusLabel: string;
   let statusClass: string;
-  if (question.is_correct === null) {
+  if (hasTextAnswer) {
+    statusLabel = "Javob berildi";
+    statusClass = "bg-muted text-foreground/60";
+  } else if (question.is_correct === null) {
     statusLabel = "— Javob berilmagan";
     statusClass = "bg-muted text-foreground/60";
   } else if (question.is_correct) {
@@ -64,6 +75,10 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
             );
           })}
         </div>
+      ) : null}
+
+      {hasTextAnswer ? (
+        <p className="text-sm text-foreground/80">Javobingiz: {question.text_answer}</p>
       ) : null}
 
       {question.explanation ? (

@@ -47,6 +47,13 @@ export interface QuestionReviewOut {
   selected_options: string[] | null;
   /** null means unanswered — mirrors the backend's own Answer.is_correct convention. */
   is_correct: boolean | null;
+  /** Sprint 70 — the student's submitted free-text answer for
+   * short_answer/essay questions. null both when unanswered and for
+   * choice-based question types. short_answer/essay are never
+   * auto-graded, so is_correct stays null for them even when answered —
+   * check this field to tell "answered, not auto-graded" apart from
+   * "unanswered". */
+  text_answer: string | null;
 }
 
 export interface ResultDetailOut extends ResultOut {
