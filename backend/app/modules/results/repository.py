@@ -7,6 +7,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.modules.results.models import Ranking, Result, ResultSection, Statistics
@@ -140,6 +141,90 @@ class StatisticsRepository:
             setattr(stats, field, value)
         self.db.flush()
         return stats
+
+    def upsert_after_result(self, user_id: uuid.UUID, subject_id: uuid.UUID | None, correct: int, wrong: int, percentage: float) -> Statistics:
+        """Sprint 69 — F1. Replaces the former get()-then-create()-or-
+        update() check-then-act path (still available above as create()/
+        update(), kept for any other caller and for direct construction
+        in tests, but no longer used by ResultService._update_statistics()).
+
+        That check-then-act path had no database-level protection at
+        all — uq_statistics_user_id_subject_id (migration 0016) did not
+        exist before this sprint — so two concurrent first-time writes
+        for the same (user_id, subject_id) could both take the "not
+        found" branch and both INSERT, producing duplicate rows; once
+        duplicated, every subsequent get_by_user_and_subject() call for
+        that key would raise MultipleResultsFound (scalar_one_or_none()
+        against >1 row).
+
+        This method makes the same logical operation ("increment this
+        user/subject's running stats by one more test's worth of
+        correct/wrong answers and percentage, or create the row if this
+        is the first test") a single atomic
+        INSERT ... ON CONFLICT DO UPDATE, same established pattern as
+        AnswerRepository.upsert() (Sprint 58) and this project's
+        analytics-module MonthlyStatisticsRepository/
+        DailyStatisticsRepository.upsert() (Sprint 64). Correctness
+        under concurrency:
+
+        - Two concurrent first-time writes for the same key: Postgres
+          serializes the two INSERTs against the same unique index
+          entry — one wins the plain INSERT, the other's ON CONFLICT
+          clause fires and its DO UPDATE runs (waiting on the winning
+          row's lock, exactly like any other row-level UPDATE), so the
+          result is exactly one row with tests_taken=2 (never two rows
+          with tests_taken=1 each, and never a crash).
+        - Two concurrent updates to an existing row: same lock-then-
+          update semantics — the DO UPDATE's SET expressions read
+          statistics.tests_taken/avg_score from the row AS OF the time
+          each statement acquires the row lock (not a stale
+          Python-side read taken before the write, which is exactly
+          what made the old code's `((float(stats.avg_score or 0) *
+          stats.tests_taken) + percentage) / new_count` computation in
+          Python racy) — so the second writer's update is computed
+          against the first writer's already-committed result, and no
+          update is lost.
+        - avg_score semantics are UNCHANGED from ResultService.
+          _update_statistics()'s original formula — this is the same
+          running (tests_taken-weighted) average, expressed as a SQL
+          expression over the CURRENT row (statistics.avg_score,
+          statistics.tests_taken) and the EXCLUDED (this call's own
+          percentage) instead of a Python-side read-modify-write:
+              new_count = statistics.tests_taken + 1
+              new_avg   = ((statistics.avg_score * statistics.tests_taken)
+                           + EXCLUDED.avg_score) / new_count
+          EXCLUDED.avg_score carries this call's own `percentage`
+          (via the INSERT VALUES below, which sets avg_score=percentage
+          for the not-yet-existing-row case) — exactly mirroring how
+          the original Python code used the same `percentage` value in
+          both branches (as avg_score for a fresh row, or as the
+          `+ percentage` term for the running-average formula).
+        """
+        stmt = (
+            pg_insert(Statistics)
+            .values(
+                user_id=user_id, subject_id=subject_id, tests_taken=1,
+                correct_answers=correct, wrong_answers=wrong, avg_score=percentage,
+            )
+        )
+        excluded = stmt.excluded
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_statistics_user_id_subject_id",
+            set_={
+                "tests_taken": Statistics.tests_taken + 1,
+                "correct_answers": Statistics.correct_answers + excluded.correct_answers,
+                "wrong_answers": Statistics.wrong_answers + excluded.wrong_answers,
+                "avg_score": func.round(
+                    (func.coalesce(Statistics.avg_score, 0) * Statistics.tests_taken + excluded.avg_score)
+                    / (Statistics.tests_taken + 1),
+                    2,
+                ),
+                "updated_at": func.now(),
+            },
+        )
+        self.db.execute(stmt)
+        self.db.flush()
+        return self.get_by_user_and_subject(user_id, subject_id)
 
 
 class RankingRepository:

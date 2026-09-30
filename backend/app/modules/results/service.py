@@ -15,7 +15,7 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
-from app.modules.results.models import Result, ResultSection, Statistics
+from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams, ResultSectionOut
 from app.modules.tests.repository import ExamSectionRepository, TestRepository
@@ -314,26 +314,25 @@ class ResultService:
         return self.repo.list_for_user(user_id, params.page, params.per_page, params.test_id, params.sort)
 
     def _update_statistics(self, user_id: uuid.UUID, subject_id: uuid.UUID | None, attempt_id: uuid.UUID, percentage: float) -> None:
+        # Sprint 69 — F1. Was get_by_user_and_subject() -> create() or
+        # update() (check-then-act, no DB-level uniqueness backing it
+        # at all before migration 0016) — a real, audit-confirmed
+        # concurrency defect: two concurrent create_result() calls for
+        # a user's first-ever result in a subject could both see no
+        # existing row and both create(), producing duplicate
+        # Statistics rows that then crash every later
+        # get_by_user_and_subject() call for that key with
+        # MultipleResultsFound. Now a single atomic
+        # INSERT ... ON CONFLICT DO UPDATE (StatisticsRepository.
+        # upsert_after_result()) — same tests_taken/correct_answers/
+        # wrong_answers/avg_score semantics as before, computed
+        # DB-side instead of via a Python read-modify-write, so
+        # concurrent writers can no longer race a stale read.
         answers = self.answer_repo.list_for_attempt(attempt_id)
         correct = sum(1 for a in answers if a.is_correct is True)
         wrong = sum(1 for a in answers if a.is_correct is False)
 
-        stats = self.stats_repo.get_by_user_and_subject(user_id, subject_id)
-        if stats is None:
-            self.stats_repo.create(Statistics(
-                user_id=user_id, subject_id=subject_id, tests_taken=1,
-                correct_answers=correct, wrong_answers=wrong, avg_score=percentage,
-            ))
-            return
-
-        new_count = stats.tests_taken + 1
-        new_avg = ((float(stats.avg_score or 0) * stats.tests_taken) + percentage) / new_count
-        self.stats_repo.update(stats, {
-            "tests_taken": new_count,
-            "correct_answers": stats.correct_answers + correct,
-            "wrong_answers": stats.wrong_answers + wrong,
-            "avg_score": round(new_avg, 2),
-        })
+        self.stats_repo.upsert_after_result(user_id, subject_id, correct, wrong, percentage)
 
 
 class RankingService:

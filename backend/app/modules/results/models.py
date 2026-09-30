@@ -32,6 +32,16 @@ class Result(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class Statistics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "statistics"
+    # Sprint 69 (F1) — was previously unconstrained (no unique
+    # constraint existed at all against the live schema, confirmed
+    # during the Sprint 69 audit), letting ResultService.
+    # _update_statistics()'s check-then-act read/create-or-update race
+    # produce duplicate rows for the same (user_id, subject_id) under
+    # concurrent writes. NULLS NOT DISTINCT so subject_id IS NULL (the
+    # "overall, not subject-scoped" bucket) participates in uniqueness
+    # exactly like a real subject UUID, matching StatisticsRepository
+    # .upsert()'s ON CONFLICT target — see migration 0016.
+    __table_args__ = (UniqueConstraint("user_id", "subject_id", name="uq_statistics_user_id_subject_id", postgresql_nulls_not_distinct=True),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=True)

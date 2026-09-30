@@ -100,6 +100,15 @@ def test_get_result_raises_when_not_owned(service, mock_repo):
 
 
 def test_statistics_created_on_first_result(service, mock_repo, mock_attempt_repo, mock_test_repo, mock_answer_repo, mock_stats_repo):
+    """Sprint 69 (F1) — ResultService._update_statistics() now calls
+    the single atomic StatisticsRepository.upsert_after_result() (real
+    INSERT ... ON CONFLICT DO UPDATE against real PostgreSQL — see
+    tests/integration/test_sprint69_statistics_null_subject_and_
+    concurrency.py for the real-DB proof) instead of the old
+    get()-then-create()-or-update() check-then-act pair. This mock-based
+    unit test now asserts the new call shape/arguments; the underlying
+    correct/wrong/tests_taken semantics this test protects are
+    unchanged."""
     user_id = uuid.uuid4()
     subject_id = uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="submitted", test_id=uuid.uuid4(), score=90, percentage=90)
@@ -107,29 +116,35 @@ def test_statistics_created_on_first_result(service, mock_repo, mock_attempt_rep
     mock_repo.get_by_attempt_id.return_value = None
     mock_test_repo.get_by_id.return_value = MagicMock(passing_score=None, subject_id=subject_id)
     mock_answer_repo.list_for_attempt.return_value = [MagicMock(is_correct=True), MagicMock(is_correct=False)]
-    mock_stats_repo.get_by_user_and_subject.return_value = None
 
     service.create_result(attempt.id, user_id)
-    mock_stats_repo.create.assert_called_once()
-    created_stats = mock_stats_repo.create.call_args[0][0]
-    assert created_stats.tests_taken == 1
-    assert created_stats.correct_answers == 1
-    assert created_stats.wrong_answers == 1
+    mock_stats_repo.upsert_after_result.assert_called_once_with(user_id, subject_id, 1, 1, 90.0)
 
 
 def test_statistics_running_average_is_correct(service, mock_repo, mock_attempt_repo, mock_test_repo, mock_answer_repo, mock_stats_repo):
-    """First result 80%, second 100% -> average must be 90%, not 100%."""
+    """First result 80%, second 100% -> average must be 90%, not 100%.
+
+    Sprint 69 (F1) — the running-average computation itself now
+    happens DB-side inside StatisticsRepository.upsert_after_result()'s
+    single atomic statement (see that method's docstring), not in
+    Python here, so this mock-based unit test can only assert that
+    ResultService forwards the correct raw inputs (percentage=100.0
+    for this second result) to upsert_after_result() — the actual
+    ((80*1)+100)/2 == 90.0 arithmetic is proven against real
+    PostgreSQL by tests/integration/test_sprint69_statistics_null_
+    subject_and_concurrency.py::test_f1_3_repeated_sequential_writes_
+    do_not_duplicate (which exercises this exact two-result averaging
+    scenario end-to-end)."""
     user_id = uuid.uuid4()
+    subject_id = uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="submitted", test_id=uuid.uuid4(), score=100, percentage=100)
     mock_attempt_repo.get_by_id.return_value = attempt
     mock_repo.get_by_attempt_id.return_value = None
-    mock_test_repo.get_by_id.return_value = MagicMock(passing_score=None, subject_id=uuid.uuid4())
+    mock_test_repo.get_by_id.return_value = MagicMock(passing_score=None, subject_id=subject_id)
     mock_answer_repo.list_for_attempt.return_value = []
-    mock_stats_repo.get_by_user_and_subject.return_value = MagicMock(tests_taken=1, avg_score=80, correct_answers=0, wrong_answers=0)
 
     service.create_result(attempt.id, user_id)
-    called_updates = mock_stats_repo.update.call_args[0][1]
-    assert called_updates["avg_score"] == 90.0
+    mock_stats_repo.upsert_after_result.assert_called_once_with(user_id, subject_id, 0, 0, 100.0)
 
 
 # --- Sprint 37: Result Analysis (get_result_detail) ---
