@@ -31,6 +31,20 @@ def mock_repo():
     individually."""
     repo = MagicMock()
     repo.get_by_id_locked.side_effect = lambda attempt_id: repo.get_by_id.return_value
+    # Sprint 72 (TEST-1) — the real AttemptRepository.update() does a
+    # plain setattr(attempt, field, value) loop (see repository.py), so
+    # _finalize()'s self.repo.update(attempt, {"status": ..., ...}) call
+    # actually mutates the attempt row in production. An unconfigured
+    # MagicMock's .update() call records the call but leaves the passed-
+    # in `attempt` object completely untouched, so any test that reads
+    # attempt.status (or percentage/score) AFTER calling a method that
+    # finalizes via repo.update() — e.g. test_submit_computes_score_
+    # correctly asserting result.status == "submitted" — was silently
+    # checking a value that could never change. Mirroring the real
+    # setattr-loop behavior here makes the mock an accurate stand-in.
+    repo.update.side_effect = lambda obj, data: (
+        [setattr(obj, field, value) for field, value in data.items()] and obj
+    )
     return repo
 
 
@@ -207,7 +221,11 @@ def test_submit_computes_score_correctly(service, mock_repo, mock_answer_repo, m
     # (an unconfigured MagicMock default would be filtered out,
     # producing an empty auto-scored set and a 0% result instead of the
     # value this test asserts).
-    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5, question_type="single_choice")
+    # Sprint 72 (ATT-N2) — _finalize() now batches via list_by_ids()
+    # instead of one get_by_id() call per question.
+    mock_question_repo.list_by_ids.side_effect = (
+        lambda qids: [MagicMock(id=qid, score=5, question_type="single_choice") for qid in qids]
+    )
     mock_answer_repo.list_for_attempt.return_value = [
         MagicMock(question_id=q1, is_correct=True),
         MagicMock(question_id=q2, is_correct=False),
@@ -235,8 +253,10 @@ def test_unanswered_questions_score_zero(service, mock_repo, mock_answer_repo, m
     q1, q2 = uuid.uuid4(), uuid.uuid4()
     attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[q1, q2])
     mock_repo.get_by_id.return_value = attempt
-    # Sprint 66 — see comment in test_submit_computes_score_correctly above.
-    mock_question_repo.get_by_id.side_effect = lambda qid: MagicMock(id=qid, score=5, question_type="single_choice")
+    # Sprint 66/72 — see comments in test_submit_computes_score_correctly above.
+    mock_question_repo.list_by_ids.side_effect = (
+        lambda qids: [MagicMock(id=qid, score=5, question_type="single_choice") for qid in qids]
+    )
     mock_answer_repo.list_for_attempt.return_value = [MagicMock(question_id=q1, is_correct=True)]  # q2 never answered
     mock_test_repo.get_by_id.return_value = MagicMock(passing_score=None)
 

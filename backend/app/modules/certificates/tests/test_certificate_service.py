@@ -15,7 +15,18 @@ from app.modules.roles.models import Role  # noqa: F401 — side-effect import o
 
 @pytest.fixture
 def mock_repo():
-    return MagicMock()
+    repo = MagicMock()
+    # Sprint 72 (CONC-1) — issue() now calls repo.insert_if_not_exists()
+    # instead of repo.create(), exactly like the real repository (a
+    # single atomic INSERT ... ON CONFLICT DO NOTHING — see
+    # CertificateRepository.insert_if_not_exists()'s own docstring).
+    # The real method returns the freshly-inserted Certificate (or None
+    # on a lost race); this mirrors the "won the race" case by default,
+    # same as the real method's happy path — every test below that
+    # wants to exercise the "lost the race" (None) branch overrides
+    # this explicitly.
+    repo.insert_if_not_exists.side_effect = lambda certificate: certificate
+    return repo
 
 
 @pytest.fixture
@@ -79,6 +90,30 @@ def test_issue_rejects_wrong_owner(service, mock_result_repo):
         service.issue(uuid.uuid4(), user_id=uuid.uuid4(), template_id=None, actor_id=uuid.uuid4())
 
 
+def test_issue_falls_back_to_existing_row_when_insert_loses_the_race(service, mock_repo, mock_result_repo, mock_verification_repo, mock_storage):
+    """Sprint 72 (CONC-1) — the fast-path existence check (above) can
+    miss a genuinely concurrent writer; insert_if_not_exists() returning
+    None simulates that writer having just won the race via
+    uq_certificates_user_id_test_id. issue() must then return the
+    winner's row (via a second get_by_user_and_test() lookup) rather
+    than raising or generating a second PDF."""
+    user_id = uuid.uuid4()
+    test_id = uuid.uuid4()
+    mock_result_repo.get_by_id.return_value = MagicMock(user_id=user_id, is_passed=True, test_id=test_id)
+    winner = MagicMock(id=uuid.uuid4())
+    # First call (the fast-path check): nothing yet. Second call (the
+    # post-conflict fallback lookup): the concurrent winner's row.
+    mock_repo.get_by_user_and_test.side_effect = [None, winner]
+    mock_repo.insert_if_not_exists.side_effect = lambda certificate: None
+
+    result = service.issue(uuid.uuid4(), user_id=user_id, template_id=None, actor_id=user_id)
+
+    assert result is winner
+    assert mock_repo.get_by_user_and_test.call_count == 2
+    mock_storage.save.assert_not_called()
+    mock_verification_repo.create.assert_not_called()
+
+
 def test_issue_is_idempotent_per_user_and_test(service, mock_repo, mock_result_repo):
     """The key check: idempotency is (user_id, test_id) via the result,
     not result_id — get_by_user_and_test must be called with the
@@ -94,7 +129,7 @@ def test_issue_is_idempotent_per_user_and_test(service, mock_repo, mock_result_r
 
     mock_repo.get_by_user_and_test.assert_called_once_with(user_id, test_id)
     assert certificate is existing
-    mock_repo.create.assert_not_called()
+    mock_repo.insert_if_not_exists.assert_not_called()
 
 
 def test_issue_succeeds_with_pdf_url_none(service, mock_repo, mock_result_repo, mock_verification_repo):
@@ -105,7 +140,7 @@ def test_issue_succeeds_with_pdf_url_none(service, mock_repo, mock_result_repo, 
     certificate = service.issue(uuid.uuid4(), user_id=user_id, template_id=None, actor_id=user_id)
 
     assert certificate.pdf_url is None
-    mock_repo.create.assert_called_once()
+    mock_repo.insert_if_not_exists.assert_called_once()
     mock_verification_repo.create.assert_called_once()
 
 
@@ -116,7 +151,7 @@ def test_issue_generates_distinct_number_and_code(service, mock_repo, mock_resul
 
     service.issue(uuid.uuid4(), user_id=user_id, template_id=None, actor_id=user_id)
 
-    created_cert = mock_repo.create.call_args[0][0]
+    created_cert = mock_repo.insert_if_not_exists.call_args[0][0]
     created_verification = mock_verification_repo.create.call_args[0][0]
     assert created_cert.certificate_number != created_verification.verification_code
 
@@ -267,7 +302,7 @@ def test_issue_idempotent_reissue_does_not_generate_a_second_pdf(service, mock_r
 
     service.issue(uuid.uuid4(), user_id=user_id, template_id=None, actor_id=user_id)
 
-    mock_repo.create.assert_not_called()
+    mock_repo.insert_if_not_exists.assert_not_called()
     mock_storage.save.assert_not_called()
 
 

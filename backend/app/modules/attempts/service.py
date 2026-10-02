@@ -150,7 +150,17 @@ class AttemptService:
             if active_progress is not None:
                 effective_question_order = active_progress.question_order or []
 
-        questions = [self.question_repo.get_by_id(qid) for qid in effective_question_order]
+        # ATT-N1 (Sprint 72) — a single batched fetch instead of one
+        # get_by_id() round trip per question (each of which itself
+        # issued 3 queries: base row + selectinload(options) +
+        # selectinload(media)). list_by_ids() only selectinloads
+        # .options (no .media), which is safe here since
+        # _to_question_view() below never reads question.media.
+        # Order is preserved explicitly via the dict lookup below,
+        # and a hard-deleted question (missing from the dict) is
+        # skipped exactly as the old `if q is not None` filter did.
+        questions_by_id = {q.id: q for q in self.question_repo.list_by_ids(effective_question_order)}
+        questions = [questions_by_id[qid] for qid in effective_question_order if qid in questions_by_id]
         answers = {a.question_id: a for a in self.answer_repo.list_for_attempt(attempt_id)}
 
         question_views = [self._to_question_view(q) for q in questions if q is not None]
@@ -411,8 +421,13 @@ class AttemptService:
     def _finalize(self, attempt: TestAttempt, new_status: AttemptStatus) -> None:
         answers = self.answer_repo.list_for_attempt(attempt.id)
         question_ids = self._effective_scoring_question_ids(attempt)
-        questions = [self.question_repo.get_by_id(qid) for qid in question_ids]
-        questions = [q for q in questions if q is not None]
+        # ATT-N2 (Sprint 72) — same batched-fetch fix as ATT-N1
+        # (get_attempt_detail() above): one list_by_ids() call instead
+        # of one get_by_id() round trip per question. Safe here too —
+        # neither auto_scored_questions below nor DEFAULT_SCORING_
+        # STRATEGY.calculate() ever reads question.media.
+        questions_by_id = {q.id: q for q in self.question_repo.list_by_ids(question_ids)}
+        questions = [questions_by_id[qid] for qid in question_ids if qid in questions_by_id]
 
         # Sprint 66 — short_answer/essay can never be automatically
         # correct (is_correct stays NULL forever for them — see

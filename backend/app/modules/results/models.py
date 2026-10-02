@@ -54,6 +54,23 @@ class Statistics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 class Ranking(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "ranking"
+    # Sprint 72 (RANK-2) — was previously unconstrained (no unique
+    # constraint existed at all against the live schema, confirmed
+    # during the Sprint 71 audit), letting RankingRepository.upsert()'s
+    # unprotected check-then-act (get-then-create-or-update) pattern
+    # produce duplicate rows for the same (user_id, subject_id, period)
+    # under concurrent writes — the exact same shape as the F1 defect
+    # migration 0016 fixed for `statistics`. NULLS NOT DISTINCT so
+    # subject_id IS NULL (the "overall, not subject-scoped" ranking
+    # bucket) participates in uniqueness exactly like a real subject
+    # UUID, matching RankingRepository.upsert()'s ON CONFLICT target —
+    # see migration 0017.
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "subject_id", "period",
+            name="uq_ranking_user_subject_period", postgresql_nulls_not_distinct=True,
+        ),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=True)

@@ -37,8 +37,19 @@ def test_get_role_raises_when_missing(service, mock_repo):
 
 
 def test_delete_system_role_is_blocked(service, mock_repo):
+    # Sprint 72 (TEST-2) — `name` is a reserved MagicMock constructor
+    # kwarg (sets the mock's own repr name, not a `.name` attribute),
+    # so `MagicMock(name="Super Admin")` never actually makes
+    # `mock.name == "Super Admin"` true — `mock.name` stays an
+    # unconfigured auto-generated child Mock. RoleService.delete_role()'s
+    # `role.name in SYSTEM_ROLE_NAMES` guard therefore silently evaluated
+    # to False, so this test exercised exactly nothing of the guard it
+    # claims to verify. Setting `.name` as a plain attribute after
+    # construction is the correct way to mock a `name` field.
     role_id = uuid.uuid4()
-    mock_repo.get_by_id.return_value = MagicMock(id=role_id, name="Super Admin")
+    mock_role = MagicMock(id=role_id)
+    mock_role.name = "Super Admin"
+    mock_repo.get_by_id.return_value = mock_role
     with pytest.raises(SystemRoleProtectedException):
         service.delete_role(role_id, actor_id=uuid.uuid4())
     mock_repo.soft_delete.assert_not_called()
@@ -63,8 +74,11 @@ def test_delete_unused_custom_role_succeeds(service, mock_repo):
 
 
 def test_cannot_deactivate_system_role_via_update(service, mock_repo):
+    # Sprint 72 (TEST-2) — see comment in test_delete_system_role_is_blocked above.
     role_id = uuid.uuid4()
-    mock_repo.get_by_id.return_value = MagicMock(id=role_id, name="Admin")
+    mock_role = MagicMock(id=role_id)
+    mock_role.name = "Admin"
+    mock_repo.get_by_id.return_value = mock_role
     with pytest.raises(SystemRoleProtectedException):
         service.update_role(role_id, RoleUpdateRequest(status="inactive"), actor_id=uuid.uuid4())
     mock_repo.update.assert_not_called()

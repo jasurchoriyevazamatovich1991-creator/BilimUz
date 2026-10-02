@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.modules.certificates.models import Certificate, CertificateTemplate, CertificateVerification
@@ -19,14 +20,17 @@ class CertificateRepository:
         return self.db.execute(stmt).scalar_one_or_none()
 
     def get_by_user_and_test(self, user_id: uuid.UUID, test_id: uuid.UUID):
-        """Idempotency check per the approved (user_id, test_id) key —
-        joins through `results` (read-only) since certificates has no
-        direct test_id column."""
-        from app.modules.results.models import Result
-        stmt = (
-            select(Certificate)
-            .join(Result, Result.id == Certificate.result_id)
-            .where(Certificate.user_id == user_id, Result.test_id == test_id, Certificate.deleted_at.is_(None))
+        """Idempotency check per the approved (user_id, test_id) key.
+
+        Sprint 72 (CONC-1) — now a direct column filter against
+        Certificate.test_id (migration 0018's denormalized column,
+        backed by uq_certificates_user_id_test_id) instead of a join
+        through `results`. Same result set as before (test_id is
+        always copied from the linked Result.test_id at issuance — see
+        CertificateService.issue() — so this is not a behavior change,
+        only a simpler/faster query against the now-indexed column)."""
+        stmt = select(Certificate).where(
+            Certificate.user_id == user_id, Certificate.test_id == test_id, Certificate.deleted_at.is_(None)
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
@@ -41,6 +45,46 @@ class CertificateRepository:
         self.db.add(certificate)
         self.db.flush()
         return certificate
+
+    def insert_if_not_exists(self, certificate: Certificate) -> Certificate | None:
+        """Sprint 72 (CONC-1) — the actual concurrency-safe INSERT for
+        CertificateService.issue(), reusing this project's own
+        established atomic-upsert idiom (StatisticsRepository.
+        upsert_after_result(), RankingRepository.upsert()) instead of
+        an application-level SAVEPOINT/except IntegrityError: that
+        approach was tried first and rejected during this sprint's own
+        test run — it introduced this codebase's only nested
+        transaction, which broke the real-PostgreSQL integration test
+        suite's pg_session rollback-isolation fixture (conftest.py
+        explicitly documents nested application-level savepoints as
+        unsafe to combine with its join_transaction_mode=
+        "create_savepoint" session).
+
+        `certificate` is a plain, not-yet-session-tracked Certificate
+        built by the caller (its id must already be set, since a
+        Core-level INSERT needs an explicit value to return on a
+        no-op conflict). Returns the freshly-fetched, fully session-
+        tracked row on success (re-querying by id rather than reusing
+        the transient input object — same reasoning as
+        StatisticsRepository.upsert_after_result()'s own re-fetch), or
+        None if a concurrent writer already holds this (user_id,
+        test_id) — ON CONFLICT DO NOTHING means no exception, no
+        poisoned transaction, nothing for the caller to catch."""
+        stmt = (
+            pg_insert(Certificate)
+            .values(
+                id=certificate.id, user_id=certificate.user_id, result_id=certificate.result_id,
+                test_id=certificate.test_id, template_id=certificate.template_id,
+                certificate_number=certificate.certificate_number, pdf_url=certificate.pdf_url,
+            )
+            .on_conflict_do_nothing(constraint="uq_certificates_user_id_test_id")
+            .returning(Certificate.id)
+        )
+        row = self.db.execute(stmt).first()
+        self.db.flush()
+        if row is None:
+            return None
+        return self.get_by_id(row[0])
 
     def update_pdf_url(self, certificate: Certificate, pdf_url: str) -> Certificate:
         certificate.pdf_url = pdf_url

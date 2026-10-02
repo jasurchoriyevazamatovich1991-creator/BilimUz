@@ -127,10 +127,34 @@ class CertificateService:
             return self._with_verification_code(existing)
 
         certificate = Certificate(
-            user_id=user_id, result_id=result_id, template_id=template_id,
+            id=uuid.uuid4(), user_id=user_id, result_id=result_id, test_id=result.test_id, template_id=template_id,
             certificate_number=generate_certificate_number(), pdf_url=None,
         )
-        self.repo.create(certificate)
+        # Sprint 72 (CONC-1) — atomic INSERT ... ON CONFLICT DO NOTHING
+        # keyed on uq_certificates_user_id_test_id (migration 0018),
+        # reusing this project's own established atomic-upsert idiom
+        # (see CertificateRepository.insert_if_not_exists()'s own
+        # docstring for why a SAVEPOINT/except IntegrityError approach
+        # was tried and rejected here). `inserted` is None exactly when
+        # a concurrent issue() call for the same (user_id, test_id) won
+        # the race between our existence check above and this INSERT —
+        # in that case we return the winner's already-committed row,
+        # the same idempotent-return behavior the fast path above gives
+        # when the race doesn't occur at all; no second certificate/
+        # verification/PDF is ever created for the same test.
+        inserted = self.repo.insert_if_not_exists(certificate)
+        if inserted is None:
+            existing = self.repo.get_by_user_and_test(user_id, result.test_id)
+            if existing is None:
+                # Truly unexpected: the INSERT reported a conflict
+                # against uq_certificates_user_id_test_id, but no row
+                # for this (user_id, test_id) can be found immediately
+                # after. Not a known certificate-domain error — don't
+                # mask it behind one.
+                raise RuntimeError("Certificate insert conflicted but no existing row was found for (user_id, test_id)")
+            return self._with_verification_code(existing)
+        certificate = inserted
+
         verification = self.verification_repo.create(CertificateVerification(
             certificate_id=certificate.id, verification_code=generate_verification_code(),
         ))

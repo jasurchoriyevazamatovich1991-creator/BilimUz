@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.audit import log_action
 from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
-from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
@@ -143,6 +143,21 @@ class ResultService:
         answers = self.answer_repo.list_for_attempt(attempt.id)
         answers_by_question = {a.question_id: a for a in answers}
 
+        # RS-1 (Sprint 72) — a section's raw_score must reflect only (a)
+        # the questions this attempt actually had delivered to it (the
+        # effective/routed scope — the same helper get_result_detail()
+        # and AttemptService._finalize() already use) and (b) the
+        # auto-gradable question types (AUTO_GRADABLE_QUESTION_TYPES —
+        # the same filter _finalize() already applies to the overall
+        # Result.score). Before this fix, list_by_section() returned
+        # EVERY question FK'd to the section regardless of whether this
+        # attempt's adaptive routing ever delivered it, and manual-
+        # grading types (short_answer/essay) were scored as simply wrong
+        # instead of excluded — see attempts/scoring.py's own comment
+        # block on AUTO_GRADABLE_QUESTION_TYPES, which named this exact
+        # gap as deliberately unfixed as of Sprint 66.
+        effective_ids = set(self._effective_result_question_ids(attempt))
+
         for section in sections:
             if section.test_id != result.test_id:
                 # Defensive only — see docstring above. Can't actually
@@ -152,7 +167,10 @@ class ResultService:
                 # own test, no matter what.
                 continue
 
-            questions = self.question_repo.list_by_section(section.id)
+            questions = [
+                q for q in self.question_repo.list_by_section(section.id)
+                if q.id in effective_ids and q.question_type in AUTO_GRADABLE_QUESTION_TYPES
+            ]
             section_answers = [answers_by_question[q.id] for q in questions if q.id in answers_by_question]
 
             # Same generic ScoringStrategy already used for the

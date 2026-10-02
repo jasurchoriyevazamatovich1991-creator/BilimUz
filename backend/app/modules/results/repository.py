@@ -4,7 +4,7 @@ in one file, same cohesive-module reasoning as questions/repository.py
 and permissions/repository.py.
 """
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -245,17 +245,32 @@ class RankingRepository:
         return self.db.execute(stmt).scalar_one_or_none()
 
     def upsert(self, user_id: uuid.UUID, subject_id: uuid.UUID | None, period: str, score: float, rank: int) -> Ranking:
-        existing = self.get(user_id, subject_id, period)
-        if existing:
-            existing.score = score
-            existing.rank = rank
-            existing.updated_at = datetime.now(timezone.utc)
-            self.db.flush()
-            return existing
-        row = Ranking(user_id=user_id, subject_id=subject_id, period=period, score=score, rank=rank)
-        self.db.add(row)
+        """Sprint 72 — RANK-2. Replaces the former get()-then-create()-
+        or-update() check-then-act path with a single atomic
+        INSERT ... ON CONFLICT DO UPDATE, same established pattern as
+        StatisticsRepository.upsert_after_result() (Sprint 69) and
+        AnswerRepository.upsert() (Sprint 58). Unlike Statistics' running
+        counters, score/rank here are not accumulated — each call
+        supplies the full, already-recomputed value (RankingService.
+        recompute() always passes the freshly computed score/rank for
+        this key), so DO UPDATE simply overwrites, with no read-modify-
+        write race to protect: two concurrent writers for the same key
+        now simply serialize on the same unique index entry and the
+        later commit wins outright, instead of each potentially taking
+        the old code's "not found" branch and both inserting a
+        duplicate row.
+        """
+        stmt = (
+            pg_insert(Ranking)
+            .values(user_id=user_id, subject_id=subject_id, period=period, score=score, rank=rank)
+        )
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_ranking_user_subject_period",
+            set_={"score": stmt.excluded.score, "rank": stmt.excluded.rank, "updated_at": func.now()},
+        )
+        self.db.execute(stmt)
         self.db.flush()
-        return row
+        return self.get(user_id, subject_id, period)
 
     def commit(self) -> None:
         self.db.commit()
