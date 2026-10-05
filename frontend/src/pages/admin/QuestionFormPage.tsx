@@ -38,6 +38,7 @@ import {
   type OptionsDiff,
   type MediaDiff,
 } from "@/hooks/useQuestions";
+import { useExamModulesForTest, useExamSectionsList, useQuestionGroupsList } from "@/hooks/useExamConfig";
 import { useAuthStore } from "@/store/authStore";
 import { questionsApi, type OptionOut, type MediaOut } from "@/api/questions";
 
@@ -74,6 +75,15 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const canWrite = currentUser?.role === "Admin" || currentUser?.role === "Super Admin" || currentUser?.role === "Teacher";
+  // Sprint 74 — ExamSection/ExamModule/QuestionGroup are only LISTABLE
+  // by Admin/Super Admin (verified in tests/router.py), even though a
+  // Teacher CAN patch a question's section_id/module_id/group_id
+  // directly. Without being able to list the valid options, a Teacher
+  // has no real dropdown to assign from — the assignment block is
+  // shown only to the roles that can actually read the structure, not
+  // built as a guessing form. This is a scoped limitation, not a bug;
+  // see the Sprint 74 final report.
+  const canConfigureExam = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
   const { data: question, isLoading, isError } = useQuestion(questionId);
   const createQuestion = useCreateQuestion();
@@ -81,12 +91,21 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
   const saveOptionsAndMedia = useSaveQuestionOptionsAndMedia(questionId ?? "");
   const deleteQuestion = useDeleteQuestion();
 
+  const assignmentEnabled = canConfigureExam && isEditMode;
+  const { data: examSections } = useExamSectionsList(assignmentEnabled ? testId : undefined);
+  const { data: examModules } = useExamModulesForTest(assignmentEnabled ? testId : undefined);
+  const { data: questionGroups } = useQuestionGroupsList(assignmentEnabled ? testId : undefined);
+
   const [questionText, setQuestionText] = useState("");
   const [questionType, setQuestionType] = useState("single_choice");
   const [difficulty, setDifficulty] = useState("medium");
   const [score, setScore] = useState(1);
   const [explanation, setExplanation] = useState("");
   const [status, setStatus] = useState("active");
+
+  const [sectionId, setSectionId] = useState("");
+  const [moduleId, setModuleId] = useState("");
+  const [groupId, setGroupId] = useState("");
 
   const [options, setOptions] = useState<LocalOption[]>([]);
   const [originalOptions, setOriginalOptions] = useState<OptionOut[]>([]);
@@ -105,6 +124,9 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
       setScore(question.score);
       setExplanation(question.explanation ?? "");
       setStatus(question.status);
+      setSectionId(question.section_id ?? "");
+      setModuleId(question.module_id ?? "");
+      setGroupId(question.group_id ?? "");
       setOriginalOptions(question.options);
       setOptions(question.options.map((o) => ({ localId: newLocalId(), id: o.id, option_text: o.option_text, is_correct: o.is_correct })));
       setOriginalMedia(question.media);
@@ -153,6 +175,28 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
         return o.localId === localId ? { ...o, is_correct: !o.is_correct } : o;
       }),
     );
+  }
+
+  const modulesForSelectedSection = (examModules ?? []).filter((m) => !sectionId || m.section_id === sectionId);
+  const groupsForSelectedModule = (questionGroups ?? []).filter((g) => !moduleId || g.module_id === null || g.module_id === moduleId);
+
+  function handleSectionChange(newSectionId: string) {
+    setSectionId(newSectionId);
+    // A module belongs to exactly one section — if the current
+    // selection no longer belongs to the new section, clear it rather
+    // than submit an impossible combination the backend would reject.
+    const currentModule = (examModules ?? []).find((m) => m.id === moduleId);
+    if (currentModule && newSectionId && currentModule.section_id !== newSectionId) {
+      setModuleId("");
+    }
+  }
+
+  function handleModuleChange(newModuleId: string) {
+    setModuleId(newModuleId);
+    const currentGroup = (questionGroups ?? []).find((g) => g.id === groupId);
+    if (currentGroup && currentGroup.module_id !== null && newModuleId && currentGroup.module_id !== newModuleId) {
+      setGroupId("");
+    }
   }
 
   function handleMediaUploaded(uploadId: string, mediaType: string, optionId?: string) {
@@ -231,7 +275,20 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
 
     if (isEditMode) {
       updateQuestion.mutate(
-        { question_text: questionText, difficulty, score, explanation: explanation || undefined, status },
+        {
+          question_text: questionText,
+          difficulty,
+          score,
+          explanation: explanation || undefined,
+          status,
+          // Sprint 74 — always sent (never omitted) once a question has
+          // loaded, so this save always reflects the admin's true
+          // current selection — never an accidental clear of a value
+          // this form simply didn't touch.
+          ...(assignmentEnabled
+            ? { section_id: sectionId || null, module_id: moduleId || null, group_id: groupId || null }
+            : {}),
+        },
         {
           onSuccess: () => {
             saveOptionsAndMedia.mutate(
@@ -372,6 +429,56 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
                   <option value="inactive">inactive</option>
                   <option value="archived">archived</option>
                 </select>
+              </div>
+            ) : null}
+
+            {assignmentEnabled ? (
+              <div className="rounded-md border border-border p-3">
+                <p className="mb-2 text-sm font-medium text-foreground">Imtihon tuzilmasiga biriktirish (ixtiyoriy)</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="sectionId" className="mb-1 block text-xs font-medium text-foreground/70">Bo'lim</label>
+                    <select
+                      id="sectionId"
+                      value={sectionId}
+                      onChange={(e) => handleSectionChange(e.target.value)}
+                      disabled={!canWrite}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                    >
+                      <option value="">— tanlanmagan —</option>
+                      {(examSections ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="moduleId" className="mb-1 block text-xs font-medium text-foreground/70">Modul</label>
+                    <select
+                      id="moduleId"
+                      value={moduleId}
+                      onChange={(e) => handleModuleChange(e.target.value)}
+                      disabled={!canWrite}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                    >
+                      <option value="">— tanlanmagan —</option>
+                      {modulesForSelectedSection.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="groupId" className="mb-1 block text-xs font-medium text-foreground/70">Guruh</label>
+                    <select
+                      id="groupId"
+                      value={groupId}
+                      onChange={(e) => setGroupId(e.target.value)}
+                      disabled={!canWrite}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                    >
+                      <option value="">— tanlanmagan —</option>
+                      {groupsForSelectedModule.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-foreground/50">
+                  Bu uchala maydon ham mustaqil va ixtiyoriy. "— tanlanmagan —" tanlash mavjud biriktirishni olib tashlaydi.
+                </p>
               </div>
             ) : null}
 

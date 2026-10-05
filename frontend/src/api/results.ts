@@ -56,6 +56,21 @@ export interface QuestionReviewOut {
   text_answer: string | null;
 }
 
+/** Sprint 55 (backend) / Sprint 73 — RS-FE-1 (frontend): read-only
+ * exposure of a modular test's per-section score. Empty for every
+ * non-modular test (the vast majority) — `sections` is always `[]` in
+ * that case, never missing. `name`/`order_number` added in Sprint 73;
+ * nullable because a ResultSection can theoretically outlive its
+ * ExamSection row (see backend ResultSectionOut docstring). */
+export interface ResultSectionOut {
+  id: string;
+  section_id: string;
+  name: string | null;
+  order_number: number | null;
+  raw_score: number | null;
+  scaled_score: number | null;
+}
+
 export interface ResultDetailOut extends ResultOut {
   total_questions: number;
   correct_answers: number;
@@ -64,6 +79,8 @@ export interface ResultDetailOut extends ResultOut {
   /** null only if the underlying attempt has no finish_time. */
   time_spent_seconds: number | null;
   questions: QuestionReviewOut[];
+  /** Already ordered by ExamSection.order_number by the backend. */
+  sections: ResultSectionOut[];
 }
 
 export const resultsApi = {

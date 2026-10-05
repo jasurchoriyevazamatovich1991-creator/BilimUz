@@ -32,7 +32,7 @@ const BASE_RESULT = {
   id: "r1", attempt_id: "a1", user_id: "u1", test_id: "t1",
   score: 8, percentage: 80, status: "final", created_at: "2026-01-01T00:00:00Z",
   total_questions: 10, correct_answers: 8, incorrect_answers: 2, unanswered: 0,
-  time_spent_seconds: 754, questions: [],
+  time_spent_seconds: 754, questions: [], sections: [],
 };
 
 describe("ResultPage — Sprint 21 certificate continuation", () => {
@@ -268,5 +268,41 @@ describe("ResultPage — Sprint 70 text answer visibility", () => {
     renderResultPage();
     await waitFor(() => expect(screen.getByText("✓ To'g'ri")).toBeInTheDocument());
     expect(screen.queryByText(/Javobingiz:/)).not.toBeInTheDocument();
+  });
+
+  // --- Sprint 73 — RS-FE-1: section-level result rendering ---
+
+  it("TEST 10: renders a 'Bo'limlar bo'yicha natija' card with each section's name and raw_score when sections is non-empty", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: true,
+      sections: [
+        { id: "s1", section_id: "es1", name: "Listening", order_number: 0, raw_score: 18, scaled_score: null },
+        { id: "s2", section_id: "es2", name: "Reading", order_number: 1, raw_score: 22, scaled_score: null },
+      ],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText("Bo'limlar bo'yicha natija")).toBeInTheDocument());
+    expect(screen.getByText("Listening")).toBeInTheDocument();
+    expect(screen.getByText("18 ball")).toBeInTheDocument();
+    expect(screen.getByText("Reading")).toBeInTheDocument();
+    expect(screen.getByText("22 ball")).toBeInTheDocument();
+  });
+
+  it("TEST 11: does NOT render the sections card at all when sections is empty (non-modular test, unaffected)", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({ ...BASE_RESULT, is_passed: true, sections: [] });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText("Javoblar taqsimoti")).toBeInTheDocument());
+    expect(screen.queryByText("Bo'limlar bo'yicha natija")).not.toBeInTheDocument();
+  });
+
+  it("TEST 12: a section with null name falls back to 'Bo'lim N', and null raw_score renders '—' instead of '0'/'null'", async () => {
+    vi.mocked(resultsApi.get).mockResolvedValue({
+      ...BASE_RESULT, is_passed: true,
+      sections: [{ id: "s1", section_id: "es1", name: null, order_number: null, raw_score: null, scaled_score: null }],
+    });
+    renderResultPage();
+    await waitFor(() => expect(screen.getByText("Bo'limlar bo'yicha natija")).toBeInTheDocument());
+    expect(screen.getByText("Bo'lim 1")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
+from app.core.middleware.rate_limit import rate_limit
 from app.core.schemas import success_response
 from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.certificates.dependencies import (
@@ -27,6 +28,14 @@ from app.modules.users.models import User
 
 router = APIRouter(prefix="/certificates", tags=["Certificates"])
 template_router = APIRouter(prefix="/certificate-templates", tags=["Certificate Templates"])
+
+# Sprint 73 — SEC-2. This endpoint requires no authentication by design
+# (see module docstring), which previously also meant no rate limit at
+# all — letting anyone script unlimited certificate-code guesses against
+# it. Rate-limited by IP only (no account to key on, same as
+# login/register/verify in auth/router.py); generous enough for a real
+# person checking a handful of certificates.
+CERTIFICATE_VERIFY_RATE_LIMIT = (20, 60)
 
 
 @router.post(
@@ -100,6 +109,7 @@ def download_certificate(
     summary="Publicly verify a certificate by its verification code",
     description="No authentication required — this is the whole point of a certificate. "
                 "Increments the verification counter on every check. 404 (generic) for an unknown code.",
+    dependencies=[Depends(rate_limit("certificate_verify", *CERTIFICATE_VERIFY_RATE_LIMIT))],
 )
 def verify_certificate(
     code: str,

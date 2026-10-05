@@ -11,7 +11,13 @@ from app.core.schemas import success_response
 from app.core.security.dependencies import get_jwt_service, get_password_service
 from app.core.security.jwt_service import JWTService
 from app.core.security.password_service import PasswordService
-from app.modules.auth.constants import LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, VERIFY_RATE_LIMIT
+from app.modules.auth.constants import (
+    CHANGE_PASSWORD_RATE_LIMIT,
+    LOGIN_RATE_LIMIT,
+    REFRESH_RATE_LIMIT,
+    REGISTER_RATE_LIMIT,
+    VERIFY_RATE_LIMIT,
+)
 from app.modules.auth.dependencies import get_auth_repository, get_current_user
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import (
@@ -64,7 +70,7 @@ def login(data: LoginRequest, request: Request, service: AuthService = Depends(g
     return success_response(tokens, "Tizimga muvaffaqiyatli kirdingiz.")
 
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(rate_limit("refresh", *REFRESH_RATE_LIMIT))])
 def refresh(data: RefreshRequest, service: AuthService = Depends(get_auth_service)):
     tokens = service.refresh(data.refresh_token)
     return success_response(tokens, "Token yangilandi.")
@@ -92,7 +98,7 @@ def sessions(
     return success_response(service.list_sessions(current_user.id), "Faol sessiyalar.")
 
 
-@router.post("/change-password")
+@router.post("/change-password", dependencies=[Depends(rate_limit("change_password", *CHANGE_PASSWORD_RATE_LIMIT))])
 def change_password(
     data: ChangePasswordRequest,
     service: AuthService = Depends(get_auth_service),

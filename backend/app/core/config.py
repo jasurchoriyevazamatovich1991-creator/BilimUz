@@ -57,3 +57,49 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Cached so .env is parsed once per process, not per request."""
     return Settings()
+
+
+# Sprint 73 — SEC-1. Pure function (no app/FastAPI import), so it can be
+# unit-tested in isolation against a hand-built Settings instance without
+# spinning up the ASGI app. Called from app/main.py's startup handler.
+#
+# Every one of these fields ships with a public, repository-visible
+# "CHANGE_ME_IN_PRODUCTION..." default (see above) purely so local/dev/CI
+# environments work out of the box without a .env file. That same
+# convenience becomes a critical vulnerability the moment ENVIRONMENT is
+# "production" and an operator forgets to override them: JWT_SECRET_KEY
+# left at its default lets anyone forge a valid access/refresh token for
+# any user (including Super Admin) using only the public source code;
+# FILE_ENCRYPTION_KEY left at its default lets anyone decrypt every
+# encrypted-at-rest secret in the settings table. R2_* defaults are only
+# checked when STORAGE_BACKEND == "r2" — the "local" backend never reads
+# them, so flagging them unconditionally would be a false positive.
+#
+# Deliberately NOT a Pydantic model_validator on Settings itself: that
+# would make EVERY environment (including this project's own test suite,
+# which constructs Settings with defaults throughout) fail at import
+# time. Scoped to an explicit, opt-in call instead.
+_PRODUCTION_UNSAFE_DEFAULTS = {
+    "JWT_SECRET_KEY": "CHANGE_ME_IN_PRODUCTION",
+    "FILE_ENCRYPTION_KEY": "CHANGE_ME_IN_PRODUCTION_GENERATE_A_REAL_FERNET_KEY",
+}
+_PRODUCTION_UNSAFE_R2_DEFAULTS = {
+    "R2_ACCOUNT_ID": "CHANGE_ME_IN_PRODUCTION",
+    "R2_ACCESS_KEY_ID": "CHANGE_ME_IN_PRODUCTION",
+    "R2_SECRET_ACCESS_KEY": "CHANGE_ME_IN_PRODUCTION",
+    "R2_BUCKET_NAME": "CHANGE_ME_IN_PRODUCTION",
+}
+
+
+def validate_production_secrets(settings: Settings) -> list[str]:
+    """Returns the list of setting names still at their unsafe default.
+    Empty list == safe to start. Does NOT raise itself (kept a pure,
+    easily-unit-testable function) — the caller (app/main.py) decides
+    what to do with a non-empty result."""
+    if settings.ENVIRONMENT != "production":
+        return []
+
+    unsafe = [name for name, default in _PRODUCTION_UNSAFE_DEFAULTS.items() if getattr(settings, name) == default]
+    if settings.STORAGE_BACKEND == "r2":
+        unsafe += [name for name, default in _PRODUCTION_UNSAFE_R2_DEFAULTS.items() if getattr(settings, name) == default]
+    return unsafe

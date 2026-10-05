@@ -325,12 +325,24 @@ class ResultService:
             return []
 
         if self.section_repo is not None:
-            order_by_section_id = {s.id: s.order_number for s in self.section_repo.list_for_test(result.test_id)}
-            rows = sorted(rows, key=lambda r: order_by_section_id.get(r.section_id, 0))
+            # Sprint 73 — RS-FE-1: same list_for_test() call this method
+            # already made for ordering now also supplies each section's
+            # display name — no new query added.
+            sections_by_id = {s.id: s for s in self.section_repo.list_for_test(result.test_id)}
+            rows = sorted(rows, key=lambda r: sections_by_id[r.section_id].order_number if r.section_id in sections_by_id else 0)
         else:
+            sections_by_id = {}
             rows = sorted(rows, key=lambda r: r.id)
 
-        return [ResultSectionOut.model_validate(r) for r in rows]
+        return [
+            ResultSectionOut(
+                id=row.id, section_id=row.section_id,
+                name=sections_by_id[row.section_id].name if row.section_id in sections_by_id else None,
+                order_number=sections_by_id[row.section_id].order_number if row.section_id in sections_by_id else None,
+                raw_score=row.raw_score, scaled_score=row.scaled_score,
+            )
+            for row in rows
+        ]
 
     def list_my_results(self, user_id: uuid.UUID, params: ResultListParams) -> tuple[list[Result], int]:
         return self.repo.list_for_user(user_id, params.page, params.per_page, params.test_id, params.sort)
@@ -406,10 +418,20 @@ class RankingService:
 
     def _sort_with_tiebreak(self, best_per_user: dict) -> list[tuple]:
         """Tie-break order (approved): higher score -> shorter completion
-        time -> earlier completed_at."""
+        time -> earlier completed_at.
+
+        Sprint 73 — PERF-1. Was N individual attempt_repo.get_by_id()
+        calls in this loop (one per ranked user) — a confirmed N+1.
+        Now a single batched attempt_repo.list_by_ids() call up front,
+        then an in-memory dict lookup per candidate. Sort key/semantics
+        are byte-identical to before (same columns, same comparison
+        tuple) — only the query count changes."""
+        attempt_ids = [result.attempt_id for result in best_per_user.values()]
+        attempts_by_id = {attempt.id: attempt for attempt in self.attempt_repo.list_by_ids(attempt_ids)}
+
         candidates = []
         for user_id, result in best_per_user.items():
-            attempt = self.attempt_repo.get_by_id(result.attempt_id)
+            attempt = attempts_by_id.get(result.attempt_id)
             duration = (attempt.finish_time - attempt.start_time) if (attempt and attempt.finish_time) else timedelta.max
             completed_at = attempt.finish_time if (attempt and attempt.finish_time) else datetime.max.replace(tzinfo=timezone.utc)
             candidates.append((user_id, float(result.percentage), duration, completed_at))

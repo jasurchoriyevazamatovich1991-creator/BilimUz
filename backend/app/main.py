@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.api.v1.version import APP_VERSION
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_production_secrets
 from app.core.exceptions import AppException, app_exception_handler
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware.security_headers import SecurityHeadersMiddleware
@@ -35,4 +35,14 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 def on_startup() -> None:
+    # Sprint 73 — SEC-1. Fail fast rather than boot a production instance
+    # that is silently signing JWTs (or storing "encrypted" secrets) with
+    # a public, repository-visible default value — see
+    # core/config.validate_production_secrets() for the full rationale.
+    unsafe = validate_production_secrets(settings)
+    if unsafe:
+        raise RuntimeError(
+            "Refusing to start in production with unsafe default secret(s): "
+            f"{', '.join(unsafe)}. Set real values via environment variables/.env before starting."
+        )
     logger.info(f"{settings.APP_NAME} v{APP_VERSION} starting in {settings.ENVIRONMENT} mode")

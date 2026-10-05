@@ -56,7 +56,7 @@ def _section_service(pg_session) -> ExamSectionService:
 
 
 def _module_service(pg_session) -> ExamModuleService:
-    return ExamModuleService(ExamModuleRepository(pg_session), ExamSectionRepository(pg_session))
+    return ExamModuleService(ExamModuleRepository(pg_session), ExamSectionRepository(pg_session), TestRepository(pg_session))
 
 
 # --- ExamSection: create, list/get, update, duplicate order, invalid test ---
@@ -172,6 +172,34 @@ def test_admin_lists_and_gets_exam_modules(pg_session):
 
     fetched = module_service.get_module(modules[0].id)
     assert fetched.name == "M1"
+
+
+def test_admin_lists_exam_modules_for_whole_test(pg_session):
+    """Sprint 74 — list_modules_for_test() must return every module
+    across all of a test's sections in one call (avoids one request per
+    section when rendering a full test's structure), ordered by
+    (section.order_number, module.order_number)."""
+    admin_id = _make_admin(pg_session)
+    test = _make_test(pg_session)
+    section_service = _section_service(pg_session)
+    section_a = section_service.create_section(ExamSectionCreateRequest(test_id=test.id, name="A", order_number=0), admin_id)
+    section_b = section_service.create_section(ExamSectionCreateRequest(test_id=test.id, name="B", order_number=1), admin_id)
+    pg_session.commit()
+
+    module_service = _module_service(pg_session)
+    module_service.create_module(ExamModuleCreateRequest(section_id=section_b.id, name="B1", order_number=0), admin_id)
+    module_service.create_module(ExamModuleCreateRequest(section_id=section_a.id, name="A1", order_number=0), admin_id)
+    module_service.create_module(ExamModuleCreateRequest(section_id=section_a.id, name="A2", order_number=1), admin_id)
+    pg_session.commit()
+
+    modules = module_service.list_modules_for_test(test.id)
+    assert [m.name for m in modules] == ["A1", "A2", "B1"]
+
+
+def test_list_modules_for_test_rejects_invalid_test_id(pg_session):
+    module_service = _module_service(pg_session)
+    with pytest.raises(InvalidTestReferenceException):
+        module_service.list_modules_for_test(uuid.uuid4())
 
 
 def test_admin_updates_exam_module(pg_session):

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.schemas import success_response
 from app.modules.auth.dependencies import require_roles
+from app.modules.tests.exceptions import InvalidTestReferenceException
 from app.modules.tests.dependencies import (
     get_exam_module_service,
     get_exam_section_service,
@@ -152,15 +153,22 @@ def create_exam_module(
 
 @router.get(
     "/exam-modules",
-    summary="List exam modules for a section",
-    description="Ordered by order_number. 404 if section_id doesn't exist.",
+    summary="List exam modules for a section, or for a whole test",
+    description="Exactly one of section_id/test_id must be given. section_id: modules of that "
+                "section only, 404 if it doesn't exist. test_id (Sprint 74): every module across "
+                "all of the test's sections in one call — avoids one request per section when "
+                "rendering a full test's structure — 422 if test_id doesn't exist. Always ordered "
+                "by order_number (test_id: section order, then module order within it).",
 )
 def list_exam_modules(
-    section_id: uuid.UUID = Query(...),
+    section_id: uuid.UUID | None = Query(default=None),
+    test_id: uuid.UUID | None = Query(default=None),
     service: ExamModuleService = Depends(get_exam_module_service),
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
-    modules = service.list_modules(section_id)
+    if (section_id is None) == (test_id is None):
+        raise InvalidTestReferenceException("Aynan bittasi ko'rsatilishi kerak: section_id yoki test_id")
+    modules = service.list_modules_for_test(test_id) if test_id is not None else service.list_modules(section_id)
     return success_response([ExamModuleOut.model_validate(m) for m in modules], "Modullar ro'yxati.")
 
 

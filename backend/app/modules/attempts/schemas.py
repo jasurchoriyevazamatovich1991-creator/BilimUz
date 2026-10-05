@@ -33,7 +33,13 @@ class SaveAnswerRequest(BaseModel):
     # automatic scoring denominator. Like selected_option(s) above, this
     # schema stays a plain, permissive DTO — which field is expected is
     # decided by question_type in the service, not here.
-    text_answer: str | None = None
+    #
+    # Sprint 73 — VAL-1. Previously unbounded — a malicious or buggy
+    # client could submit an arbitrarily large string, bloating Answer
+    # storage with no application-level limit (no essay realistically
+    # needs more than a few thousand characters; 10,000 is a generous
+    # ceiling matching a long multi-paragraph essay with headroom).
+    text_answer: str | None = Field(default=None, max_length=10_000)
 
 
 class OptionForAttemptOut(BaseModel):

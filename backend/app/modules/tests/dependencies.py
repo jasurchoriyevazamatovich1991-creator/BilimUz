@@ -43,8 +43,9 @@ def get_exam_section_service(
 def get_exam_module_service(
     repo: ExamModuleRepository = Depends(get_exam_module_repository),
     section_repo: ExamSectionRepository = Depends(get_exam_section_repository),
+    test_repo: TestRepository = Depends(get_test_repository),
 ) -> ExamModuleService:
-    return ExamModuleService(repo, section_repo)
+    return ExamModuleService(repo, section_repo, test_repo)
 
 
 def get_question_group_service(

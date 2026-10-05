@@ -58,7 +58,7 @@ describe("QuestionFormPage — conditional option-set validation (approved decis
   it("single_choice: allows submit with exactly 1 correct option", async () => {
     vi.mocked(questionsApi.create).mockResolvedValue({
       id: "q1", test_id: "t1", question_text: "2+2 nechi?", question_type: "single_choice",
-      difficulty: "medium", score: 1, explanation: null, status: "active", options: [], media: [],
+      difficulty: "medium", score: 1, explanation: null, status: "active", section_id: null, module_id: null, group_id: null, options: [], media: [],
       created_at: "", updated_at: "",
     });
     renderCreatePage();
@@ -141,7 +141,8 @@ describe("QuestionFormPage — conditional option-set validation (approved decis
   it("CREATE mode: media staged before saving is submitted via addMedia after the question is created (Sprint 33 fix — this never happened before)", async () => {
     vi.mocked(questionsApi.create).mockResolvedValue({
       id: "new-q1", test_id: "t1", question_text: "Q", question_type: "single_choice", difficulty: "medium",
-      score: 1, explanation: null, status: "active", options: [], media: [], created_at: "", updated_at: "",
+      score: 1, explanation: null, status: "active", section_id: null, module_id: null, group_id: null,
+      options: [], media: [], created_at: "", updated_at: "",
     });
     vi.mocked(questionsApi.addMedia).mockResolvedValue({
       id: "m1", question_id: "new-q1", option_id: null, media_type: "image", file_url: "", upload_id: "u1",

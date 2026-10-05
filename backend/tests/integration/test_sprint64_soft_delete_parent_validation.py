@@ -71,7 +71,7 @@ def _make_test(pg_session) -> Test:
 
 
 def _module_service(pg_session) -> ExamModuleService:
-    return ExamModuleService(ExamModuleRepository(pg_session), ExamSectionRepository(pg_session))
+    return ExamModuleService(ExamModuleRepository(pg_session), ExamSectionRepository(pg_session), TestRepository(pg_session))
 
 
 def _group_service(pg_session) -> QuestionGroupService:

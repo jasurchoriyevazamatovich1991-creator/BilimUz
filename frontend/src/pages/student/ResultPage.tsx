@@ -13,7 +13,7 @@ import { ErrorState } from "@/components/layout/ErrorState";
 import { useResult } from "@/hooks/useResults";
 import { useTest } from "@/hooks/useTests";
 import { useIssueCertificate } from "@/hooks/useCertificates";
-import type { QuestionReviewOut } from "@/api/results";
+import type { QuestionReviewOut, ResultSectionOut } from "@/api/results";
 
 function formatTimeSpent(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -84,6 +84,24 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
       {question.explanation ? (
         <p className="mt-2 text-xs text-foreground/50">Izoh: {question.explanation}</p>
       ) : null}
+    </div>
+  );
+}
+
+/** Sprint 73 — RS-FE-1. Backend has produced correctly-scoped
+ * `ResultSectionOut` rows since Sprint 72 (RS-1) for every modular
+ * test, but the frontend never consumed them — this renders the
+ * per-section score list the backend already orders correctly.
+ * `raw_score`/`scaled_score` are both nullable (e.g. a section whose
+ * questions are all manual-grading types scores null, not 0 — see
+ * backend Sprint 72 RS1-D), rendered as "—" rather than "null"/"0". */
+function SectionScoreRow({ section, index }: { section: ResultSectionOut; index: number }) {
+  const label = section.name ?? `Bo'lim ${index + 1}`;
+  const scoreText = section.raw_score === null ? "—" : `${section.raw_score} ball`;
+  return (
+    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0">
+      <span className="text-foreground">{label}</span>
+      <span className="font-medium text-foreground/80">{scoreText}</span>
     </div>
   );
 }
@@ -172,6 +190,19 @@ export function ResultPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {result.sections.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Bo'limlar bo'yicha natija</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {result.sections.map((section, index) => (
+              <SectionScoreRow key={section.id} section={section} index={index} />
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {result.questions.length > 0 ? (
         <Card>

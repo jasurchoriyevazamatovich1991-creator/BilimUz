@@ -57,6 +57,12 @@ export interface QuestionOut {
   score: number;
   explanation: string | null;
   status: string;
+  // Sprint 74 — additive. The question's current exam-structure
+  // assignment (Sprint 52's backend fields), exposed here for the
+  // first time so the Admin Exam Configuration UI can show/edit it.
+  section_id: string | null;
+  module_id: string | null;
+  group_id: string | null;
   options: OptionOut[];
   media: MediaOut[];
   created_at: string;
@@ -88,6 +94,16 @@ export interface QuestionUpdateRequest {
   score?: number;
   explanation?: string;
   status?: string;
+  // Sprint 74 — additive. Independent, optional assignment fields
+  // (verified against QuestionUpdateRequest in the real backend
+  // schema — Sprint 52). Omitting a field leaves that relationship
+  // unchanged; explicitly passing null unassigns it. Always send the
+  // question's true current value here (never omit once the question
+  // has loaded) so a save can never silently clear an assignment the
+  // admin didn't intend to touch.
+  section_id?: string | null;
+  module_id?: string | null;
+  group_id?: string | null;
 }
 
 export const questionsApi = {

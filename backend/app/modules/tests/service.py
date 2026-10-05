@@ -184,9 +184,10 @@ class ExamModuleService:
     style, same duplicate-order-number guard at (section, order_number)
     scope instead of (test, order_number)."""
 
-    def __init__(self, repo: ExamModuleRepository, section_repo: ExamSectionRepository):
+    def __init__(self, repo: ExamModuleRepository, section_repo: ExamSectionRepository, test_repo: TestRepository):
         self.repo = repo
         self.section_repo = section_repo
+        self.test_repo = test_repo
 
     def _ensure_no_duplicate_order(self, section_id: uuid.UUID, order_number: int, exclude_id: uuid.UUID | None = None) -> None:
         for existing in self.repo.list_for_section(section_id):
@@ -215,6 +216,20 @@ class ExamModuleService:
         if self.section_repo.get_by_id(section_id) is None:
             raise ExamSectionNotFoundException("Ko'rsatilgan bo'lim (section_id) mavjud emas")
         return self.repo.list_for_section(section_id)
+
+    def list_modules_for_test(self, test_id: uuid.UUID) -> list[ExamModule]:
+        """Sprint 74 — additive. The Admin Exam Configuration UI needs
+        every module across a whole test (to render the full
+        Test -> Sections -> Modules tree) without issuing one HTTP
+        request per section (an N+1 pattern at the API layer). Reuses
+        ExamModuleRepository.list_for_test() exactly as-is — that single
+        JOIN query already existed (used internally by
+        has_modules()/the attempt-execution path since Sprint 46) and is
+        already ordered by (section.order_number, module.order_number).
+        No new query logic, no migration."""
+        if self.test_repo.get_by_id(test_id) is None:
+            raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
+        return self.repo.list_for_test(test_id)
 
     def get_module(self, module_id: uuid.UUID) -> ExamModule:
         module = self.repo.get_by_id(module_id)

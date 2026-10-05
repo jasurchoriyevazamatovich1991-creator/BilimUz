@@ -24,6 +24,12 @@ export function TestsListPage({ basePath = "/admin" }: { basePath?: string }) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const canWrite = currentUser?.role === "Admin" || currentUser?.role === "Super Admin" || currentUser?.role === "Teacher";
+  // Sprint 74 — ExamSection/ExamModule/QuestionGroup endpoints require
+  // Admin/Super Admin only (stricter than Test/Question's own
+  // canWrite, which also allows Teacher — verified in the backend
+  // router). Hiding the link for Teacher is a UX nicety; the backend's
+  // own require_roles stays the real enforcement either way.
+  const canConfigureExam = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -131,6 +137,15 @@ export function TestsListPage({ basePath = "/admin" }: { basePath?: string }) {
                       >
                         Savollar
                       </button>
+                      {canConfigureExam ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`${basePath}/tests/${test.id}/exam-config`)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Tuzilma
+                        </button>
+                      ) : null}
                       <button type="button" onClick={() => setPendingDelete(test)} className="text-sm text-destructive hover:underline">
                         O'chirish
                       </button>

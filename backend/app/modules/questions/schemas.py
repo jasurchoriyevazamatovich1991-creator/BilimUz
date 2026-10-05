@@ -185,6 +185,16 @@ class QuestionOut(BaseModel):
     score: float
     explanation: str | None
     status: str
+    # Sprint 74 — additive. These three columns have existed on the
+    # Question model since Sprint 52 (assignable via
+    # QuestionUpdateRequest, validated in QuestionService.update_question())
+    # but were never exposed on the read side, making it impossible for
+    # any admin UI to show a question's current exam-structure
+    # assignment. No migration — the columns already exist; this only
+    # adds them to the response.
+    section_id: uuid.UUID | None = None
+    module_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = None
     options: list[OptionOut] = []
     media: list[MediaOut] = []
     created_at: datetime

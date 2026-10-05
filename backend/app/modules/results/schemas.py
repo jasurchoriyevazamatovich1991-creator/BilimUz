@@ -65,9 +65,23 @@ class ResultSectionOut(BaseModel):
     (id, section_id, raw_score, scaled_score) — no result_id (redundant,
     the client already has it from the enclosing ResultDetailOut),
     no timestamps/deleted_at (internal bookkeeping, not part of any
-    other *Out schema's public shape in this module either)."""
+    other *Out schema's public shape in this module either).
+
+    Sprint 73 — RS-FE-1. Added `name`/`order_number` (additive,
+    both nullable). Sprint 72's audit found this backend data had NO
+    frontend type or rendering at all, despite Sprint 72 itself having
+    just fixed the underlying scoring correctness (RS-1) — a section id
+    alone is useless for a human-readable result page, so the owning
+    ExamSection's display name/order travel with it. Nullable because
+    ResultSection rows can theoretically outlive their ExamSection row
+    (no FK-cascade guarantee was ever established for this pair) —
+    ResultService._get_result_sections() populates them from a live
+    lookup and leaves them None if the section can't be found, same
+    defensive posture as its existing section_repo-is-None fallback."""
     id: uuid.UUID
     section_id: uuid.UUID
+    name: str | None = None
+    order_number: int | None = None
     raw_score: float | None
     scaled_score: float | None
 

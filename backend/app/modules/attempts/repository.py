@@ -18,6 +18,20 @@ class AttemptRepository:
         stmt = select(TestAttempt).where(TestAttempt.id == attempt_id, TestAttempt.deleted_at.is_(None))
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def list_by_ids(self, attempt_ids: list[uuid.UUID]) -> list[TestAttempt]:
+        """Sprint 73 — PERF-1. Batched counterpart to get_by_id(), same
+        reasoning/pattern as QuestionRepository.list_by_ids() (Sprint
+        72, ATT-N1/ATT-N2): a single SELECT ... WHERE id IN (...) query
+        instead of N individual get_by_id() round trips. Used by
+        RankingService._sort_with_tiebreak() to batch-load every
+        candidate's attempt in one query. Order is NOT guaranteed to
+        match attempt_ids — callers that need a lookup build a dict
+        keyed by id."""
+        if not attempt_ids:
+            return []
+        stmt = select(TestAttempt).where(TestAttempt.id.in_(attempt_ids), TestAttempt.deleted_at.is_(None))
+        return list(self.db.execute(stmt).scalars().all())
+
     def get_by_id_locked(self, attempt_id: uuid.UUID) -> TestAttempt | None:
         """Sprint 54 — same real PostgreSQL row-lock pattern as Sprint
         50's AttemptModuleProgressRepository.get_for_attempt_and_module_locked

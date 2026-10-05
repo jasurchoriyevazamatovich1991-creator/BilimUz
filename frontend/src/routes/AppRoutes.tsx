@@ -32,6 +32,7 @@ import { LessonFormPage } from "@/pages/admin/LessonFormPage";
 import { TestsListPage } from "@/pages/admin/TestsListPage";
 import { TestFormPage } from "@/pages/admin/TestFormPage";
 import { TestQuestionsListPage } from "@/pages/admin/TestQuestionsListPage";
+import { ExamConfigPage } from "@/pages/admin/ExamConfigPage";
 import { QuestionFormPage } from "@/pages/admin/QuestionFormPage";
 import { TeacherDashboardPage } from "@/pages/teacher/DashboardPage";
 import { TeacherSubjectsPage } from "@/pages/teacher/SubjectsPage";
@@ -122,6 +123,11 @@ export function AppRoutes() {
           <Route path="/admin/tests/:testId/questions" element={<TestQuestionsListPage />} />
           <Route path="/admin/tests/:testId/questions/new" element={<QuestionFormPage />} />
           <Route path="/admin/tests/:testId/questions/:questionId" element={<QuestionFormPage />} />
+          {/* Sprint 74 — Admin Exam Configuration UI. Admin/Super Admin
+              only (backend RBAC); not added under /teacher since
+              Teacher cannot read or write ExamSection/ExamModule/
+              QuestionGroup at all (verified in tests/router.py). */}
+          <Route path="/admin/tests/:testId/exam-config" element={<ExamConfigPage />} />
           {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
             "/admin/users",
             "/admin/roles",
