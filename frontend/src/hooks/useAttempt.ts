@@ -12,7 +12,7 @@
  */
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { attemptsApi, type AttemptListParams } from "@/api/attempts";
+import { attemptsApi, type AttemptListParams, type SubmitModuleResultOut } from "@/api/attempts";
 import { resultsApi } from "@/api/results";
 import { useToastStore } from "@/store/toastStore";
 import { ApiError } from "@/api/client";
@@ -65,6 +65,21 @@ export function useAttempt(attemptId: string | undefined) {
     // decision 4): the browser reloads, this query refetches, the
     // backend returns the full persisted state (questions + answered
     // map), nothing is read from localStorage.
+  });
+  useToastOnQueryError(query);
+  return query;
+}
+
+// Sprint 76 — student-scoped module/section name/order, for the module
+// navigator. `enabled: !!moduleId` is the whole reason this never fires
+// an extra request for a non-modular attempt (attempt.module_id is
+// null there) or before the attempt detail has loaded — Phase 12's
+// "avoid repeated/unnecessary requests" requirement.
+export function useModuleForAttempt(attemptId: string | undefined, moduleId: string | null | undefined) {
+  const query = useQuery({
+    queryKey: ["attempts", "module", attemptId, moduleId],
+    queryFn: () => attemptsApi.getModule(attemptId as string, moduleId as string),
+    enabled: !!attemptId && !!moduleId,
   });
   useToastOnQueryError(query);
   return query;
@@ -175,5 +190,34 @@ export function useSubmitAndCreateResult(attemptId: string) {
         addToast(error instanceof ApiError ? error.message : "Yuborib bo'lmadi");
       }
     },
+  });
+}
+
+/**
+ * Sprint 76 — integrates the existing (Sprint 50) module-submit
+ * endpoint for a modular attempt. Deliberately does NOT itself decide
+ * what happens next (load next module vs. navigate to result) — the
+ * backend's response (`completed`/`next_module_id`) is the only
+ * authority on that, matching Phase 3's "frontend must not implement
+ * adaptive routing logic itself." The caller (AttemptPage) branches on
+ * the resolved data.
+ *
+ * On a non-final module (completed: false), invalidates the attempt
+ * detail query so the next useAttempt() read picks up the new
+ * module_id/module_expires_at/questions/answered the backend already
+ * routed to — no client-side guess at what the next module contains.
+ */
+export function useSubmitModule(attemptId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (moduleId: string) => attemptsApi.submitModule(attemptId, moduleId),
+    onSuccess: (outcome: SubmitModuleResultOut) => {
+      if (!outcome.completed) {
+        queryClient.invalidateQueries({ queryKey: ["attempts", "detail", attemptId] });
+      }
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Modulni yakunlab bo'lmadi"),
   });
 }

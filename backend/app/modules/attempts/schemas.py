@@ -97,6 +97,56 @@ class AttemptDetailOut(AttemptOut):
     answered — but never which answer is correct."""
     questions: list[QuestionForAttemptOut]
     answered: list[AnsweredQuestionState]
+    # Sprint A (post-75, generic modular student exam UI groundwork) —
+    # additive, defaults are impossible to omit by construction (always
+    # explicitly set by get_attempt_detail()) but behave as None for
+    # every attempt this previously existed for: a non-modular attempt
+    # (module_execution_service not configured) or a modular attempt
+    # with no currently-active AttemptModuleProgress row (e.g. the whole
+    # exam is already finished). The id of the module currently being
+    # delivered, when there is one — lets the student frontend know
+    # "which module am I in" without guessing, then look up that
+    # module's name/section via GET /attempts/{id}/modules/{module_id}
+    # below. Never populated for a module the student hasn't been
+    # routed to yet.
+    module_id: uuid.UUID | None = None
+    # Sprint 76 — additive. Audit finding (Phase 2/14): the real,
+    # per-attempt deadline for the active module
+    # (AttemptModuleProgress.expires_at — set once in
+    # ModuleExecutionService._create_module_progress from the module's
+    # own `duration`, independent of the whole-attempt
+    # TestAttempt.expires_at) was computed and enforced server-side
+    # since Sprint 50, but never serialized anywhere a student could
+    # read it — ModuleForAttemptOut (Sprint A) intentionally only
+    # exposes static ExamModule configuration (name/order/duration), not
+    # this per-attempt instance value. Without it, a frontend module
+    # timer would have no authoritative deadline to count down to. None
+    # whenever module_id above is None (non-modular attempt, or no
+    # active module right now), and also None for an active module that
+    # was created with no `duration` (module.duration is None) — both
+    # pre-existing, unchanged states.
+    module_expires_at: datetime | None = None
+
+
+class ModuleForAttemptOut(BaseModel):
+    """Sprint A (post-75) — student-scoped module/section metadata, for
+    building a module navigator UI. Deliberately a narrow read view:
+    excludes difficulty_tier/routing_group/routing_variant (admin-only
+    routing configuration surfaced by tests/router.py's Admin/Super
+    Admin-only exam-modules endpoints — not something a student needs
+    or should see). Only reachable for a module the attempt has
+    actually been routed to (see AttemptService.get_module_for_attempt's
+    IDOR guard) — a student can never discover an upcoming, unrouted
+    module's existence through this endpoint."""
+    id: uuid.UUID
+    name: str
+    order_number: int
+    duration: int | None
+    section_id: uuid.UUID
+    section_name: str
+    section_order_number: int
+
+    model_config = {"from_attributes": True}
 
 
 class SubmitResultOut(BaseModel):

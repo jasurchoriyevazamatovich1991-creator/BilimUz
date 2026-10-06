@@ -20,6 +20,7 @@ from app.modules.attempts.exceptions import (
     InvalidOptionReferenceException,
     InvalidQuestionReferenceException,
     MaxAttemptsExceededException,
+    ModuleNotFoundForAttemptException,
     ResultNotAvailableException,
     TestNotPublishedException,
 )
@@ -32,13 +33,14 @@ from app.modules.attempts.schemas import (
     AttemptDetailOut,
     AttemptListParams,
     AttemptOut,
+    ModuleForAttemptOut,
     OptionForAttemptOut,
     QuestionForAttemptOut,
     SubmitResultOut,
 )
 from app.modules.attempts.validators import build_question_order, compute_expiry, is_expired
 from app.modules.questions.repository import OptionRepository, QuestionRepository
-from app.modules.tests.repository import TestRepository
+from app.modules.tests.repository import ExamSectionRepository, TestRepository
 
 
 class AttemptService:
@@ -51,6 +53,7 @@ class AttemptService:
         option_repository: OptionRepository,
         module_execution_service: "ModuleExecutionService | None" = None,
         module_repository: "ExamModuleRepository | None" = None,
+        section_repository: "ExamSectionRepository | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
@@ -66,6 +69,11 @@ class AttemptService:
         # (non-modular) behavior when they're None.
         self.module_execution = module_execution_service
         self.module_repo = module_repository
+        # Sprint A (post-75) — same optional/default-None pattern as
+        # module_execution_service/module_repository above. Only read by
+        # get_module_for_attempt(); every existing caller/test
+        # constructing AttemptService without it is unaffected.
+        self.section_repo = section_repository
 
     # --- Start ---------------------------------------------------------
 
@@ -145,10 +153,23 @@ class AttemptService:
         # row right now) are completely unaffected — both fall through to
         # the original attempt.question_order behavior, unchanged.
         effective_question_order = attempt.question_order or []
+        # Sprint A (post-75) — additive. Captured alongside the existing
+        # active_progress lookup above (no new query) so AttemptDetailOut
+        # can tell the student frontend which module is currently being
+        # delivered, without it having to guess from question content.
+        # Stays None for every case this didn't change: non-modular
+        # attempts, or a modular attempt with no active progress row
+        # right now (e.g. already finished).
+        active_module_id: uuid.UUID | None = None
+        # Sprint 76 — additive, same None-by-default reasoning as
+        # active_module_id above. See AttemptDetailOut.module_expires_at.
+        active_module_expires_at: datetime | None = None
         if self.module_execution is not None:
             active_progress = self.module_execution.get_active_module_progress(attempt_id)
             if active_progress is not None:
                 effective_question_order = active_progress.question_order or []
+                active_module_id = active_progress.module_id
+                active_module_expires_at = active_progress.expires_at
 
         # ATT-N1 (Sprint 72) — a single batched fetch instead of one
         # get_by_id() round trip per question (each of which itself
@@ -176,7 +197,10 @@ class AttemptService:
             )
             for qid in effective_question_order
         ]
-        return AttemptDetailOut(**AttemptOut.model_validate(attempt).model_dump(), questions=question_views, answered=answered_states)
+        return AttemptDetailOut(
+            **AttemptOut.model_validate(attempt).model_dump(), questions=question_views, answered=answered_states,
+            module_id=active_module_id, module_expires_at=active_module_expires_at,
+        )
 
     def list_my_attempts(self, user_id: uuid.UUID, params: AttemptListParams) -> tuple[list[TestAttempt], int]:
         return self.repo.list_for_user(user_id, params)
@@ -320,6 +344,50 @@ class AttemptService:
 
         self.repo.commit()
         return {"completed": False, "next_module_id": outcome["next_module_id"], "result": None}
+
+    # --- Sprint A (post-75): student-scoped module/section metadata ---
+
+    def get_module_for_attempt(self, attempt_id: uuid.UUID, module_id: uuid.UUID, user_id: uuid.UUID) -> ModuleForAttemptOut:
+        """Student-scoped module/section name/order lookup — lets the
+        frontend build a module navigator without needing the
+        Admin/Super-Admin-only /tests/exam-modules endpoints
+        (tests/router.py). Reuses
+        ModuleExecutionService.get_owned_module_progress() as the exact
+        same IDOR guard submit_module() already relies on: a module_id
+        with no AttemptModuleProgress row for THIS attempt raises
+        ModuleNotFoundForAttemptException (404) regardless of whether
+        the module doesn't exist, belongs to a different test, or
+        belongs to someone else's attempt — no enumeration signal,
+        mirroring every other module-scoped lookup in this service. This
+        also means a module is visible here only once execution has
+        actually routed the attempt to it (a progress row already
+        exists) — an upcoming, unrouted module can never be discovered
+        through this endpoint.
+
+        Requires both module_execution and section_repo to be
+        configured (the real FastAPI dependency path always wires
+        both — see get_attempt_service); either being None means this
+        AttemptService was built for a context that doesn't support
+        module execution at all (e.g. a pre-Sprint-50 legacy
+        construction), so the module is reported not-found exactly as
+        it effectively is for that caller."""
+        attempt = self._get_owned_attempt(attempt_id, user_id)
+        if self.module_execution is None or self.section_repo is None:
+            raise ModuleNotFoundForAttemptException("Bu modul ushbu urinishga tegishli emas")
+
+        self.module_execution.get_owned_module_progress(attempt, module_id)
+
+        module = self.module_repo.get_by_id(module_id) if self.module_repo is not None else None
+        if module is None:
+            raise ModuleNotFoundForAttemptException("Bu modul ushbu urinishga tegishli emas")
+        section = self.section_repo.get_by_id(module.section_id)
+        if section is None:
+            raise ModuleNotFoundForAttemptException("Bu modul ushbu urinishga tegishli emas")
+
+        return ModuleForAttemptOut(
+            id=module.id, name=module.name, order_number=module.order_number, duration=module.duration,
+            section_id=section.id, section_name=section.name, section_order_number=section.order_number,
+        )
 
     # --- Internal helpers --------------------------------------------------
 

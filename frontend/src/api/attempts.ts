@@ -57,6 +57,42 @@ export interface AnsweredQuestionState {
 export interface AttemptDetailOut extends AttemptOut {
   questions: QuestionForAttemptOut[];
   answered: AnsweredQuestionState[];
+  // Sprint 76 — additive, optional here (backend always sends both, but
+  // marking them optional on the frontend type keeps every pre-existing
+  // test fixture in this file's test suite — built before these fields
+  // existed — valid without touching them). null/undefined for a
+  // non-modular attempt (the backend sends null) — the only new signal
+  // this page needs to tell "is this a modular exam".
+  module_id?: string | null;
+  // The active module's real, per-attempt deadline
+  // (AttemptModuleProgress.expires_at) — independent of the whole-
+  // attempt `expires_at` above. null when module_id is null, or when
+  // the active module has no duration set.
+  module_expires_at?: string | null;
+}
+
+// Sprint 76 — student-scoped module/section metadata (Sprint A,
+// post-75). Deliberately excludes difficulty_tier/routing_group/
+// routing_variant (admin-only routing configuration, see
+// api/examConfig.ts's ExamModuleOut) — a student never needs or sees
+// adaptive-routing internals, only what to call this module/section.
+export interface ModuleForAttemptOut {
+  id: string;
+  name: string;
+  order_number: number;
+  duration: number | null;
+  section_id: string;
+  section_name: string;
+  section_order_number: number;
+}
+
+// Sprint 76 — response of POST /attempts/{id}/modules/{module_id}/submit
+// (backend SubmitModuleResultOut, Sprint 50). result is populated only
+// when completed is true, mirroring SubmitResultOut's own rule.
+export interface SubmitModuleResultOut {
+  completed: boolean;
+  next_module_id: string | null;
+  result: SubmitResultOut | null;
 }
 
 export interface SubmitResultOut {
@@ -117,4 +153,16 @@ export const attemptsApi = {
   submit: (attemptId: string) => unwrap<SubmitResultOut>(httpClient.post(`/attempts/${attemptId}/submit`)),
 
   getResult: (attemptId: string) => unwrap<SubmitResultOut>(httpClient.get(`/attempts/${attemptId}/result`)),
+
+  // Sprint 76 — student-scoped module/section name/order lookup, for
+  // the module navigator. Same backend endpoint Sprint A added
+  // (GET /attempts/{id}/modules/{module_id}); this is its first
+  // frontend consumer.
+  getModule: (attemptId: string, moduleId: string) =>
+    unwrap<ModuleForAttemptOut>(httpClient.get(`/attempts/${attemptId}/modules/${moduleId}`)),
+
+  // Sprint 76 — integrates the existing (Sprint 50) module-submit
+  // endpoint; no new backend endpoint was created for this.
+  submitModule: (attemptId: string, moduleId: string) =>
+    unwrap<SubmitModuleResultOut>(httpClient.post(`/attempts/${attemptId}/modules/${moduleId}/submit`)),
 };

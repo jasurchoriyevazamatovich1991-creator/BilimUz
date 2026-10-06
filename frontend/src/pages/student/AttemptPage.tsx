@@ -37,7 +37,7 @@ import { ErrorState } from "@/components/layout/ErrorState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Timer } from "@/components/attempts/Timer";
 import { QuestionNavigator } from "@/components/attempts/QuestionNavigator";
-import { useAttempt, useSaveAnswer, useSubmitAndCreateResult } from "@/hooks/useAttempt";
+import { useAttempt, useModuleForAttempt, useSaveAnswer, useSubmitAndCreateResult, useSubmitModule } from "@/hooks/useAttempt";
 import { useCreateResultForFinishedAttempt } from "@/hooks/useResults";
 
 /** Small helper isolated so its own loading state doesn't affect the
@@ -65,9 +65,38 @@ export function AttemptPage() {
   const saveAnswer = useSaveAnswer(attemptId ?? "");
   const submitAndCreateResult = useSubmitAndCreateResult(attemptId ?? "");
 
+  // Sprint 76 — module-aware additions. moduleId is null for a
+  // non-modular attempt (attempt.module_id is null/undefined there) —
+  // every hook below that depends on it is correspondingly disabled,
+  // so a legacy attempt triggers none of this sprint's new requests or
+  // branches (Phase 1/2 audit finding: module_id is the one reliable
+  // "is this exam modular" signal the backend already provides).
+  const moduleId = attempt?.module_id ?? null;
+  const isModular = moduleId != null;
+  const { data: moduleInfo } = useModuleForAttempt(attemptId, moduleId);
+  const submitModule = useSubmitModule(attemptId ?? "");
+  // Separate instance from ViewFinishedResultButton's own below — same
+  // idempotent create-or-get endpoint, used here only after a modular
+  // attempt's FINAL module is submitted, to resolve the real Result id
+  // for navigation (mirrors fireSubmit()'s existing non-modular path,
+  // which calls this same backend endpoint via useSubmitAndCreateResult).
+  const resolveResultAfterFinalModule = useCreateResultForFinishedAttempt(attemptId ?? "");
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const hasFiredSubmitRef = useRef(false); // synchronous guard, belt-and-suspenders alongside isPending
+
+  // Sprint 76 — a routed module transition (submit_module's
+  // next_module_id) swaps in a whole new, differently-ordered question
+  // list (see Sprint 57's module-scoped question delivery) — resetting
+  // to the first question avoids landing on a stale/out-of-range index
+  // from the previous module. Also fires harmlessly once on initial
+  // load (moduleId: undefined -> its real value), a no-op since
+  // currentIndex already starts at 0.
+  useEffect(() => {
+    setCurrentIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleId]);
 
   // Sprint 67 (C2) — value is a single option id for single_choice/
   // true_false (unchanged), or an array of option ids for
@@ -202,22 +231,87 @@ export function AttemptPage() {
     });
   }
 
+  // Sprint 76 — the modular counterpart of fireSubmit() above, same
+  // guard pattern (hasFiredSubmitRef + isPending checks, belt-and-
+  // suspenders). Backend is the sole authority on what happens next
+  // (Phase 3): a non-final module (completed: false) just resets the
+  // guard and lets useSubmitModule's own onSuccess (useAttempt.ts)
+  // invalidate the attempt-detail query — the next render picks up
+  // whatever module the backend routed to, nothing is computed here. A
+  // final module (completed: true) resolves the real Result id via the
+  // same idempotent create-or-get endpoint fireSubmit() already uses,
+  // then navigates exactly the same way.
+  function fireModuleSubmit() {
+    if (hasFiredSubmitRef.current || submitModule.isPending || resolveResultAfterFinalModule.isPending || !moduleId) return;
+    hasFiredSubmitRef.current = true;
+    submitModule.mutate(moduleId, {
+      onSuccess: (outcome) => {
+        if (!outcome.completed) {
+          hasFiredSubmitRef.current = false;
+          return;
+        }
+        resolveResultAfterFinalModule.mutate(undefined, {
+          onSuccess: (result) => navigate(`/student/results/${result.id}`),
+          onSettled: () => {
+            hasFiredSubmitRef.current = false;
+          },
+        });
+      },
+      onError: () => {
+        hasFiredSubmitRef.current = false;
+      },
+    });
+  }
+
   function handleManualSubmitConfirm() {
     setConfirmSubmitOpen(false);
-    fireSubmit();
+    if (isModular) {
+      fireModuleSubmit();
+    } else {
+      fireSubmit();
+    }
   }
 
   function handleTimerExpire() {
-    fireSubmit(); // same guarded entry point as manual submit — cannot double-fire
+    // same guarded entry points as manual submit — cannot double-fire
+    if (isModular) {
+      fireModuleSubmit();
+    } else {
+      fireSubmit();
+    }
   }
+
+  // Sprint 76 — the module-scoped deadline (AttemptModuleProgress.
+  // expires_at, Phase 2 audit finding, now exposed via
+  // AttemptDetailOut.module_expires_at) takes priority when this is a
+  // modular attempt; null/undefined falls through to the legacy
+  // whole-attempt expires_at Timer already used, so a non-modular
+  // attempt's Timer is byte-for-byte unchanged.
+  const effectiveExpiresAt = attempt.module_expires_at ?? attempt.expires_at;
+  const isSubmitPending = isModular
+    ? submitModule.isPending || resolveResultAfterFinalModule.isPending
+    : submitAndCreateResult.isPending;
 
   return (
     <div className="mx-auto max-w-3xl">
+      {isModular ? (
+        // Sprint 76 — module navigator (Phase 4): read-only display of
+        // where the student currently is. Renders only once moduleInfo
+        // has loaded (useModuleForAttempt) — until then this row is
+        // simply absent, no loading skeleton invented for it.
+        <div className="mb-2 text-xs text-foreground/50" data-testid="module-navigator">
+          {moduleInfo ? (
+            <span>
+              Bo'lim {moduleInfo.section_order_number + 1}: {moduleInfo.section_name} · Modul {moduleInfo.order_number + 1}: {moduleInfo.name}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
         <span className="text-sm text-foreground/60">
           Savol {currentIndex + 1} / {attempt.questions.length}
         </span>
-        {attempt.expires_at ? <Timer expiresAt={attempt.expires_at} onExpire={handleTimerExpire} /> : null}
+        {effectiveExpiresAt ? <Timer expiresAt={effectiveExpiresAt} onExpire={handleTimerExpire} /> : null}
       </div>
 
       <div className="mb-6">
@@ -312,21 +406,28 @@ export function AttemptPage() {
             Keyingi
           </button>
         </div>
-        <Button
-          variant="destructive"
-          onClick={() => setConfirmSubmitOpen(true)}
-          disabled={submitAndCreateResult.isPending}
-        >
-          {submitAndCreateResult.isPending ? "Yuborilmoqda..." : "Yakunlash"}
+        {/* Sprint 76 — isSubmitPending/submitLabel below unify the
+            legacy whole-attempt submit and the new per-module submit
+            under one button: which mutation is "the" pending one (and
+            what the button says) depends only on isModular, computed
+            once here rather than duplicating this ternary at both
+            call sites below (Phase 6 — "disable submit button while
+            request is pending" applies identically to both paths). */}
+        <Button variant="destructive" onClick={() => setConfirmSubmitOpen(true)} disabled={isSubmitPending}>
+          {isSubmitPending ? "Yuborilmoqda..." : isModular ? "Modulni yakunlash" : "Yakunlash"}
         </Button>
       </div>
 
       <ConfirmDialog
         open={confirmSubmitOpen}
-        title="Testni yakunlash"
-        description={`${attempt.questions.length - answeredIndices.size} ta savolga javob berilmagan. Testni yakunlashni tasdiqlaysizmi?`}
-        confirmLabel="Yakunlash"
-        isConfirming={submitAndCreateResult.isPending}
+        title={isModular ? "Modulni yakunlash" : "Testni yakunlash"}
+        description={
+          isModular
+            ? `${attempt.questions.length - answeredIndices.size} ta savolga javob berilmagan. Ushbu modulni yakunlashni tasdiqlaysizmi? Modul yakunlangandan keyin uning savollariga qaytib bo'lmaydi.`
+            : `${attempt.questions.length - answeredIndices.size} ta savolga javob berilmagan. Testni yakunlashni tasdiqlaysizmi?`
+        }
+        confirmLabel={isModular ? "Modulni yakunlash" : "Yakunlash"}
+        isConfirming={isSubmitPending}
         onConfirm={handleManualSubmitConfirm}
         onCancel={() => setConfirmSubmitOpen(false)}
       />

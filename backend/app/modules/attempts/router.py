@@ -18,6 +18,7 @@ from app.modules.attempts.schemas import (
     AttemptDetailOut,
     AttemptListParams,
     AttemptOut,
+    ModuleForAttemptOut,
     SaveAnswerRequest,
     StartAttemptRequest,
     SubmitModuleResultOut,
@@ -144,6 +145,27 @@ def get_result(
 ):
     result: SubmitResultOut = service.get_result(attempt_id, user_id=user.id)
     return success_response(result, "Natija.")
+
+
+@router.get(
+    "/{attempt_id}/modules/{module_id}",
+    summary="Get module/section metadata for a module navigator",
+    description="Sprint A (post-75). Student-scoped name/order lookup for one module the attempt has "
+                "already been routed to — lets the frontend build a module navigator (e.g. for the "
+                "id AttemptDetailOut.module_id reports, or a next_module_id returned by the submit-module "
+                "endpoint below) without needing the Admin/Super Admin-only /tests/exam-modules "
+                "endpoints. 404 if the module doesn't belong to this attempt (same not-found-or-not-yours "
+                "shape as every other module-scoped lookup — no IDOR signal) or if this attempt's test "
+                "has no module execution at all.",
+)
+def get_module_for_attempt(
+    attempt_id: uuid.UUID,
+    module_id: uuid.UUID,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    module: ModuleForAttemptOut = service.get_module_for_attempt(attempt_id, module_id, user_id=user.id)
+    return success_response(module, "Modul ma'lumoti.")
 
 
 @router.post(

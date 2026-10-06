@@ -7,7 +7,7 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
 from app.modules.attempts.service import AttemptService
 from app.modules.questions.repository import OptionRepository, QuestionRepository
-from app.modules.tests.repository import ExamModuleRepository, RoutingThresholdRuleRepository, TestRepository
+from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, RoutingThresholdRuleRepository, TestRepository
 
 
 def get_attempt_repository(db: Session = Depends(get_db)) -> AttemptRepository:
@@ -24,6 +24,10 @@ def get_module_progress_repository(db: Session = Depends(get_db)) -> AttemptModu
 
 def get_exam_module_repository(db: Session = Depends(get_db)) -> ExamModuleRepository:
     return ExamModuleRepository(db)
+
+
+def get_exam_section_repository(db: Session = Depends(get_db)) -> ExamSectionRepository:
+    return ExamSectionRepository(db)
 
 
 def get_routing_threshold_rule_repository(db: Session = Depends(get_db)) -> RoutingThresholdRuleRepository:
@@ -54,6 +58,7 @@ def get_attempt_service(
     answer_repo: AnswerRepository = Depends(get_answer_repository),
     module_execution: ModuleExecutionService = Depends(get_module_execution_service),
     module_repo: ExamModuleRepository = Depends(get_exam_module_repository),
+    section_repo: ExamSectionRepository = Depends(get_exam_section_repository),
     db: Session = Depends(get_db),
 ) -> AttemptService:
     # Sprint 50 — module_execution/module_repo are now always wired for
@@ -62,7 +67,9 @@ def get_attempt_service(
     # branch actually activate for modular tests. Non-modular tests are
     # STILL completely unaffected — has_modules() returns False for
     # them, so the branch body never runs regardless of these being set.
+    # Sprint A (post-75) — section_repo wired the same way, for
+    # AttemptService.get_module_for_attempt()'s section-name lookup.
     return AttemptService(
         repo, answer_repo, TestRepository(db), QuestionRepository(db), OptionRepository(db),
-        module_execution, module_repo,
+        module_execution, module_repo, section_repo,
     )
