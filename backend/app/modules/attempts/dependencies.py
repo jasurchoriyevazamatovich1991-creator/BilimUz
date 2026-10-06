@@ -7,7 +7,7 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
 from app.modules.attempts.service import AttemptService
 from app.modules.questions.repository import OptionRepository, QuestionRepository
-from app.modules.tests.repository import ExamModuleRepository, TestRepository
+from app.modules.tests.repository import ExamModuleRepository, RoutingThresholdRuleRepository, TestRepository
 
 
 def get_attempt_repository(db: Session = Depends(get_db)) -> AttemptRepository:
@@ -26,13 +26,26 @@ def get_exam_module_repository(db: Session = Depends(get_db)) -> ExamModuleRepos
     return ExamModuleRepository(db)
 
 
+def get_routing_threshold_rule_repository(db: Session = Depends(get_db)) -> RoutingThresholdRuleRepository:
+    return RoutingThresholdRuleRepository(db)
+
+
 def get_module_execution_service(
     module_repo: ExamModuleRepository = Depends(get_exam_module_repository),
     progress_repo: AttemptModuleProgressRepository = Depends(get_module_progress_repository),
+    routing_rule_repo: RoutingThresholdRuleRepository = Depends(get_routing_threshold_rule_repository),
     db: Session = Depends(get_db),
 ) -> ModuleExecutionService:
+    # Sprint 75 — routing_rule_repo is now always wired for the real
+    # FastAPI dependency path (production behavior), exactly as
+    # module_repo/progress_repo already were since Sprint 50. This is
+    # what lets _select_routing_strategy() actually find real
+    # RoutingThresholdRule rows once a future sprint adds a way to
+    # create them. Until then, list_for_test() always returns an empty
+    # list for every existing test, so production behavior is unchanged.
     return ModuleExecutionService(
         module_repo, progress_repo, QuestionRepository(db), AnswerRepository(db), AttemptRepository(db),
+        routing_rule_repo,
     )
 
 

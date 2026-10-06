@@ -227,3 +227,38 @@ class QuestionGroupOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- Sprint 75 completion: RoutingThresholdRule Admin CRUD ---
+# Persistence for adaptive_routing.PerformanceThresholdRule
+# (attempts/adaptive_routing.py, Sprint 49), mirroring that dataclass's
+# two fields (min_ratio, variant) exactly, plus the mandatory test_id
+# scoping and the routing_group key RoutingThresholdRuleRepository
+# groups by. Deliberately generic — no IELTS/GRE/SAT-specific field or
+# enum anywhere in this schema.
+
+class RoutingThresholdRuleCreateRequest(BaseModel):
+    test_id: uuid.UUID
+    routing_group: str = Field(min_length=1, max_length=50)
+    min_ratio: float = Field(ge=0, le=1)
+    variant: str = Field(min_length=1, max_length=50)
+
+
+class RoutingThresholdRuleUpdateRequest(BaseModel):
+    # test_id is deliberately NOT here — mirrors QuestionGroupUpdateRequest's
+    # own rule: a rule can never be moved to another test through PATCH.
+    routing_group: str | None = Field(default=None, min_length=1, max_length=50)
+    min_ratio: float | None = Field(default=None, ge=0, le=1)
+    variant: str | None = Field(default=None, min_length=1, max_length=50)
+
+
+class RoutingThresholdRuleOut(BaseModel):
+    id: uuid.UUID
+    test_id: uuid.UUID
+    routing_group: str
+    min_ratio: float
+    variant: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

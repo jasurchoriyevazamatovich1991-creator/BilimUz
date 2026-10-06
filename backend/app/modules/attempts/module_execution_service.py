@@ -18,7 +18,14 @@ service when it's True.
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from app.modules.attempts.adaptive_routing import ModuleCandidate, ModulePerformance, SequentialRoutingStrategy
+from app.modules.attempts.adaptive_routing import (
+    AdaptiveRoutingStrategy,
+    ModuleCandidate,
+    ModulePerformance,
+    PerformanceThresholdRoutingStrategy,
+    PerformanceThresholdRule,
+    SequentialRoutingStrategy,
+)
 from app.modules.attempts.exceptions import (
     InvalidQuestionReferenceException,
     ModuleNotActiveException,
@@ -29,7 +36,7 @@ from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgr
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
 from app.modules.attempts.validators import build_question_order
 from app.modules.questions.repository import QuestionRepository
-from app.modules.tests.repository import ExamModuleRepository
+from app.modules.tests.repository import ExamModuleRepository, RoutingThresholdRuleRepository
 
 
 class ModuleExecutionService:
@@ -40,21 +47,30 @@ class ModuleExecutionService:
         question_repo: QuestionRepository,
         answer_repo: AnswerRepository,
         attempt_repo: AttemptRepository,
+        routing_rule_repo: "RoutingThresholdRuleRepository | None" = None,
     ):
         self.module_repo = module_repo
         self.progress_repo = progress_repo
         self.question_repo = question_repo
         self.answer_repo = answer_repo
         self.attempt_repo = attempt_repo
-        # Sprint 49's PerformanceThresholdRoutingStrategy needs
-        # caller-supplied threshold rules this generic execution layer
-        # has no exam-specific knowledge of (by design — see Sprint 49's
-        # own "no exam-specific defaults" requirement). Until a future
-        # sprint wires real per-exam configuration through, the
-        # execution layer uses SequentialRoutingStrategy — itself a
-        # real AdaptiveRoutingStrategy implementation Sprint 48 already
-        # shipped, not a placeholder invented here.
+        # Sprint 50's own default — still the fallback for every
+        # routing_group that has no configured rules (see
+        # _select_routing_strategy below), and the ONLY strategy ever
+        # used when routing_rule_repo is None, which is exactly the
+        # pre-Sprint-75 behavior every existing caller/test that
+        # constructs this class with the original 5 positional
+        # arguments still gets, unchanged.
         self.routing_strategy = SequentialRoutingStrategy()
+        # Sprint 75 — Live Adaptive Routing Engine. Optional, defaults
+        # to None so every pre-Sprint-75 call site (all Sprint 50-61
+        # tests, and any future caller that doesn't need live adaptive
+        # routing) continues to construct this class exactly as before
+        # and gets byte-identical SequentialRoutingStrategy behavior —
+        # see _select_routing_strategy()'s own None-check. Only the real
+        # FastAPI dependency wiring (attempts/dependencies.py) supplies
+        # a real repository.
+        self.routing_rule_repo = routing_rule_repo
 
     # --- Module initialization -------------------------------------------
 
@@ -183,6 +199,7 @@ class ModuleExecutionService:
 
     def _route_to_next_module(self, attempt: TestAttempt, completed_module, correct_count: int, total_count: int) -> uuid.UUID | None:
         all_modules = self.module_repo.list_for_test(attempt.test_id)
+        modules_by_id = {m.id: m for m in all_modules}
         already_progressed_ids = {p.module_id for p in self.progress_repo.list_for_attempt(attempt.id)}
 
         # Eligibility: exclude modules already completed/submitted or
@@ -208,8 +225,61 @@ class ModuleExecutionService:
         else:
             performance = ModulePerformance(correct_count=correct_count, total_count=total_count)
 
-        decision = self.routing_strategy.decide_next_module(completed_module, performance, candidates)
-        return decision.next_module_id
+        strategy = self._select_routing_strategy(attempt.test_id, completed_module.routing_group)
+        decision = strategy.decide_next_module(completed_module, performance, candidates)
+        next_module_id = decision.next_module_id
+        if next_module_id is None:
+            return None
+
+        # Sprint 75 — Phase 5 defense-in-depth. A strategy is pure
+        # Python with no database access by design (adaptive_routing.py's
+        # own docstrings) — it cannot itself verify the candidate it
+        # picked is still a real, currently-eligible module belonging to
+        # the SAME ExamSection as the module just completed.
+        # routing_group/routing_variant alternatives are, by this
+        # project's own architecture, alternatives at the same position
+        # WITHIN one section (e.g. SAT's two Module-2 variants inside
+        # "Reading and Writing") — never a cross-section jump. A
+        # mismatch here can only come from a data/configuration error
+        # (e.g. two different sections reusing the same routing_group/
+        # variant names), never a normal outcome. Rather than trust the
+        # strategy's raw answer or raise and strand the student
+        # mid-attempt, this fails safely by treating it exactly like "no
+        # next module" (next_module_id is None already does the right,
+        # safe thing per the Sprint 75 brief's Phase 4 point 6: preserve
+        # normal exam completion/finalization semantics).
+        candidate_module = modules_by_id.get(next_module_id)
+        if candidate_module is None or candidate_module.section_id != completed_module.section_id:
+            return None
+
+        return next_module_id
+
+    def _select_routing_strategy(self, test_id: uuid.UUID, routing_group: str | None) -> AdaptiveRoutingStrategy:
+        """Sprint 75 — generic strategy selection. PerformanceThresholdRoutingStrategy
+        is used ONLY when the completed module's routing_group actually
+        has at least one persisted RoutingThresholdRule for this exact
+        test — i.e. only when an admin has genuinely configured adaptive
+        thresholds for that group on that test. Every other case (no
+        routing_group at all, or a routing_group with zero configured
+        rules — true for every exam that existed before this sprint,
+        since no rule row could ever have been created before migration
+        0019) falls through to self.routing_strategy
+        (SequentialRoutingStrategy), completely unchanged from Sprint 50.
+        This single `if` is what makes Sprint 75 change nothing about
+        any pre-existing exam's behavior: with routing_rule_repo=None
+        (every pre-Sprint-75 caller) or zero configured rows (every
+        exam that exists today), this always returns the exact same
+        SequentialRoutingStrategy instance used before this sprint."""
+        if routing_group is not None and self.routing_rule_repo is not None:
+            rules = self.routing_rule_repo.list_for_test(test_id)
+            rules_by_group: dict[str, list[PerformanceThresholdRule]] = {}
+            for rule in rules:
+                rules_by_group.setdefault(rule.routing_group, []).append(
+                    PerformanceThresholdRule(min_ratio=float(rule.min_ratio), variant=rule.variant)
+                )
+            if routing_group in rules_by_group:
+                return PerformanceThresholdRoutingStrategy(rules_by_group)
+        return self.routing_strategy
 
     def get_effective_question_ids(self, attempt_id: uuid.UUID) -> list[uuid.UUID] | None:
         """Sprint 61 — S61-C. The set of questions actually DELIVERED to
@@ -263,7 +333,22 @@ class ModuleExecutionService:
         """True once every ExamModule for this test has a submitted
         AttemptModuleProgress row — the generic completion rule Sprint
         50 requires ('finish the exam only when the generic execution
-        rules determine there are no remaining modules')."""
+        rules determine there are no remaining modules').
+
+        Sprint 75 note: for an attempt that actually took an adaptive
+        branch (a configured routing_group with real rules), a sibling
+        routing_variant module the student was never routed into can
+        legitimately never get a progress row, so this method can stay
+        False forever for such an attempt — that is correct and
+        harmless. The real per-attempt completion signal for a modular
+        attempt is _route_to_next_module() returning None (handled
+        entirely inside submit_module(), which finalizes immediately
+        when that happens); this method is used ONLY as submit_attempt()'s
+        separate guard against calling the whole-attempt submit endpoint
+        while the module flow is still genuinely in progress, and
+        submit_attempt() is unreachable after that point anyway because
+        the attempt's status is already SUBMITTED by then
+        (AttemptNotActiveException fires first)."""
         all_modules = self.module_repo.list_for_test(attempt.test_id)
         progress_rows = self.progress_repo.list_for_attempt(attempt.id)
         submitted_module_ids = {p.module_id for p in progress_rows if p.status == AttemptStatus.SUBMITTED.value}

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup
+from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, RoutingThresholdRule
 from app.modules.tests.schemas import TestListParams
 
 
@@ -228,6 +228,65 @@ class QuestionGroupRepository:
 
     def soft_delete(self, group: QuestionGroup) -> None:
         group.deleted_at = datetime.now(timezone.utc)
+        self.db.flush()
+
+    def commit(self) -> None:
+        self.db.commit()
+
+
+class RoutingThresholdRuleRepository:
+    """Sprint 75 — the only reader/writer for RoutingThresholdRule.
+    Deliberately returns plain ORM rows, not attempts.adaptive_routing's
+    PerformanceThresholdRule dataclass — the `tests` module has no
+    dependency on `attempts`' routing-strategy types; the caller
+    (ModuleExecutionService, in the `attempts` module, which already
+    depends on `tests.repository` for ExamModuleRepository) is
+    responsible for converting these rows into whatever shape its own
+    strategy needs. No HTTP endpoint uses this in Sprint 75 — see
+    RoutingThresholdRule's own docstring."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def list_for_test(self, test_id: uuid.UUID) -> list[RoutingThresholdRule]:
+        """Every non-deleted rule configured for this exact test,
+        regardless of routing_group — grouping by routing_group is the
+        caller's job (ModuleExecutionService). Scoping by test_id here,
+        not just routing_group, is the DB-level guarantee that a rule
+        written for one test's "verbal" group can never be read while
+        routing a different test that happens to reuse that name."""
+        stmt = select(RoutingThresholdRule).where(
+            RoutingThresholdRule.test_id == test_id, RoutingThresholdRule.deleted_at.is_(None),
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def get_by_id(self, rule_id: uuid.UUID) -> RoutingThresholdRule | None:
+        return self.db.get(RoutingThresholdRule, rule_id)
+
+    def get_active_by_id(self, rule_id: uuid.UUID) -> RoutingThresholdRule | None:
+        """Sprint 75 completion — same reasoning as ExamModuleRepository's
+        own get_active_by_id(): excludes a soft-deleted row, so a
+        deleted rule is never returned as active (GET/PATCH/DELETE all
+        use this, mirroring QuestionGroupService's own get_group()
+        pattern)."""
+        stmt = select(RoutingThresholdRule).where(
+            RoutingThresholdRule.id == rule_id, RoutingThresholdRule.deleted_at.is_(None),
+        )
+        return self.db.scalars(stmt).first()
+
+    def create(self, rule: RoutingThresholdRule) -> RoutingThresholdRule:
+        self.db.add(rule)
+        self.db.flush()
+        return rule
+
+    def update(self, rule: RoutingThresholdRule, data: dict) -> RoutingThresholdRule:
+        for field, value in data.items():
+            setattr(rule, field, value)
+        self.db.flush()
+        return rule
+
+    def soft_delete(self, rule: RoutingThresholdRule) -> None:
+        rule.deleted_at = datetime.now(timezone.utc)
         self.db.flush()
 
     def commit(self) -> None:

@@ -13,15 +13,23 @@ from app.modules.subjects.repository import SubjectRepository
 from app.modules.tests.exceptions import (
     CannotPublishEmptyTestException,
     DuplicateOrderNumberException,
+    DuplicateRoutingThresholdRuleException,
     ExamModuleNotFoundException,
     ExamSectionNotFoundException,
     InvalidStatusTransitionException,
     InvalidTestReferenceException,
     QuestionGroupNotFoundException,
+    RoutingThresholdRuleNotFoundException,
     TestNotFoundException,
 )
-from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, Test, TestStatus
-from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, QuestionGroupRepository, TestRepository
+from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, RoutingThresholdRule, Test, TestStatus
+from app.modules.tests.repository import (
+    ExamModuleRepository,
+    ExamSectionRepository,
+    QuestionGroupRepository,
+    RoutingThresholdRuleRepository,
+    TestRepository,
+)
 from app.modules.tests.schemas import (
     ExamModuleCreateRequest,
     ExamModuleUpdateRequest,
@@ -29,6 +37,8 @@ from app.modules.tests.schemas import (
     ExamSectionUpdateRequest,
     QuestionGroupCreateRequest,
     QuestionGroupUpdateRequest,
+    RoutingThresholdRuleCreateRequest,
+    RoutingThresholdRuleUpdateRequest,
     TestCreateRequest,
     TestListParams,
     TestUpdateRequest,
@@ -329,4 +339,90 @@ class QuestionGroupService:
         group = self.get_group(group_id)
         self.repo.soft_delete(group)
         log_action(self.repo.db, action="question_group.deleted", user_id=actor_id, entity_type="question_group", entity_id=group.id)
+        self.repo.commit()
+
+
+class RoutingThresholdRuleService:
+    """Sprint 75 completion — Admin Configuration API for
+    RoutingThresholdRule (Sprint 75's own persisted threshold config).
+    Mirrors QuestionGroupService's own shape exactly: existence/
+    ownership checks via already-existing repositories, a service-level
+    duplicate guard mirroring the DB's own UNIQUE(test_id, routing_group,
+    min_ratio) constraint (so a collision surfaces as a clean 409
+    instead of a raw IntegrityError, the same reasoning
+    DuplicateOrderNumberException already established), and soft-delete
+    instead of a hard DELETE.
+
+    This service introduces NO new routing logic — ModuleExecutionService.
+    _select_routing_strategy() already reads RoutingThresholdRuleRepository.
+    list_for_test() exactly as this service writes to it. Creating this
+    API is the only change: it lets a real admin populate the table that
+    was previously reachable only by a test writing rows directly."""
+
+    def __init__(self, repo: RoutingThresholdRuleRepository, test_repo: TestRepository):
+        self.repo = repo
+        self.test_repo = test_repo
+
+    def _ensure_no_duplicate(
+        self, test_id: uuid.UUID, routing_group: str, min_ratio: float, exclude_id: uuid.UUID | None = None
+    ) -> None:
+        for existing in self.repo.list_for_test(test_id):
+            if existing.routing_group == routing_group and float(existing.min_ratio) == float(min_ratio) and existing.id != exclude_id:
+                raise DuplicateRoutingThresholdRuleException(
+                    f"Bu test uchun routing_group='{routing_group}', min_ratio={min_ratio} qoidasi allaqachon mavjud"
+                )
+
+    def create_rule(self, data: RoutingThresholdRuleCreateRequest, actor_id: uuid.UUID) -> RoutingThresholdRule:
+        # test must exist and not be soft-deleted — TestRepository.get_by_id
+        # already filters deleted_at IS NULL, same existence check every
+        # other Admin Configuration endpoint in this module uses (no new
+        # "active" status rule invented beyond the established pattern).
+        if self.test_repo.get_by_id(data.test_id) is None:
+            raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
+        self._ensure_no_duplicate(data.test_id, data.routing_group, data.min_ratio)
+
+        rule = RoutingThresholdRule(
+            test_id=data.test_id, routing_group=data.routing_group, min_ratio=data.min_ratio, variant=data.variant,
+        )
+        self.repo.create(rule)
+        log_action(self.repo.db, action="routing_threshold_rule.created", user_id=actor_id, entity_type="routing_threshold_rule", entity_id=rule.id)
+        self.repo.commit()
+        return rule
+
+    def list_rules(self, test_id: uuid.UUID) -> list[RoutingThresholdRule]:
+        if self.test_repo.get_by_id(test_id) is None:
+            raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
+        return self.repo.list_for_test(test_id)
+
+    def get_rule(self, rule_id: uuid.UUID) -> RoutingThresholdRule:
+        rule = self.repo.get_active_by_id(rule_id)
+        if rule is None:
+            raise RoutingThresholdRuleNotFoundException("Yo'naltirish qoidasi topilmadi")
+        return rule
+
+    def update_rule(self, rule_id: uuid.UUID, data: RoutingThresholdRuleUpdateRequest, actor_id: uuid.UUID) -> RoutingThresholdRule:
+        rule = self.get_rule(rule_id)
+        payload = data.model_dump(exclude_unset=True)
+        # test_id is never in RoutingThresholdRuleUpdateRequest at all —
+        # a rule can never be moved to another test through PATCH,
+        # mirroring QuestionGroupUpdateRequest's own rule exactly.
+        if "routing_group" in payload or "min_ratio" in payload:
+            new_group = payload.get("routing_group", rule.routing_group)
+            new_ratio = payload.get("min_ratio", float(rule.min_ratio))
+            self._ensure_no_duplicate(rule.test_id, new_group, new_ratio, exclude_id=rule.id)
+        self.repo.update(rule, payload)
+        log_action(self.repo.db, action="routing_threshold_rule.updated", user_id=actor_id, entity_type="routing_threshold_rule", entity_id=rule.id)
+        self.repo.commit()
+        return rule
+
+    def delete_rule(self, rule_id: uuid.UUID, actor_id: uuid.UUID) -> None:
+        """Soft delete — matches ExamSection/ExamModule/QuestionGroup's
+        own convention. A soft-deleted rule is immediately excluded from
+        RoutingThresholdRuleRepository.list_for_test(), the exact method
+        ModuleExecutionService._select_routing_strategy() calls — so a
+        deleted rule can never influence a live routing decision, with
+        no change needed to the execution-side code at all."""
+        rule = self.get_rule(rule_id)
+        self.repo.soft_delete(rule)
+        log_action(self.repo.db, action="routing_threshold_rule.deleted", user_id=actor_id, entity_type="routing_threshold_rule", entity_id=rule.id)
         self.repo.commit()

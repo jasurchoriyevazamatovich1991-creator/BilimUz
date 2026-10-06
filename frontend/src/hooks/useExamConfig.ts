@@ -9,12 +9,15 @@ import {
   examModulesApi,
   examSectionsApi,
   questionGroupsApi,
+  routingThresholdRulesApi,
   type ExamModuleCreateRequest,
   type ExamModuleUpdateRequest,
   type ExamSectionCreateRequest,
   type ExamSectionUpdateRequest,
   type QuestionGroupCreateRequest,
   type QuestionGroupUpdateRequest,
+  type RoutingThresholdRuleCreateRequest,
+  type RoutingThresholdRuleUpdateRequest,
 } from "@/api/examConfig";
 import { useToastStore } from "@/store/toastStore";
 import { ApiError } from "@/api/client";
@@ -161,6 +164,61 @@ export function useDeleteQuestionGroup(testId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questionGroups", "list", testId] });
       addToast("Guruh o'chirildi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "O'chirib bo'lmadi"),
+  });
+}
+
+// --- RoutingThresholdRule (Sprint 75 completion) ---
+
+export function useRoutingThresholdRulesList(testId: string | undefined) {
+  const query = useQuery({
+    queryKey: ["routingThresholdRules", "list", testId],
+    queryFn: () => routingThresholdRulesApi.list(testId as string),
+    enabled: !!testId,
+  });
+  useToastOnQueryError(query);
+  return query;
+}
+
+export function useCreateRoutingThresholdRule(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: RoutingThresholdRuleCreateRequest) => routingThresholdRulesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["routingThresholdRules", "list", testId] });
+      addToast("Yo'naltirish qoidasi yaratildi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Yaratib bo'lmadi"),
+  });
+}
+
+export function useUpdateRoutingThresholdRule(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ ruleId, data }: { ruleId: string; data: RoutingThresholdRuleUpdateRequest }) =>
+      routingThresholdRulesApi.update(ruleId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["routingThresholdRules", "list", testId] });
+      addToast("Yo'naltirish qoidasi yangilandi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Yangilab bo'lmadi"),
+  });
+}
+
+export function useDeleteRoutingThresholdRule(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (ruleId: string) => routingThresholdRulesApi.remove(ruleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["routingThresholdRules", "list", testId] });
+      addToast("Yo'naltirish qoidasi o'chirildi", "success");
     },
     onError: (error) => addToast(error instanceof ApiError ? error.message : "O'chirib bo'lmadi"),
   });

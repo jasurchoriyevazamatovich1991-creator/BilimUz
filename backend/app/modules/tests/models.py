@@ -149,3 +149,38 @@ class QuestionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # on module delete, matching Question.module_id/.section_id/
     # .group_id's own established pattern.
     module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_modules.id", ondelete="SET NULL"), nullable=True)
+
+
+class RoutingThresholdRule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sprint 75 — Live Adaptive Routing Engine: the persistent
+    configuration `PerformanceThresholdRoutingStrategy`
+    (attempts/adaptive_routing.py, Sprint 49) has needed since it was
+    written but never had a real source for in production (see
+    migration 0019's docstring for the full Phase 3 reasoning on why
+    this is a genuine new table, not something derivable from existing
+    ExamModule columns).
+
+    Always scoped to exactly one Test (mandatory test_id) — mirrors
+    ExamSection/QuestionGroup's own ownership pattern. A rule only ever
+    applies to modules belonging to the SAME test as this row's test_id
+    (enforced by RoutingThresholdRuleRepository's only reader method,
+    which filters by test_id), so a routing_group name reused across
+    two different tests can never cross-apply.
+
+    One row = one (routing_group, min_ratio -> variant) rule, mirroring
+    adaptive_routing.PerformanceThresholdRule's own two fields exactly
+    — this table is that dataclass's persistence, nothing more.
+
+    No admin UI/endpoint creates these rows in Sprint 75 (explicitly
+    deferred — see README). Every pre-existing exam therefore has zero
+    rows here, which is what keeps Sprint 75 fully backward-compatible:
+    see ModuleExecutionService._select_routing_strategy()."""
+    __tablename__ = "routing_threshold_rules"
+    __table_args__ = (
+        UniqueConstraint("test_id", "routing_group", "min_ratio", name="uq_routing_threshold_rules_test_group_ratio"),
+    )
+
+    test_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tests.id", ondelete="CASCADE"), nullable=False)
+    routing_group: Mapped[str] = mapped_column(String(50), nullable=False)
+    min_ratio: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    variant: Mapped[str] = mapped_column(String(50), nullable=False)

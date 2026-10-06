@@ -140,3 +140,47 @@ export const questionGroupsApi = {
 
   remove: (groupId: string) => httpClient.delete(`/tests/question-groups/${groupId}`),
 };
+
+/**
+ * Sprint 75 completion — Adaptive Routing Rule Admin CRUD. Persisted
+ * configuration for PerformanceThresholdRoutingStrategy. Same Admin/
+ * Super Admin-only RBAC as ExamSection/ExamModule/QuestionGroup above
+ * (verified in backend router.py's require_roles calls). No GET-by-id
+ * endpoint exists on the backend — only list (by test_id), create,
+ * patch, delete — never invented here.
+ */
+export interface RoutingThresholdRuleOut {
+  id: string;
+  test_id: string;
+  routing_group: string;
+  min_ratio: number;
+  variant: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoutingThresholdRuleCreateRequest {
+  test_id: string;
+  routing_group: string;
+  min_ratio: number;
+  variant: string;
+}
+
+export interface RoutingThresholdRuleUpdateRequest {
+  routing_group?: string;
+  min_ratio?: number;
+  variant?: string;
+}
+
+export const routingThresholdRulesApi = {
+  list: (testId: string) =>
+    unwrap<RoutingThresholdRuleOut[]>(httpClient.get("/tests/routing-threshold-rules", { params: { test_id: testId } })),
+
+  create: (data: RoutingThresholdRuleCreateRequest) =>
+    unwrap<RoutingThresholdRuleOut>(httpClient.post("/tests/routing-threshold-rules", data)),
+
+  update: (ruleId: string, data: RoutingThresholdRuleUpdateRequest) =>
+    unwrap<RoutingThresholdRuleOut>(httpClient.patch(`/tests/routing-threshold-rules/${ruleId}`, data)),
+
+  remove: (ruleId: string) => httpClient.delete(`/tests/routing-threshold-rules/${ruleId}`),
+};

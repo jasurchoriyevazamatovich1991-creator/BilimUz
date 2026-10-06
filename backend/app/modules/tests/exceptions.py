@@ -49,3 +49,18 @@ class DuplicateOrderNumberException(AppException):
 class QuestionGroupNotFoundException(AppException):
     status_code = status.HTTP_404_NOT_FOUND
     error_code = "QUESTION_GROUP_NOT_FOUND"
+
+
+class RoutingThresholdRuleNotFoundException(AppException):
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "ROUTING_THRESHOLD_RULE_NOT_FOUND"
+
+
+class DuplicateRoutingThresholdRuleException(AppException):
+    """(test_id, routing_group, min_ratio) already has a rule — the
+    exact condition UNIQUE(test_id, routing_group, min_ratio) enforces
+    at the DB level (migration 0019). Mirrors DuplicateOrderNumberException's
+    own reasoning: a clean 409 from the service layer instead of a raw
+    IntegrityError from a race that slips past this same check."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "DUPLICATE_ROUTING_THRESHOLD_RULE"

@@ -14,6 +14,7 @@ from app.modules.tests.dependencies import (
     get_exam_module_service,
     get_exam_section_service,
     get_question_group_service,
+    get_routing_threshold_rule_service,
     get_test_service,
 )
 from app.modules.tests.schemas import (
@@ -26,13 +27,22 @@ from app.modules.tests.schemas import (
     QuestionGroupCreateRequest,
     QuestionGroupOut,
     QuestionGroupUpdateRequest,
+    RoutingThresholdRuleCreateRequest,
+    RoutingThresholdRuleOut,
+    RoutingThresholdRuleUpdateRequest,
     TestCreateRequest,
     TestListParams,
     TestOut,
     TestPublishRequest,
     TestUpdateRequest,
 )
-from app.modules.tests.service import ExamModuleService, ExamSectionService, QuestionGroupService, TestService
+from app.modules.tests.service import (
+    ExamModuleService,
+    ExamSectionService,
+    QuestionGroupService,
+    RoutingThresholdRuleService,
+    TestService,
+)
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/tests", tags=["Tests"])
@@ -284,6 +294,75 @@ def delete_question_group(
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
     service.delete_group(group_id, actor_id=user.id)
+
+
+# --- Sprint 75 completion: RoutingThresholdRule Admin CRUD ---
+# IMPORTANT: same static-route-before-dynamic-/{test_id} ordering rule
+# as question-groups above — "/routing-threshold-rules" (no path
+# param) MUST be registered before the dynamic /{test_id} route below,
+# for the identical reason documented on question-groups.
+
+@router.post(
+    "/routing-threshold-rules",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an adaptive routing threshold rule",
+    description="Sprint 75's persisted configuration for PerformanceThresholdRoutingStrategy "
+                "(attempts/adaptive_routing.py) — one (routing_group, min_ratio -> variant) rule, "
+                "always scoped to one test. 422 if test_id doesn't exist. 409 if (test_id, "
+                "routing_group, min_ratio) already has a rule.",
+)
+def create_routing_threshold_rule(
+    data: RoutingThresholdRuleCreateRequest,
+    service: RoutingThresholdRuleService = Depends(get_routing_threshold_rule_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    rule = service.create_rule(data, actor_id=user.id)
+    return success_response(RoutingThresholdRuleOut.model_validate(rule), "Yo'naltirish qoidasi yaratildi.")
+
+
+@router.get(
+    "/routing-threshold-rules",
+    summary="List adaptive routing threshold rules for a test",
+    description="Every non-deleted rule configured for this exact test. 422 if test_id doesn't exist.",
+)
+def list_routing_threshold_rules(
+    test_id: uuid.UUID = Query(...),
+    service: RoutingThresholdRuleService = Depends(get_routing_threshold_rule_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    rules = service.list_rules(test_id)
+    return success_response([RoutingThresholdRuleOut.model_validate(r) for r in rules], "Yo'naltirish qoidalari ro'yxati.")
+
+
+@router.patch(
+    "/routing-threshold-rules/{rule_id}",
+    summary="Update an adaptive routing threshold rule",
+    description="test_id can never be changed — a rule cannot be moved to another test. "
+                "409 if the updated (routing_group, min_ratio) collides with a sibling rule of the same test.",
+)
+def update_routing_threshold_rule(
+    rule_id: uuid.UUID,
+    data: RoutingThresholdRuleUpdateRequest,
+    service: RoutingThresholdRuleService = Depends(get_routing_threshold_rule_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    rule = service.update_rule(rule_id, data, actor_id=user.id)
+    return success_response(RoutingThresholdRuleOut.model_validate(rule), "Yo'naltirish qoidasi yangilandi.")
+
+
+@router.delete(
+    "/routing-threshold-rules/{rule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Soft-delete an adaptive routing threshold rule",
+    description="Sets deleted_at. A deleted rule is immediately excluded from live routing decisions "
+                "(ModuleExecutionService reads only non-deleted rules).",
+)
+def delete_routing_threshold_rule(
+    rule_id: uuid.UUID,
+    service: RoutingThresholdRuleService = Depends(get_routing_threshold_rule_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    service.delete_rule(rule_id, actor_id=user.id)
 
 
 @router.get(
