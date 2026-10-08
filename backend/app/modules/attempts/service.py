@@ -112,7 +112,18 @@ class AttemptService:
             raise MaxAttemptsExceededException(f"Bu test uchun maksimal urinishlar soni ({effective_max_attempts}) tugagan")
 
         questions = self.question_repo.list_all_for_test(test_id)
-        question_ids = build_question_order([q.id for q in questions], shuffle=test.shuffle_questions)
+        # Sprint 78 — group_ids passed alongside question_ids (zero new
+        # queries: question.group_id is a plain column already loaded
+        # on these same Question rows) so that when shuffle_questions
+        # is True, a QuestionGroup's member questions are shuffled as
+        # one contiguous block rather than scattered individually. A
+        # non-modular test is the only place this ever applies — see
+        # build_question_order()'s own docstring for why the modular
+        # per-module path (ModuleExecutionService._create_module_progress())
+        # is unaffected (it always passes shuffle=False already).
+        question_ids = build_question_order(
+            [q.id for q in questions], shuffle=test.shuffle_questions, group_ids=[q.group_id for q in questions],
+        )
 
         now = datetime.now(timezone.utc)
         attempt = TestAttempt(
