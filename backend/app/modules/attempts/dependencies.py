@@ -7,7 +7,13 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
 from app.modules.attempts.service import AttemptService
 from app.modules.questions.repository import OptionRepository, QuestionRepository
-from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, RoutingThresholdRuleRepository, TestRepository
+from app.modules.tests.repository import (
+    ExamModuleRepository,
+    ExamSectionRepository,
+    QuestionGroupRepository,
+    RoutingThresholdRuleRepository,
+    TestRepository,
+)
 
 
 def get_attempt_repository(db: Session = Depends(get_db)) -> AttemptRepository:
@@ -28,6 +34,10 @@ def get_exam_module_repository(db: Session = Depends(get_db)) -> ExamModuleRepos
 
 def get_exam_section_repository(db: Session = Depends(get_db)) -> ExamSectionRepository:
     return ExamSectionRepository(db)
+
+
+def get_question_group_repository(db: Session = Depends(get_db)) -> QuestionGroupRepository:
+    return QuestionGroupRepository(db)
 
 
 def get_routing_threshold_rule_repository(db: Session = Depends(get_db)) -> RoutingThresholdRuleRepository:
@@ -59,6 +69,7 @@ def get_attempt_service(
     module_execution: ModuleExecutionService = Depends(get_module_execution_service),
     module_repo: ExamModuleRepository = Depends(get_exam_module_repository),
     section_repo: ExamSectionRepository = Depends(get_exam_section_repository),
+    group_repo: QuestionGroupRepository = Depends(get_question_group_repository),
     db: Session = Depends(get_db),
 ) -> AttemptService:
     # Sprint 50 — module_execution/module_repo are now always wired for
@@ -69,7 +80,9 @@ def get_attempt_service(
     # them, so the branch body never runs regardless of these being set.
     # Sprint A (post-75) — section_repo wired the same way, for
     # AttemptService.get_module_for_attempt()'s section-name lookup.
+    # Sprint 77 — group_repo wired the same way, for
+    # get_attempt_detail()'s batched QuestionGroup/stimulus_text lookup.
     return AttemptService(
         repo, answer_repo, TestRepository(db), QuestionRepository(db), OptionRepository(db),
-        module_execution, module_repo, section_repo,
+        module_execution, module_repo, section_repo, group_repo,
     )

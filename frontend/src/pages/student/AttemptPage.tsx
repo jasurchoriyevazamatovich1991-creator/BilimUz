@@ -325,6 +325,25 @@ export function AttemptPage() {
 
       {currentQuestion ? (
         <div className="mb-6 rounded-lg border border-border p-5">
+          {/* Sprint 77 — shared stimulus/passage context for a grouped
+              question (QuestionGroup.stimulus_text). Rendered from
+              currentQuestion's own group_title/stimulus_text — this
+              page shows exactly one question at a time, so the panel
+              is naturally shown once per screen, and paging between
+              two questions that share the same group_id shows the
+              identical panel both times rather than it disappearing or
+              being duplicated. Absent entirely for an ungrouped
+              question (group_id null/undefined) or when the group has
+              no stimulus_text (e.g. a diagram-only group) — nothing
+              invented to fill the space. */}
+          {currentQuestion.group_id && currentQuestion.stimulus_text ? (
+            <div className="mb-4 rounded-md bg-foreground/5 p-4" data-testid="group-stimulus">
+              {currentQuestion.group_title ? (
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/50">{currentQuestion.group_title}</p>
+              ) : null}
+              <p className="whitespace-pre-wrap text-sm text-foreground/80">{currentQuestion.stimulus_text}</p>
+            </div>
+          ) : null}
           <p className="mb-4 text-foreground">{currentQuestion.question_text}</p>
           {currentQuestion.question_type === "short_answer" || currentQuestion.question_type === "essay" ? (
             // Sprint 68 — short_answer gets a single-line text input,

@@ -53,12 +53,33 @@ class OptionForAttemptOut(BaseModel):
 class QuestionForAttemptOut(BaseModel):
     """Deliberately excludes is_correct (on options) and explanation —
     the student-facing, answer-hidden view. Never reuse
-    questions.schemas.QuestionOut for this endpoint."""
+    questions.schemas.QuestionOut for this endpoint.
+
+    Sprint 77 — group_id/group_title/stimulus_text are additive, all
+    default None. Populated by AttemptService._to_question_view() only
+    when this exact question (already scoped to the attempt's
+    effective_question_order — the active module for a modular
+    attempt, the whole test otherwise, per Sprint 57) has a group_id
+    pointing at a QuestionGroup that still exists and is not
+    soft-deleted. There is no separate "fetch the group" endpoint or
+    query keyed by an attacker-supplied group_id anywhere — the group
+    is only ever looked up for group_ids already present on questions
+    this student was already going to receive, so a future module's or
+    another test's QuestionGroup can never be reached this way (see
+    AttemptService.get_attempt_detail()'s batched group lookup). None
+    for every question that has no group (the entire pre-Sprint-77
+    question population, unchanged), and also None (not a dangling
+    group_id) when the referenced group has been soft-deleted — a
+    deleted group is treated as if the question were never grouped at
+    all, so the frontend never renders an empty/stale stimulus block."""
     id: uuid.UUID
     question_text: str
     question_type: str
     score: float
     options: list[OptionForAttemptOut] = []
+    group_id: uuid.UUID | None = None
+    group_title: str | None = None
+    stimulus_text: str | None = None
 
     model_config = {"from_attributes": True}
 

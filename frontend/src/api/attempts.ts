@@ -33,6 +33,17 @@ export interface QuestionForAttemptOut {
   question_type: string;
   score: number;
   options: OptionForAttemptOut[];
+  // Sprint 77 — additive, optional here for the same reason module_id/
+  // module_expires_at are optional on AttemptDetailOut below: every
+  // pre-existing test fixture in this project's test suites (built
+  // before these fields existed) stays valid untouched. null/undefined
+  // for every question with no QuestionGroup (unchanged, the entire
+  // pre-Sprint-77 population) and also for a question whose group was
+  // soft-deleted — the backend treats that exactly like "no group" (see
+  // backend QuestionForAttemptOut's docstring), never a dangling id.
+  group_id?: string | null;
+  group_title?: string | null;
+  stimulus_text?: string | null;
 }
 
 export interface AnsweredQuestionState {

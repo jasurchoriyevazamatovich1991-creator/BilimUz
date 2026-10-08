@@ -207,6 +207,22 @@ class QuestionGroupRepository:
         stmt = select(QuestionGroup).where(QuestionGroup.id == group_id, QuestionGroup.deleted_at.is_(None))
         return self.db.scalars(stmt).first()
 
+    def list_active_by_ids(self, group_ids: list[uuid.UUID]) -> list[QuestionGroup]:
+        """Sprint 77 — bulk fetch for student exam delivery
+        (AttemptService.get_attempt_detail()'s group-context
+        enrichment), mirroring QuestionRepository.list_by_ids()'s own
+        single-batched-query shape exactly, to avoid one
+        get_by_id()-per-question N+1. Excludes soft-deleted rows for the
+        same reason get_active_by_id() does — a group a teacher has
+        deleted must never resurface in a student's exam, even if a
+        question row still carries its now-dangling group_id (SET NULL
+        on hard delete only fires for an actual DELETE, not a soft
+        delete, so this filter is the only thing that hides it)."""
+        if not group_ids:
+            return []
+        stmt = select(QuestionGroup).where(QuestionGroup.id.in_(group_ids), QuestionGroup.deleted_at.is_(None))
+        return list(self.db.scalars(stmt).all())
+
     def list_for_test(self, test_id: uuid.UUID) -> list[QuestionGroup]:
         stmt = (
             select(QuestionGroup)

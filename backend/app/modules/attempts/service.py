@@ -40,7 +40,7 @@ from app.modules.attempts.schemas import (
 )
 from app.modules.attempts.validators import build_question_order, compute_expiry, is_expired
 from app.modules.questions.repository import OptionRepository, QuestionRepository
-from app.modules.tests.repository import ExamSectionRepository, TestRepository
+from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
 
 
 class AttemptService:
@@ -54,6 +54,7 @@ class AttemptService:
         module_execution_service: "ModuleExecutionService | None" = None,
         module_repository: "ExamModuleRepository | None" = None,
         section_repository: "ExamSectionRepository | None" = None,
+        question_group_repository: "QuestionGroupRepository | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
@@ -74,6 +75,11 @@ class AttemptService:
         # get_module_for_attempt(); every existing caller/test
         # constructing AttemptService without it is unaffected.
         self.section_repo = section_repository
+        # Sprint 77 — same optional/default-None pattern. Only read by
+        # get_attempt_detail()'s group-context enrichment; a caller/test
+        # that omits it simply gets group_id/group_title/stimulus_text
+        # left None on every question (the exact pre-Sprint-77 shape).
+        self.group_repo = question_group_repository
 
     # --- Start ---------------------------------------------------------
 
@@ -184,7 +190,25 @@ class AttemptService:
         questions = [questions_by_id[qid] for qid in effective_question_order if qid in questions_by_id]
         answers = {a.question_id: a for a in self.answer_repo.list_for_attempt(attempt_id)}
 
-        question_views = [self._to_question_view(q) for q in questions if q is not None]
+        # Sprint 77 — one batched QuestionGroup fetch for every distinct
+        # group_id referenced by `questions` above (already scoped to
+        # effective_question_order — the active module for a modular
+        # attempt, the whole attempt otherwise), never one query per
+        # question. Because the group_ids collected here come only from
+        # questions this student was already about to receive, a group
+        # belonging to a future module, another test, or another
+        # attempt can never be looked up through this path — there is
+        # no endpoint or query that takes a caller-supplied group_id.
+        # list_active_by_ids() excludes soft-deleted rows, so a deleted
+        # group's stimulus never resurfaces even if a question's
+        # group_id still points at it (SET NULL only fires on a hard
+        # delete). self.group_repo is None for any caller/test that
+        # doesn't pass it in — every question then gets the same
+        # all-None group fields as before this sprint.
+        group_ids = {q.group_id for q in questions if q.group_id is not None}
+        groups_by_id = {g.id: g for g in self.group_repo.list_active_by_ids(list(group_ids))} if self.group_repo is not None and group_ids else {}
+
+        question_views = [self._to_question_view(q, groups_by_id) for q in questions if q is not None]
         answered_states = [
             AnsweredQuestionState(
                 question_id=qid, is_answered=qid in answers,
@@ -566,9 +590,18 @@ class AttemptService:
             correct_count=correct_count, status=attempt.status,
         )
 
-    def _to_question_view(self, question) -> QuestionForAttemptOut:
+    def _to_question_view(self, question, groups_by_id: dict | None = None) -> QuestionForAttemptOut:
         options = [OptionForAttemptOut.model_validate(o) for o in question.options if o.deleted_at is None]
+        # Sprint 77 — group_by_id intentionally looked up here rather
+        # than passed pre-resolved per question: a missing key (group
+        # soft-deleted, group_repo not wired, or question.group_id is
+        # None) all collapse to the same "ungrouped" view below, which
+        # is exactly the safe default this question had before Sprint 77.
+        group = (groups_by_id or {}).get(question.group_id) if question.group_id is not None else None
         return QuestionForAttemptOut(
             id=question.id, question_text=question.question_text,
             question_type=question.question_type, score=float(question.score), options=options,
+            group_id=group.id if group is not None else None,
+            group_title=group.title if group is not None else None,
+            stimulus_text=group.stimulus_text if group is not None else None,
         )
