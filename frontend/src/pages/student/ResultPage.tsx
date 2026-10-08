@@ -14,6 +14,7 @@ import { useResult } from "@/hooks/useResults";
 import { useTest } from "@/hooks/useTests";
 import { useIssueCertificate } from "@/hooks/useCertificates";
 import type { QuestionReviewOut, ResultSectionOut } from "@/api/results";
+import { FormulaText } from "@/components/questions/FormulaText";
 
 function formatTimeSpent(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -53,8 +54,32 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
 
   return (
     <div className="rounded-lg border border-border p-4">
+      {/* Sprint 80 — shared stimulus/passage context for a grouped
+          question, mirroring AttemptPage's identical Sprint 77 panel
+          (and its Sprint 80 FormulaText wiring) exactly — same
+          "absent entirely when ungrouped or group has no stimulus_text"
+          rule. group_title stays plain JSX text, NOT FormulaText: the
+          audit found QuestionGroup.title has no backend sanitization
+          (it's a plain, length-bounded string, not rich-text content),
+          so routing it through dangerouslySetInnerHTML would be an
+          unsanitized-HTML XSS surface. */}
+      {question.group_id && question.stimulus_text ? (
+        <div className="mb-3 rounded-md bg-foreground/5 p-3" data-testid="group-stimulus">
+          {question.group_title ? (
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/50">{question.group_title}</p>
+          ) : null}
+          <FormulaText html={question.stimulus_text} className="whitespace-pre-wrap text-sm text-foreground/80" />
+        </div>
+      ) : null}
+
       <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">Savol {index + 1}: {question.question_text}</p>
+        {/* Sprint 80 — question_text is backend-sanitized HTML (bleach)
+            that may contain $...$/$$...$$ LaTeX; reuses the same
+            FormulaText component AttemptPage uses, not a second
+            rendering implementation. */}
+        <p className="text-sm font-medium text-foreground">
+          Savol {index + 1}: <FormulaText html={question.question_text} />
+        </p>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusClass}`}>{statusLabel}</span>
       </div>
 
@@ -68,7 +93,10 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
                 key={option.id}
                 className={`text-sm ${isCorrectOption ? "font-medium text-success" : wasSelected ? "text-destructive" : "text-foreground/60"}`}
               >
-                {wasSelected ? "→ " : ""}{option.option_text}
+                {wasSelected ? "→ " : ""}
+                {/* Sprint 80 — option_text is backend-sanitized HTML,
+                    same reasoning as question_text above. */}
+                <FormulaText html={option.option_text} />
                 {isCorrectOption ? " (to'g'ri javob)" : ""}
                 {wasSelected && !isCorrectOption ? " (sizning javobingiz)" : ""}
               </p>
@@ -78,11 +106,24 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
       ) : null}
 
       {hasTextAnswer ? (
+        // Sprint 80 — text_answer is the student's OWN typed free text
+        // (short_answer/essay), NEVER passed through sanitize_rich_text
+        // server-side (confirmed by audit: save_answer()'s free-text
+        // branch persists it verbatim). It must stay plain, auto-
+        // escaping JSX — routing it through FormulaText's
+        // dangerouslySetInnerHTML would introduce a brand-new XSS
+        // vector that does not exist today.
         <p className="text-sm text-foreground/80">Javobingiz: {question.text_answer}</p>
       ) : null}
 
       {question.explanation ? (
-        <p className="mt-2 text-xs text-foreground/50">Izoh: {question.explanation}</p>
+        // Sprint 80 — explanation already had its own dedicated
+        // sanitize_rich_text field_validator since Sprint 32
+        // specifically because it is rendered here, during result
+        // review — same FormulaText reuse as above.
+        <p className="mt-2 text-xs text-foreground/50">
+          Izoh: <FormulaText html={question.explanation} />
+        </p>
       ) : null}
     </div>
   );

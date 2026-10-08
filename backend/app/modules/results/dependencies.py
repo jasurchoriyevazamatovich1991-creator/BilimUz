@@ -9,7 +9,7 @@ from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.questions.repository import QuestionRepository
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.service import RankingService, ResultService
-from app.modules.tests.repository import ExamSectionRepository, TestRepository
+from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
 
 
 def get_result_repository(db: Session = Depends(get_db)) -> ResultRepository:
@@ -44,6 +44,10 @@ def get_result_service(
         repo, stats_repo, AttemptRepository(db), AnswerRepository(db), TestRepository(db), QuestionRepository(db),
         ExamSectionRepository(db), section_repo,
         module_execution_service=module_execution_service,
+        # Sprint 80 — same reuse rationale as module_execution_service
+        # above: a plain, stateless repository wrapping this request's
+        # own db session, no new DI wiring pattern introduced.
+        question_group_repository=QuestionGroupRepository(db),
     )
 
 

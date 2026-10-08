@@ -44,6 +44,22 @@ def service(mock_repo, mock_stats_repo, mock_attempt_repo, mock_answer_repo, moc
     return ResultService(mock_repo, mock_stats_repo, mock_attempt_repo, mock_answer_repo, mock_test_repo, mock_question_repo)
 
 
+@pytest.fixture
+def mock_group_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def service_with_group_repo(mock_repo, mock_stats_repo, mock_attempt_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_group_repo):
+    """Sprint 80 — same 6-arg legacy construction as `service` above,
+    plus the new optional question_group_repository wired in, exactly
+    how get_result_service() constructs it for a real request."""
+    return ResultService(
+        mock_repo, mock_stats_repo, mock_attempt_repo, mock_answer_repo, mock_test_repo, mock_question_repo,
+        question_group_repository=mock_group_repo,
+    )
+
+
 def test_create_rejects_wrong_owner(service, mock_attempt_repo):
     other_user = uuid.uuid4()
     mock_attempt_repo.get_by_id.return_value = MagicMock(user_id=other_user, status="submitted")
@@ -149,10 +165,19 @@ def test_statistics_running_average_is_correct(service, mock_repo, mock_attempt_
 
 # --- Sprint 37: Result Analysis (get_result_detail) ---
 
-def _make_question(qid, text="Savol?", qtype="single_choice", explanation=None, options=None):
-    q = MagicMock(id=qid, question_text=text, question_type=qtype, explanation=explanation)
+def _make_question(qid, text="Savol?", qtype="single_choice", explanation=None, options=None, group_id=None):
+    # Sprint 80 — group_id defaults to None explicitly (not left to
+    # MagicMock's own auto-attribute, which would be a truthy MagicMock
+    # object, not None) so get_result_detail()'s `question.group_id is
+    # not None` checks behave correctly for every pre-Sprint-80 test
+    # that doesn't care about grouping at all.
+    q = MagicMock(id=qid, question_text=text, question_type=qtype, explanation=explanation, group_id=group_id)
     q.options = options or []
     return q
+
+
+def _make_group(gid, title="Passage 1", stimulus_text="Once upon a time..."):
+    return MagicMock(id=gid, title=title, stimulus_text=stimulus_text)
 
 
 def _make_option(oid, text, is_correct):
@@ -461,3 +486,102 @@ def test_existing_choice_type_review_unchanged_by_text_answer_field(service, moc
     assert detail.questions[0].is_correct is True
     assert detail.questions[1].selected_options == [opt_a]
     assert detail.questions[2].is_correct is False
+
+
+# --- Sprint 80: QuestionReviewOut group_id/group_title/stimulus_text ---
+# Mirrors AttemptService._to_question_view()'s own Sprint 77 test
+# coverage shape, through ResultService.get_result_detail() instead.
+
+def test_grouped_question_includes_group_fields_when_group_repo_wired(
+    service_with_group_repo, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo, mock_group_repo,
+):
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    group_id = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = []
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, text="Passage question 1", group_id=group_id)]
+    mock_group_repo.list_active_by_ids.return_value = [_make_group(group_id, title="Passage 1", stimulus_text="Once upon a time...")]
+
+    detail = service_with_group_repo.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.group_id == group_id
+    assert review.group_title == "Passage 1"
+    assert review.stimulus_text == "Once upon a time..."
+    # Single batched call, never one get_by_id() per question (N+1 avoidance).
+    mock_group_repo.list_active_by_ids.assert_called_once_with([group_id])
+
+
+def test_ungrouped_question_has_null_group_fields_even_with_group_repo_wired(
+    service_with_group_repo, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo, mock_group_repo,
+):
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = []
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, group_id=None)]
+
+    detail = service_with_group_repo.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.group_id is None
+    assert review.group_title is None
+    assert review.stimulus_text is None
+    mock_group_repo.list_active_by_ids.assert_not_called()
+
+
+def test_soft_deleted_group_renders_as_ungrouped(
+    service_with_group_repo, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo, mock_group_repo,
+):
+    """A group soft-deleted after the question was authored must look
+    exactly like 'never grouped' — list_active_by_ids() already excludes
+    it, mirroring AttemptService's identical Sprint 77 guarantee."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    group_id = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = []
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, group_id=group_id)]
+    mock_group_repo.list_active_by_ids.return_value = []  # soft-deleted -> excluded
+
+    detail = service_with_group_repo.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.group_id is None
+    assert review.group_title is None
+    assert review.stimulus_text is None
+
+
+def test_grouped_question_has_null_group_fields_when_group_repo_not_wired(
+    service, mock_repo, mock_attempt_repo, mock_answer_repo, mock_question_repo,
+):
+    """Backward-compat — a legacy ResultService construction (no
+    question_group_repository, exactly like the `service` fixture every
+    pre-Sprint-80 test in this file uses) must degrade to all-None group
+    fields even for a question that DOES have a group_id, never crash."""
+    user_id = uuid.uuid4()
+    result_id = uuid.uuid4()
+    q1 = uuid.uuid4()
+    group_id = uuid.uuid4()
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    mock_repo.get_by_id.return_value = result
+    attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
+    mock_attempt_repo.get_by_id.return_value = attempt
+    mock_answer_repo.list_for_attempt.return_value = []
+    mock_question_repo.list_by_ids.return_value = [_make_question(q1, group_id=group_id)]
+
+    detail = service.get_result_detail(result_id, user_id)
+    review = detail.questions[0]
+    assert review.group_id is None
+    assert review.group_title is None
+    assert review.stimulus_text is None

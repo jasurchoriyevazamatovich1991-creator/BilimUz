@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.modules.questions.validators import sanitize_rich_text
 from app.modules.tests.validators import validate_duration, validate_passing_score, validate_test_title
 
 
@@ -206,6 +207,19 @@ class QuestionGroupCreateRequest(BaseModel):
     stimulus_text: str | None = None
     order_number: int = Field(default=0, ge=0)
 
+    @field_validator("stimulus_text")
+    @classmethod
+    def _stimulus_text(cls, v: str | None) -> str | None:
+        # Sprint 80 — audit found stimulus_text had NO sanitization at
+        # all (unlike question_text/option_text since Sprint 32, and
+        # explanation since Sprint 32's own dedicated fix). Rendered to
+        # students during exam-taking (AttemptPage) and result review
+        # (ResultPage) via FormulaText/dangerouslySetInnerHTML as of
+        # this sprint — the exact same gap class explanation was fixed
+        # for, now closed the same way: reuse sanitize_rich_text(), no
+        # new dependency or allowlist.
+        return sanitize_rich_text(v) if v else v
+
 
 class QuestionGroupUpdateRequest(BaseModel):
     # test_id is deliberately NOT here — a group can never be moved to
@@ -214,6 +228,12 @@ class QuestionGroupUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     stimulus_text: str | None = None
     order_number: int | None = Field(default=None, ge=0)
+
+    @field_validator("stimulus_text")
+    @classmethod
+    def _stimulus_text(cls, v: str | None) -> str | None:
+        # Sprint 80 — see QuestionGroupCreateRequest._stimulus_text above.
+        return sanitize_rich_text(v) if v else v
 
 
 class QuestionGroupOut(BaseModel):

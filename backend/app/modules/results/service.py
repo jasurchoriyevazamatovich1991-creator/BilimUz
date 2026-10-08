@@ -18,7 +18,7 @@ from app.modules.results.exceptions import AttemptNotFinishedException, ResultNo
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams, ResultSectionOut
-from app.modules.tests.repository import ExamSectionRepository, TestRepository
+from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
 
@@ -51,6 +51,15 @@ class ResultService:
         # the exact legacy (attempt.question_order) behavior when this
         # is None, identical to how it always behaved before this sprint.
         module_execution_service: ModuleExecutionService | None = None,
+        # Sprint 80 — optional, default None, same backward-compat
+        # reasoning already established above for every other trailing
+        # param on this constructor: every existing caller (this
+        # module's own unit tests, and every integration test fixture
+        # listed in the Sprint 80 audit) that constructs ResultService
+        # without it is completely unaffected — get_result_detail()
+        # below degrades to the exact legacy (group_id/group_title/
+        # stimulus_text always None) behavior when this is None.
+        question_group_repository: QuestionGroupRepository | None = None,
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
@@ -61,6 +70,7 @@ class ResultService:
         self.section_repo = exam_section_repository
         self.result_section_repo = result_section_repository
         self.module_execution = module_execution_service
+        self.group_repo = question_group_repository
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -250,6 +260,17 @@ class ResultService:
         questions = self.question_repo.list_by_ids(question_ids)
         questions_by_id = {q.id: q for q in questions}
 
+        # Sprint 80 — mirrors AttemptService.get_attempt_detail()'s
+        # identical Sprint 77 group-context enrichment exactly: a
+        # single batched list_active_by_ids() call (no N+1), scoped
+        # only to group_ids already present on questions this result's
+        # own (already ownership-verified) attempt actually delivered —
+        # never a client-supplied group_id. self.group_repo is None for
+        # any caller/test that doesn't pass it in — every question then
+        # gets the same all-None group fields as before this sprint.
+        group_ids = {q.group_id for q in questions if q.group_id is not None}
+        groups_by_id = {g.id: g for g in self.group_repo.list_active_by_ids(list(group_ids))} if self.group_repo is not None and group_ids else {}
+
         correct_count = 0
         incorrect_count = 0
         unanswered_count = 0
@@ -268,6 +289,13 @@ class ResultService:
             else:
                 incorrect_count += 1
 
+            # Sprint 80 — see group_ids/groups_by_id above. A missing
+            # key (group soft-deleted, group_repo not wired, or
+            # question.group_id is None) all collapse to the same
+            # "ungrouped" view, exactly mirroring
+            # AttemptService._to_question_view()'s own fallback.
+            group = groups_by_id.get(question.group_id) if question.group_id is not None else None
+
             question_reviews.append(QuestionReviewOut(
                 question_id=question.id, question_text=question.question_text,
                 question_type=question.question_type, explanation=question.explanation,
@@ -279,6 +307,9 @@ class ResultService:
                 # above (answers_by_question, via list_for_attempt());
                 # zero additional queries.
                 text_answer=answer.text_answer if answer else None,
+                group_id=group.id if group is not None else None,
+                group_title=group.title if group is not None else None,
+                stimulus_text=group.stimulus_text if group is not None else None,
             ))
 
         time_spent_seconds = None

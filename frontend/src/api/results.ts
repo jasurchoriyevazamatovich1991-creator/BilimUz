@@ -54,6 +54,17 @@ export interface QuestionReviewOut {
    * check this field to tell "answered, not auto-graded" apart from
    * "unanswered". */
   text_answer: string | null;
+  /** Sprint 80 — additive, all optional/default null (mirrors
+   * attempts.ts's identical Sprint 77 QuestionForAttemptOut.group_id/
+   * group_title/stimulus_text fields exactly, including staying
+   * optional here so every pre-Sprint-80 test fixture that omits them
+   * entirely keeps compiling, same as that file's own convention).
+   * null/absent for every ungrouped question (all pre-Sprint-80
+   * results, unchanged) and also null when the referenced group has
+   * been soft-deleted. */
+  group_id?: string | null;
+  group_title?: string | null;
+  stimulus_text?: string | null;
 }
 
 /** Sprint 55 (backend) / Sprint 73 — RS-FE-1 (frontend): read-only

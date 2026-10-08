@@ -37,6 +37,7 @@ import { ErrorState } from "@/components/layout/ErrorState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Timer } from "@/components/attempts/Timer";
 import { QuestionNavigator } from "@/components/attempts/QuestionNavigator";
+import { FormulaText } from "@/components/questions/FormulaText";
 import { useAttempt, useModuleForAttempt, useSaveAnswer, useSubmitAndCreateResult, useSubmitModule } from "@/hooks/useAttempt";
 import { useCreateResultForFinishedAttempt } from "@/hooks/useResults";
 
@@ -339,12 +340,38 @@ export function AttemptPage() {
           {currentQuestion.group_id && currentQuestion.stimulus_text ? (
             <div className="mb-4 rounded-md bg-foreground/5 p-4" data-testid="group-stimulus">
               {currentQuestion.group_title ? (
+                // Sprint 80 — group_title is left as plain, auto-escaping
+                // JSX text, NOT routed through FormulaText: unlike
+                // stimulus_text/question_text/option_text, the audit
+                // (Sprint 80, section 1.5) found QuestionGroup.title has
+                // no backend sanitization field_validator at all (it is
+                // a plain, length-bounded string, not rich-text
+                // content) — rendering it via dangerouslySetInnerHTML
+                // would be an unsanitized-HTML XSS surface, so it keeps
+                // its pre-existing, already-safe plain-text rendering.
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/50">{currentQuestion.group_title}</p>
               ) : null}
-              <p className="whitespace-pre-wrap text-sm text-foreground/80">{currentQuestion.stimulus_text}</p>
+              {/* Sprint 80 — stimulus_text is now backend-sanitized
+                  (see backend/app/modules/tests/schemas.py's
+                  QuestionGroupCreateRequest/UpdateRequest._stimulus_text,
+                  this same sprint) and may contain $...$/$$...$$ LaTeX,
+                  so it renders through the same reusable FormulaText
+                  component already used for question/option text below
+                  — one renderer, not a second copy of the formula logic. */}
+              <FormulaText
+                html={currentQuestion.stimulus_text}
+                className="whitespace-pre-wrap text-sm text-foreground/80"
+              />
             </div>
           ) : null}
-          <p className="mb-4 text-foreground">{currentQuestion.question_text}</p>
+          {/* Sprint 80 — question_text is backend-sanitized HTML
+              (bleach, since Sprint 32) that may contain $...$/$$...$$
+              LaTeX — previously rendered as plain JSX text, which
+              both escaped the sanitized HTML back to a literal string
+              AND never rendered any LaTeX. FormulaText is the existing
+              reusable renderer (admin QuestionPreview.tsx) for exactly
+              this contract; reused here unchanged. */}
+          <FormulaText html={currentQuestion.question_text} className="mb-4 block text-foreground" />
           {currentQuestion.question_type === "short_answer" || currentQuestion.question_type === "essay" ? (
             // Sprint 68 — short_answer gets a single-line text input,
             // essay gets a multi-line textarea. Neither question type
@@ -396,7 +423,11 @@ export function AttemptPage() {
                         disabled={saveAnswer.isPending}
                         className="accent-primary"
                       />
-                      <span className="text-sm text-foreground">{option.option_text}</span>
+                      {/* Sprint 80 — option_text is backend-sanitized
+                          HTML (bleach, since Sprint 32) that may
+                          contain $...$/$$...$$ LaTeX, same reasoning
+                          as question_text above. */}
+                      <FormulaText html={option.option_text} className="text-sm text-foreground" />
                     </label>
                   );
                 });

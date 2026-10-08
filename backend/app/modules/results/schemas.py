@@ -57,6 +57,19 @@ class QuestionReviewOut(BaseModel):
     # stays None for them even when answered — this field is what lets a
     # consumer tell "answered, not auto-graded" apart from "unanswered".
     text_answer: str | None
+    # Sprint 80 — additive, all default None. Mirrors Sprint 77's
+    # identical QuestionForAttemptOut.group_id/group_title/stimulus_text
+    # fields exactly (attempts/schemas.py) — same reasoning applies here:
+    # Result Review had no way to show a grouped question's shared
+    # stimulus/passage at all before this sprint (confirmed by audit —
+    # ResultService never fetched QuestionGroup data). None for every
+    # question that has no group (all pre-Sprint-80 results, unchanged),
+    # and also None when the referenced group has been soft-deleted —
+    # same "deleted group looks exactly like no group" convention as
+    # Sprint 77, not a dangling reference.
+    group_id: uuid.UUID | None = None
+    group_title: str | None = None
+    stimulus_text: str | None = None
 
 
 class ResultSectionOut(BaseModel):
