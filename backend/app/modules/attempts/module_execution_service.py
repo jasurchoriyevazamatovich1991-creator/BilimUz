@@ -171,8 +171,17 @@ class ModuleExecutionService:
         once at the end, which is also what releases this row lock."""
         locked_progress = self.progress_repo.get_for_attempt_and_module_locked(attempt.id, progress.module_id)
         self.validate_active(locked_progress)
-        progress = locked_progress
+        return self._execute_submit(attempt, locked_progress)
 
+    def _execute_submit(self, attempt: TestAttempt, progress: AttemptModuleProgress) -> dict:
+        """Sprint 79 — factored out of submit_module() (pure extraction,
+        no behavior change) so auto_finish_active_module_if_expired()
+        below can reuse the exact same scoring/routing logic on an
+        already-locked, already-validated-as-submittable progress row.
+        Callers are responsible for locking `progress` and deciding
+        whether it's eligible to be submitted — this method just does
+        the scoring/status-update/routing work submit_module() always
+        did."""
         module = self.module_repo.get_by_id(progress.module_id)
         questions = self.question_repo.list_by_module(progress.module_id)
         answers = [a for a in self.answer_repo.list_for_attempt(attempt.id) if a.question_id in (progress.question_order or [])]
@@ -196,6 +205,47 @@ class ModuleExecutionService:
         next_module = self.module_repo.get_by_id(next_module_id)
         self._create_module_progress(attempt, next_module)
         return {"completed": False, "next_module_id": next_module_id}
+
+    def auto_finish_active_module_if_expired(self, attempt: TestAttempt) -> dict | None:
+        """Sprint 79 — lazy per-module expiry, the module-scope analogue
+        of AttemptService._auto_finish_if_expired(). Without this, a
+        module whose own `expires_at` has passed while the whole-attempt
+        Test.duration/TestAttempt.expires_at has NOT (the normal
+        configuration for any modular test where each module carries
+        its own, shorter time limit) left the student permanently
+        stuck: submit_module() raised ModuleNotActiveException ("vaqt
+        tugagan") on every retry, and submit_attempt() was separately
+        blocked by is_exam_complete()==False — no code path ever
+        finalized or advanced the expired module. See Sprint 79 audit,
+        CRITICAL finding, reproduced by
+        tests/integration/test_module_execution.py::
+        test_expired_module_cannot_be_submitted (Test.duration=600,
+        module.duration=10 — exactly this scenario).
+
+        Returns None (a pure no-op) when there is no active module, or
+        the active module has not actually expired — so this changes
+        nothing for the overwhelming majority of calls. Otherwise
+        re-acquires the progress row under the SAME row-level lock
+        submit_module() uses, re-checks status/expiry under that lock
+        (a concurrent explicit submit_module() call may have already
+        submitted this exact row between the unlocked read here and the
+        lock acquisition — in that case this is a no-op too), and then
+        reuses _execute_submit() to do precisely what an explicit,
+        on-time submit_module() call would have done: score the module,
+        mark it submitted, and route to the next module (or signal
+        whole-exam completion via {"completed": True, ...} — the
+        caller, AttemptService, is responsible for finalizing the whole
+        attempt in that case, exactly as it already does for an
+        explicit submit_module()'s completed branch)."""
+        progress = self.get_active_module_progress(attempt.id)
+        if progress is None or progress.expires_at is None or progress.expires_at >= datetime.now(timezone.utc):
+            return None
+        locked_progress = self.progress_repo.get_for_attempt_and_module_locked(attempt.id, progress.module_id)
+        if locked_progress.status != AttemptStatus.IN_PROGRESS.value or locked_progress.submitted_at is not None:
+            return None
+        if locked_progress.expires_at is None or locked_progress.expires_at >= datetime.now(timezone.utc):
+            return None
+        return self._execute_submit(attempt, locked_progress)
 
     def _route_to_next_module(self, attempt: TestAttempt, completed_module, correct_count: int, total_count: int) -> uuid.UUID | None:
         all_modules = self.module_repo.list_for_test(attempt.test_id)

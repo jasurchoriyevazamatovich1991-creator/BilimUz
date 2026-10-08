@@ -153,6 +153,7 @@ class AttemptService:
     def get_attempt(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> TestAttempt:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+        self._auto_finish_active_module_if_expired(attempt)
         return attempt
 
     def get_attempt_detail(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> AttemptDetailOut:
@@ -249,6 +250,7 @@ class AttemptService:
     ) -> None:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+        self._auto_finish_active_module_if_expired(attempt)
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
         if question_id not in (attempt.question_order or []):
@@ -301,6 +303,7 @@ class AttemptService:
     def submit_attempt(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> SubmitResultOut:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+        self._auto_finish_active_module_if_expired(attempt)
 
         # Sprint 59 — the attempt row is locked BEFORE the active-status
         # check and BEFORE _finalize()'s score/percentage write, closing
@@ -348,6 +351,7 @@ class AttemptService:
         module_id in the URL)."""
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+        self._auto_finish_active_module_if_expired(attempt)
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
 
@@ -475,6 +479,51 @@ class AttemptService:
             if attempt.status in ACTIVE_STATUSES:
                 self._finalize(attempt, AttemptStatus.AUTO_FINISHED)
                 self.repo.commit()
+
+    def _auto_finish_active_module_if_expired(self, attempt: TestAttempt) -> None:
+        """Sprint 79 — lazy per-module expiry, the module-scope analogue
+        of _auto_finish_if_expired() above. Without this, a module whose
+        own expires_at has passed while the whole-attempt
+        Test.duration/TestAttempt.expires_at has NOT (the normal
+        configuration for any modular test where each module carries
+        its own, shorter time limit — see Sprint 79 audit CRITICAL
+        finding, reproduced by the existing
+        test_expired_module_cannot_be_submitted) left the student
+        permanently stuck: submit_module() raised ModuleNotActiveException
+        on every retry, and submit_attempt() was separately blocked by
+        is_exam_complete()==False — no code path ever finalized or
+        advanced the expired module.
+
+        A pure no-op for a non-modular AttemptService construction
+        (self.module_execution is None), an attempt that is not
+        currently ACTIVE_STATUSES (nothing to expire), or a modular
+        attempt whose active module — if any — has not actually
+        expired. Called from every module-scoped entry point
+        (get_attempt(), save_answer(), submit_attempt(), submit_module()),
+        mirroring exactly where _auto_finish_if_expired() is called.
+
+        ModuleExecutionService.auto_finish_active_module_if_expired()
+        does the actual work (reusing submit_module()'s own locked
+        scoring/routing logic) and returns the same
+        {"completed": bool, "next_module_id": ...} shape submit_module()
+        does, or None if it was a no-op. When the expired module routed
+        to a next module, the whole attempt stays ACTIVE_STATUSES (now
+        with a fresh active module) and this only needs to commit. When
+        the expired module was the last one (completed=True), the whole
+        attempt is finalized exactly like _auto_finish_if_expired() does
+        for whole-test expiry — AttemptStatus.AUTO_FINISHED, no
+        "attempt.submitted" audit-log entry, since this was not an
+        explicit user submit action."""
+        if self.module_execution is None or attempt.status not in ACTIVE_STATUSES:
+            return
+        outcome = self.module_execution.auto_finish_active_module_if_expired(attempt)
+        if outcome is None:
+            return
+        if outcome["completed"]:
+            attempt = self._lock_attempt(attempt)
+            if attempt.status in ACTIVE_STATUSES:
+                self._finalize(attempt, AttemptStatus.AUTO_FINISHED)
+        self.repo.commit()
 
     def _lock_attempt(self, attempt: TestAttempt) -> TestAttempt:
         """Sprint 59 — CRITICAL fix for the attempt-finalize race
