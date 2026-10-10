@@ -1,95 +1,76 @@
 # BilimUz Backend
 
-FastAPI backend for the BilimUz education platform. See `docs/00_Folder_Architecture.md` for the full architectural rationale and `docs/ADR/` for why each major technology was chosen.
+FastAPI backend — feature-based modullar (`app/modules/`, 27 modul) + Layered Architecture (Router → Service → Repository → Database). To'liq loyiha konteksti va imkoniyatlar ro'yxati uchun repository ildizidagi [`README.md`](../README.md)ga qarang; sprint-by-sprint to'liq tarix — [`../docs/SPRINT_HISTORY.md`](../docs/SPRINT_HISTORY.md)da.
 
-## Stack
-
-Python 3.13, FastAPI, PostgreSQL, SQLAlchemy 2.x, Alembic, Pydantic v2, Redis, JWT.
-
-## Project structure
-
-```
-app/
-├── main.py              # FastAPI app instance, middleware, startup logging
-├── core/
-│   ├── config.py          # Settings (env-driven, single source of truth)
-│   ├── security.py         # Password hashing, JWT create/verify
-│   ├── logging.py           # Structured logging setup
-│   ├── exceptions.py         # AppException hierarchy + global handler
-│   ├── schemas.py              # Shared {success, message, data, errors} envelope
-│   ├── mixins.py                 # UUID PK / timestamp / audit / status mixins
-│   ├── audit.py                    # Centralized audit_logs writer
-│   ├── redis_client.py               # Single Redis client instance
-│   └── middleware/                     # Rate limiting, security headers
-├── db/
-│   ├── database.py          # SQLAlchemy engine (connection pooling)
-│   ├── base.py                # Declarative Base — every model.py imports from here
-│   └── session.py               # SessionLocal + get_db() FastAPI dependency
-├── api/
-│   ├── router.py             # Aggregates every module + v1 router under /api/v1
-│   └── v1/
-│       ├── health.py           # GET /api/v1/health — checks DB connectivity
-│       └── version.py            # GET /api/v1/version — app/env/API version info
-├── auth/                    # Feature module (see auth/README.md)
-├── subjects/                # Feature module (see subjects/README.md)
-└── {other 23 modules}/      # Scaffolded, not yet implemented — .cursor/context/05-system-modules.md
-```
-
-**Two kinds of code live in `app/`:** foundation (`core/`, `db/`, `api/v1/`) that every module depends on, and feature modules (`auth/`, `subjects/`, ...) that depend on the foundation but never on each other directly. See `docs/ADR/ADR-005-Use-Clean-Architecture.md`.
-
-## Local development
-
-### Option A — Docker (recommended)
+## O'rnatish
 
 ```bash
-cp backend/.env.example backend/.env   # fill in real values, especially JWT_SECRET_KEY
-docker-compose up --build
-```
-
-This starts Postgres, Redis, and the backend (with `--reload`) together. API available at `http://localhost:8000`, interactive docs at `http://localhost:8000/docs`.
-
-### Option B — Local Python
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env        # point DATABASE_URL at a Postgres you're running yourself
+```
+
+## Sozlash
+
+```bash
+cp .env.example .env
+```
+
+`.env` faylida eng muhim qiymatlarni to'g'rilang — to'liq jadval uchun root README'ning 8-bo'limiga qarang. Eslatma: **`ENVIRONMENT` endi majburiy** — `development`, `staging` yoki `production`'dan biri aniq berilishi shart; aks holda ilova (`uvicorn app.main:app` ham, `alembic` ham) ishga tushmaydi (Sprint 81 — Package 1 Follow-up, fail-closed konfiguratsiya). `staging`/`production`'da `JWT_SECRET_KEY` va `FILE_ENCRYPTION_KEY` (va, agar `STORAGE_BACKEND=r2` bo'lsa, `R2_*` qiymatlari) standart (`CHANGE_ME_IN_PRODUCTION...`) qiymatda qolsa, backend ishga tushishni rad etadi.
+
+## Ma'lumotlar bazasi va migratsiyalar
+
+PostgreSQL 16 talab qilinadi (local o'rnatilgan yoki Docker). Migratsiyalar `alembic/versions/`da (19 fayl, `0001`–`0019`):
+
+```bash
 alembic upgrade head
-uvicorn app.main:app --reload
 ```
 
-## Database migrations
+Yangi migratsiya yaratish: `alembic revision -m "tasvir"` (avtogenerate ehtiyotkorlik bilan — `alembic/env.py` har bir modulning `models.py`sini import qilgan bo'lishi kerak).
 
-See `backend/alembic/README.md`. Short version: `alembic upgrade head` to apply, `alembic revision --autogenerate -m "..."` to create a new one — but only for modules that already have a `models.py` (check `alembic/env.py`'s import list first).
-
-## Endpoints available today
-
-```
-GET  /api/v1/health     — service + database connectivity check
-GET  /api/v1/version    — app name, version, environment
-GET  /docs               — Swagger UI (auto-generated)
-POST /api/v1/auth/*        — see auth/README.md
-GET  /api/v1/subjects/*      — see subjects/README.md
-```
-
-## Testing
+## Ishga tushirish
 
 ```bash
-cd backend
-pip install -r requirements.txt
-pytest
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Honest status** (see `docs/CHANGELOG.md`): tests are written for `auth` and `subjects` but have never been executed against a real environment — this dev environment has no network access to install dependencies or run Postgres. Run them for real before trusting them as verification, not just documentation.
+Yoki repository ildizidan Docker Compose orqali (Postgres+Redis+backend birga): `docker-compose up -d`.
 
-## What's NOT here yet
+- Swagger UI: `http://localhost:8000/docs`
+- OpenAPI sxema: `http://localhost:8000/api/v1/openapi.json`
 
-Per the current sprint's scope, business modules beyond `auth`/`subjects` (Login flows beyond basic JWT, full RBAC/Permissions, Tests, AI, Payments) are intentionally not implemented — see `.cursor/context/05-system-modules.md` for the honest per-module status.
+Birinchi Super Admin foydalanuvchisini yaratish (migratsiyalar qo'llanilgandan keyin, idempotent — ikkinchi marta ishga tushirish xavfsiz, duplikat yaratmaydi):
 
-## Future improvements
+```bash
+SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD=YOUR_STRONG_PASSWORD python scripts/seed_admin.py
+```
 
-- Root-level unversioned `/health` (in addition to `/api/v1/health`) for load balancers/Kubernetes probes that shouldn't need to know the API version.
-- Structured logging via `structlog` instead of the stdlib-based formatter in `core/logging.py`, if log volume/querying needs grow.
-- Async SQLAlchemy (`AsyncSession`) if request concurrency needs outgrow the current sync `Session` model — by design, only `repository.py` files per module would need to change.
+## Modullar (`app/modules/`, 27 ta)
+
+`ai, analytics, attempts, audit_logs, auth, certificates, grades, learning_centers, lessons, notifications, payments, permissions, profiles, progress, questions, results, roles, schools, settings, subjects, system_logs, tests, topics, uploads, users`
+
+Har bir modulda odatda `router.py`, `service.py`, `repository.py`, `schemas.py` va (kerak bo'lsa) `models.py` mavjud. Real endpointlar ro'yxati uchun `http://localhost:8000/docs` (Swagger UI, ishga tushirilgandan keyin) — eng ishonchli manba, chunki u haqiqiy routerlardan avtomatik generatsiya qilinadi.
+
+## Testlash
+
+```bash
+# To'liq unit/mock-asoslangan to'plam — PostgreSQL/Redis talab qilinmaydi:
+python -m pytest app/ -q
+
+# Faqat ENVIRONMENT/secret-safety testlari (Sprint 81):
+python -m pytest app/core/tests/ -q
+
+# Real PostgreSQL integratsiya testlari — ALOHIDA, TEST_DATABASE_URL va
+# ishlab turgan PostgreSQL talab qiladi (DB nomi "_test" bilan tugashi shart,
+# conftest.py shuni tekshiradi):
+TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test \
+    python -m pytest tests/integration/ -q
+```
+
+Bu sandbox muhitida (GitHub Release Preparation vazifasi doirasida) oxirgi marta ishga tushirilganda: `app/` ostidagi to'liq mock/unit to'plam — **608 passed** (shundan 28 tasi `app/core/tests/`da — ENVIRONMENT/secret-safety testlari). `tests/integration/` — PostgreSQL/Redis ishlab turmagani sababli bu muhitda ishga tushirilmagan; TEST_DATABASE_URL'ga ega ishlab turgan PostgreSQL mavjud bo'lsa, boshqa muhitda ishga tushiriladi.
+
+## Xavfsizlik eslatmalari
+
+- `.env` faylini hech qachon commit qilmang (`.gitignore`da istisno qilingan).
+- `backend/.env.example` faqat xavfsiz placeholder qiymatlarni o'z ichiga oladi — haqiqiy secretlarni hech qachon bu faylga yoki boshqa versiyalanadigan joyga yozmang.
+- Production/staging'da standart secret qiymatlari bilan ishga tushirish ataylab bloklanadi — yuqoridagi "Sozlash" bo'limiga qarang.

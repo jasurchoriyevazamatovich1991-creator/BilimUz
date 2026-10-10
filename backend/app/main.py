@@ -41,8 +41,14 @@ def on_startup() -> None:
     # core/config.validate_production_secrets() for the full rationale.
     unsafe = validate_production_secrets(settings)
     if unsafe:
+        # Sprint 81 — Package 1 (S81-AUDIT-004): message now names the
+        # actual guarded environment (ENVIRONMENT can be "staging" here
+        # too, not only "production") instead of hardcoding "production"
+        # — the secret names themselves are never included in `unsafe`,
+        # only their field NAMES, so this never logs/raises an actual
+        # secret value.
         raise RuntimeError(
-            "Refusing to start in production with unsafe default secret(s): "
+            f"Refusing to start in {settings.ENVIRONMENT!r} with unsafe default secret(s): "
             f"{', '.join(unsafe)}. Set real values via environment variables/.env before starting."
         )
     logger.info(f"{settings.APP_NAME} v{APP_VERSION} starting in {settings.ENVIRONMENT} mode")
