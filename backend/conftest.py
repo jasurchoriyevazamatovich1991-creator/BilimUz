@@ -1,5 +1,7 @@
 """
 Sprint 40 — Real PostgreSQL Integration Test Infrastructure.
+Sprint 84 — Package 2 added the equivalent Redis test-isolation block
+immediately below (same file, same reasoning, same timing constraint).
 
 CRITICAL DESIGN CONSTRAINT (see the module-level block below):
 `app/db/database.py`'s `engine` is created at IMPORT time, bound to
@@ -8,7 +10,10 @@ pytest always loads every `conftest.py` before it collects/imports any
 test module, this file is the ONLY safe place to redirect
 `DATABASE_URL` to the test database BEFORE that engine (or anything
 that transitively imports it) can ever be constructed with the wrong
-URL.
+URL. `app/core/redis_client.py`'s module-level `redis_client` has the
+exact same constraint against `settings.REDIS_URL` (both settle at
+import time via the same `@lru_cache`-wrapped `get_settings()`), so the
+Redis block below follows the identical pattern.
 
 SAFETY GUARANTEE FOR THE EXISTING 483 MOCK-BASED TESTS:
 None of them import `app.db.database`, `app.db.session`, or `app.main`
@@ -16,7 +21,8 @@ None of them import `app.db.database`, `app.db.session`, or `app.main`
 test_*.py` returns nothing). The block below is a complete no-op
 unless `TEST_DATABASE_URL` is set in the environment, so running the
 existing suite exactly as before (`pytest app/ scripts/`, no env var)
-is entirely unaffected by this file's existence.
+is entirely unaffected by this file's existence. The Redis block below
+is a no-op under the exact same condition (`TEST_REDIS_URL` unset).
 """
 import os
 
@@ -48,6 +54,83 @@ if TEST_DATABASE_URL:
     # before any `app.*` import happens anywhere in this test run.
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
+# =====================================================================
+# Sprint 84 — Package 2. TEST_REDIS_URL, mirroring TEST_DATABASE_URL
+# above exactly: never auto-derived from REDIS_URL, must run before any
+# `app.*` import, and is a complete no-op unless TEST_REDIS_URL is
+# actually set.
+#
+# Audit finding this closes: `app/core/redis_client.py` builds one
+# module-level `redis_client = redis.Redis.from_url(settings.REDIS_URL,
+# ...)` at import time. `settings.REDIS_URL` defaults to
+# "redis://localhost:6379/0" — the exact same host AND the exact same
+# logical DB index (0) a developer's own local dev server uses by
+# default (confirmed against `.env.example`'s own REDIS_URL line).
+# Unlike Postgres, there was no TEST_REDIS_URL at all before this
+# sprint, so any integration test that exercises the real `rate_limit()`
+# dependency (e.g. tests/integration/test_sprint73_rate_limiting_and_hardening.py,
+# or anything using the `client` fixture) was writing real
+# `ratelimit:*` keys into whatever Redis DB a developer's own dev
+# server happens to be pointed at — never flushed (confirmed: no
+# `flushdb`/`flushall` call exists anywhere in this codebase, so no
+# data-loss risk), but not isolated either: a developer manually
+# exercising login/register locally while the suite runs (or vice
+# versa) could see the other's counters, and there was no way to prove
+# which Redis database a test run actually landed on.
+#
+# Redis has no named-database equivalent to Postgres's "_test" suffix
+# convention (just 16 numbered logical databases, 0-15, in one server
+# process — already how REDIS_URL's own trailing "/0" addresses the
+# dev database). The safety gate below is the direct Redis equivalent:
+# refuse a TEST_REDIS_URL whose DB index is 0 (or missing, which Redis
+# treats as 0) or 1 (REDIS_URL's conventional dev index AND the
+# second-most-common manual default) — the same "refuse anything that
+# looks like the real one" intent as the "_test" suffix check above,
+# expressed in terms Redis actually supports. This requires NO new
+# Redis deployment or infrastructure: any already-running Redis server
+# already supports selecting a different numbered database for free.
+# =====================================================================
+def _validate_test_redis_url_db_index(url: str) -> int:
+    """Extracted as a plain, importable function (rather than left
+    inline) specifically so a unit test can exercise this validation
+    logic directly — the module-level block below runs once at
+    conftest.py's own import time, before pytest ever collects a test,
+    so nothing inside an `if TEST_REDIS_URL:` body could otherwise be
+    called from a test at all. Returns the parsed DB index on success;
+    raises RuntimeError on anything invalid or disallowed."""
+    from urllib.parse import urlparse
+
+    redis_path = urlparse(url).path.lstrip("/")
+    try:
+        db_index = int(redis_path) if redis_path else 0
+    except ValueError:
+        raise RuntimeError(
+            f"TEST_REDIS_URL must end with a numeric Redis DB index "
+            f"(e.g. 'redis://localhost:6379/15') — got path {redis_path!r} "
+            f"from TEST_REDIS_URL={url!r}."
+        )
+    if db_index in (0, 1):
+        raise RuntimeError(
+            f"TEST_REDIS_URL's DB index must not be 0 or 1 — got "
+            f"{db_index!r} (from TEST_REDIS_URL={url!r}). "
+            f"Refusing to start: this check exists specifically so "
+            f"integration tests can never be pointed at the conventional "
+            f"development Redis database (REDIS_URL's own default is "
+            f"'redis://localhost:6379/0'). Pick an unused index, e.g. "
+            f"'redis://localhost:6379/15'."
+        )
+    return db_index
+
+
+TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL")
+
+if TEST_REDIS_URL:
+    _validate_test_redis_url_db_index(TEST_REDIS_URL)
+    # Only NOW, after the safety gate passes, is REDIS_URL redirected —
+    # before any `app.*` import (and therefore before
+    # app.core.redis_client's module-level client is ever constructed).
+    os.environ["REDIS_URL"] = TEST_REDIS_URL
+
 
 import pytest  # noqa: E402 — after the safety gate above, deliberately
 from sqlalchemy import text  # noqa: E402
@@ -70,6 +153,25 @@ def _require_test_database_url() -> str:
             pytrace=False,
         )
     return TEST_DATABASE_URL  # pragma: no cover — pytest.fail always raises above
+
+
+def _require_test_redis_url() -> str:
+    """Sprint 84 — Package 2. Mirrors _require_test_database_url() above
+    exactly: a clear, explicit failure (not a silent fallback to
+    whatever REDIS_URL happens to resolve to) for any test that
+    deliberately wants to prove it is running against an isolated test
+    Redis database rather than merely hoping it is."""
+    if not TEST_REDIS_URL:
+        pytest.fail(
+            "TEST_REDIS_URL environment variable is required for this "
+            "test. Example:\n"
+            "  TEST_REDIS_URL=redis://localhost:6379/15 "
+            "pytest app/core/tests/test_redis_test_isolation.py\n"
+            "(Tests that don't request Redis-isolation fixtures are "
+            "completely unaffected by this and continue to run as before.)",
+            pytrace=False,
+        )
+    return TEST_REDIS_URL  # pragma: no cover — pytest.fail always raises above
 
 
 def _run_alembic_upgrade_to_head(db_url: str) -> None:
@@ -238,3 +340,33 @@ def client(pg_session):
             yield test_client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture(scope="function")
+def test_redis():
+    """
+    Sprint 84 — Package 2. Fails clearly (via _require_test_redis_url())
+    if TEST_REDIS_URL isn't set — no silent fallback to the real
+    `app.core.redis_client.redis_client` singleton, which by this point
+    in the test run is already bound to whichever URL REDIS_URL
+    resolved to (the test URL, if the module-level redirect block above
+    ran; the real default otherwise).
+
+    Yields a plain `redis.Redis` connected to TEST_REDIS_URL, and
+    flushes ONLY that one isolated test database at teardown — safe
+    specifically because the module-level safety gate above already
+    refused any TEST_REDIS_URL whose DB index is 0 or 1, so this can
+    never be the conventional development database. This is the direct
+    Redis equivalent of pg_session's rollback-at-teardown: it leaves no
+    residue for the next test, without ever touching a non-test Redis
+    database.
+    """
+    import redis
+
+    url = _require_test_redis_url()
+    client_ = redis.Redis.from_url(url, decode_responses=True)
+    try:
+        yield client_
+    finally:
+        client_.flushdb()
+        client_.close()

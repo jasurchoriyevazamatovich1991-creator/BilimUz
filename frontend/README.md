@@ -49,6 +49,10 @@ npm run test:watch     # vitest — watch rejimi
 npm run lint            # ESLint
 ```
 
+## Ma'lum xususiyatlar (Sprint 83)
+
+`components/questions/FormulaText.tsx` — savol matnidagi HTML va `$..$`/`$$..$$` formula (KaTeX) belgilarini birga render qiladi. Sprint 83'da HTML teg chegaralarini buzadigan bug tuzatildi: formula regex'i endi faqat matn segmentlariga (teg ichidagi atributlarga emas) qo'llanadi — `html.split(/(<[^>]*>)/)` orqali tegdan ajratilgan juft-indeksli segmentlarga. Tekshirilgan cheklov: formula endi bitta teg chegarasidan oshib keta olmaydi (ataylab qilingan, xavfsiz trade-off). To'liq testlar: `FormulaText.test.tsx` (20 test).
+
 ## Folder tuzilmasi
 
 ```

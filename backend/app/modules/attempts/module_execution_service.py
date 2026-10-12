@@ -33,7 +33,7 @@ from app.modules.attempts.exceptions import (
 )
 from app.modules.attempts.models import AttemptModuleProgress, AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
-from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
 from app.modules.attempts.validators import build_question_order
 from app.modules.questions.repository import QuestionRepository
 from app.modules.tests.repository import ExamModuleRepository, RoutingThresholdRuleRepository
@@ -189,16 +189,56 @@ class ModuleExecutionService:
         # Sprint 45's ScoringStrategy, reused exactly — this is the
         # SAME generic percentage calculation AttemptService._finalize()
         # already uses for the whole-attempt case, applied here at
-        # module scope instead.
+        # module scope instead. (scoring_result itself is not consumed
+        # below — see scoring.py's own docstring for why this call site
+        # was deliberately left as a dead, unfiltered value when Sprint
+        # 66 scoped AUTO_GRADABLE_QUESTION_TYPES to _finalize() only;
+        # left untouched here, out of this sprint's scope.)
         scoring_result = DEFAULT_SCORING_STRATEGY.calculate(questions, answers)
-        correct_count = sum(1 for a in answers if a.is_correct is True)
+
+        # Sprint 82 — Package 3 (adaptive-routing denominator). Mirrors
+        # AttemptService._finalize()'s AUTO_GRADABLE_QUESTION_TYPES
+        # filter (Sprint 66) exactly, applied here to the adaptive-
+        # routing performance ratio instead of the final score.
+        # short_answer/essay answers can never have is_correct=True —
+        # save_answer()'s free-text branch always leaves is_correct
+        # NULL for them, since nothing in this codebase grades free
+        # text automatically — so including them in `questions` only
+        # ever inflated total_count (the ratio's denominator) without
+        # ever being able to contribute to correct_count (the
+        # numerator), systematically deflating every module's
+        # performance ratio by however many short_answer/essay
+        # questions it happened to contain. That deflated ratio feeds
+        # directly into PerformanceThresholdRoutingStrategy's
+        # `ratio >= min_rule.min_ratio` comparison
+        # (adaptive_routing.py), so a module mixing auto-gradable and
+        # free-text questions could route a student to a lower
+        # performance tier than their actual auto-gradable answers
+        # earned. correct_count is also explicitly scoped to
+        # eligible_ids (defensive — is_correct is already never True
+        # for an ineligible answer, so this does not change
+        # correct_count's value, only makes the two counts share the
+        # same, single, explicit eligible set, matching
+        # AttemptService._build_result()'s own
+        # effective_id_set-scoped correct_count pattern).
+        eligible_questions = [q for q in questions if q.question_type in AUTO_GRADABLE_QUESTION_TYPES]
+        eligible_ids = {q.id for q in eligible_questions}
+        correct_count = sum(1 for a in answers if a.is_correct is True and a.question_id in eligible_ids)
 
         self.progress_repo.update(progress, {
             "status": AttemptStatus.SUBMITTED.value,
             "submitted_at": datetime.now(timezone.utc),
         })
 
-        next_module_id = self._route_to_next_module(attempt, module, correct_count, len(questions))
+        # total_count=len(eligible_questions) — a module containing ONLY
+        # short_answer/essay questions now correctly produces
+        # total_count=0 here, which _route_to_next_module()'s existing
+        # `if total_count <= 0` branch already handles safely (falls
+        # back to a neutral ModulePerformance(correct_count=0,
+        # total_count=1) rather than a ZeroDivisionError/ValueError from
+        # PerformanceThresholdRoutingStrategy's ratio computation) — no
+        # change needed there.
+        next_module_id = self._route_to_next_module(attempt, module, correct_count, len(eligible_questions))
         if next_module_id is None:
             return {"completed": True, "next_module_id": None}
 

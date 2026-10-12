@@ -4,11 +4,24 @@ __pycache__/
 .env
 venv/
 .venv/
+.pytest_cache/
+.coverage
 
 # Frontend
 node_modules/
 dist/
 .vite/
+
+# Editor / machine-specific
+.vscode/
+.idea/
+*.swp
+
+# Release/backup archives (GitHub Release Preparation task, Sprint 84+ —
+# found multiple untracked pre-commit backup ZIPs at repo root with no
+# ignore rule covering them; none were ever tracked, but this prevents a
+# careless `git add -A`/`git add .` from accidentally committing one)
+*.zip
 
 # Database
 database/backups/*

@@ -183,6 +183,49 @@ def test_save_answer_rejects_option_from_wrong_question(service, mock_repo, mock
         service.save_answer(attempt.id, user_id, question_id, uuid.uuid4())
 
 
+def test_save_answer_locks_the_attempt_before_the_status_check(service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo):
+    """Sprint 82 — Package 1 regression. save_answer() must now go
+    through the same locked path (_lock_attempt() ->
+    repo.get_by_id_locked()) every other finalize-triggering/status-
+    sensitive call site already uses, not just the unlocked
+    repo.get_by_id() read from _get_owned_attempt()."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    option_id = uuid.uuid4()
+    attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = attempt
+    mock_question_repo.get_by_id.return_value = MagicMock(question_type="single_choice")
+    mock_option_repo.get_by_id.return_value = MagicMock(question_id=question_id, is_correct=True)
+
+    service.save_answer(attempt.id, user_id, question_id, option_id)
+
+    mock_repo.get_by_id_locked.assert_called_once_with(attempt.id)
+
+
+def test_save_answer_rejects_when_lock_reveals_a_concurrent_finalize(service, mock_repo, mock_answer_repo, mock_question_repo):
+    """Sprint 82 — Package 1 regression, the core race this fix closes.
+    Simulates a concurrent submit_attempt() that finalized the attempt
+    AFTER the unlocked repo.get_by_id() read (still "in_progress") but
+    BEFORE this method's own lock acquisition — by making
+    get_by_id_locked() return a DIFFERENT, already-"submitted" object,
+    independent of mock_repo's default same-object echo. Before the
+    fix, save_answer() never re-checked status after the lock (in fact
+    never acquired one at all) and would have silently written the
+    answer; after the fix it must raise and must never call upsert()."""
+    user_id = uuid.uuid4()
+    question_id = uuid.uuid4()
+    stale_attempt = MagicMock(id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None, question_order=[question_id])
+    finalized_attempt = MagicMock(id=stale_attempt.id, user_id=user_id, status="submitted", expires_at=None, question_order=[question_id])
+    mock_repo.get_by_id.return_value = stale_attempt
+    mock_repo.get_by_id_locked.side_effect = None
+    mock_repo.get_by_id_locked.return_value = finalized_attempt
+
+    with pytest.raises(AttemptNotActiveException):
+        service.save_answer(stale_attempt.id, user_id, question_id, uuid.uuid4())
+
+    mock_answer_repo.upsert.assert_not_called()
+
+
 def test_save_answer_succeeds_and_computes_correctness(service, mock_repo, mock_answer_repo, mock_option_repo, mock_question_repo):
     user_id = uuid.uuid4()
     question_id = uuid.uuid4()
@@ -274,6 +317,41 @@ def test_result_unavailable_while_in_progress(service, mock_repo):
     mock_repo.get_by_id.return_value = attempt
     with pytest.raises(ResultNotAvailableException):
         service.get_result(attempt.id, user_id)
+
+
+def test_get_result_checks_module_level_expiry_when_configured(mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo):
+    """Sprint 82 — Package 2 regression. get_result() must call
+    ModuleExecutionService.auto_finish_active_module_if_expired(), the
+    exact call every other attempt-lifecycle entry point
+    (get_attempt(), save_answer(), submit_attempt(), submit_module())
+    already makes and get_result() alone was missing — see the
+    corresponding real-PostgreSQL integration test
+    (tests/integration/test_sprint82_result_retrieval_expiration.py)
+    for the full expired-module scenario this wiring enables."""
+    mock_module_execution = MagicMock()
+    mock_module_execution.auto_finish_active_module_if_expired.return_value = None  # no-op: not actually expired
+    service_with_modules = AttemptService(
+        mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo,
+        module_execution_service=mock_module_execution,
+    )
+    user_id = uuid.uuid4()
+    # Must be an ACTIVE_STATUSES status ("in_progress") — both
+    # _auto_finish_if_expired() and _auto_finish_active_module_if_expired()
+    # short-circuit immediately for a non-active attempt (nothing left
+    # to auto-finish), so this call is only reachable while still active.
+    # With the mocked auto-finish being a no-op, the attempt correctly
+    # stays "in_progress" and get_result() still raises afterward —
+    # this test only asserts that the call itself happens.
+    attempt = MagicMock(
+        id=uuid.uuid4(), user_id=user_id, status="in_progress", expires_at=None,
+        score=0, percentage=0, question_order=[],
+    )
+    mock_repo.get_by_id.return_value = attempt
+
+    with pytest.raises(ResultNotAvailableException):
+        service_with_modules.get_result(attempt.id, user_id)
+
+    mock_module_execution.auto_finish_active_module_if_expired.assert_called_once_with(attempt)
 
 
 def test_result_computes_is_passed_correctly(service, mock_repo, mock_answer_repo, mock_test_repo):

@@ -19,6 +19,31 @@ real bug was that the losing side of a race would raise an UNHANDLED
 IntegrityError (a 500) instead of succeeding gracefully. Fixed by
 AnswerRepository.upsert(), a single atomic INSERT ... ON CONFLICT DO
 UPDATE against that exact constraint.
+
+Sprint 82 update (Package 1 interaction): save_answer() now calls
+self._lock_attempt(attempt) — a real `SELECT ... FOR UPDATE` against
+the attempt row — BEFORE it ever reaches the answer-repo write step
+this test used to synchronize on. That made the original
+_WriteSyncedAnswerRepository barrier (synced at the write statement)
+produce a real deadlock: the lock-winning thread would acquire the
+attempt's row lock and then block on the barrier waiting for the
+lock-losing thread, which could never arrive at that barrier because
+it was itself blocked at the Postgres level waiting for the winner's
+lock to release — confirmed directly: the losing thread's `SELECT ...
+FOR UPDATE` sat for the full 10s barrier timeout, then both threads
+rolled back with a BrokenBarrierError, caught by this test's generic
+`except Exception` as an "ERROR" outcome.
+
+Fixed here by moving the synchronization point to match the new real
+earliest contention point for two concurrent save_answer() calls on
+the same attempt: the attempt-row lock itself, exactly mirroring
+test_sprint59_attempt_finalize_race_condition.py's and
+test_sprint82_answer_saving_attempt_finalize_race.py's own
+_LockSyncedAttemptRepository technique (wait on the barrier
+immediately BEFORE issuing the real locked SELECT, never after a
+write). This keeps the test's original intent — prove exactly one
+Answer row results, no unhandled error — fully intact, now compatible
+with Package 1's new lock ordering.
 """
 import threading
 import uuid
@@ -40,65 +65,55 @@ from app.modules.tests.repository import TestRepository
 from app.modules.users.models import User, UserStatus
 
 
-def _make_service(session, answer_repo: AnswerRepository | None = None) -> AttemptService:
+def _make_service(session, attempt_repo: AttemptRepository | None = None) -> AttemptService:
     return AttemptService(
-        AttemptRepository(session), answer_repo if answer_repo is not None else AnswerRepository(session),
+        attempt_repo if attempt_repo is not None else AttemptRepository(session), AnswerRepository(session),
         TestRepository(session), QuestionRepository(session), OptionRepository(session),
     )
 
 
-class _WriteSyncedAnswerRepository(AnswerRepository):
+class _LockSyncedAttemptRepository(AttemptRepository):
     """Test-only synchronization aid — never used by application code.
 
-    Review finding: real Postgres round-trips on this host are fast
-    enough (sub-millisecond) that two threads simply started together
-    (`t1.start(); t2.start()`), or even released together from a
-    barrier placed BEFORE `save_answer()` is called, do not reliably
-    overlap — one thread can run its entire request to completion
-    before the other issues its first query, especially once SQL echo
-    logging (which was accidentally adding GIL-yielding I/O and masking
-    this) is off, as it is in the real test suite (`echo=settings.DEBUG`,
-    False under pytest). Verified: an outer start-barrier reproduced the
-    pre-fix IntegrityError in ~90% of manual runs with echo logging on,
-    but 0/5 with it off — not a reliable, deterministic proof.
+    Review finding (original Sprint 58 version of this test): real
+    Postgres round-trips on this host are fast enough (sub-millisecond)
+    that two threads simply started together (`t1.start(); t2.start()`),
+    or even released together from a barrier placed BEFORE
+    `save_answer()` is called, do not reliably overlap — one thread can
+    run its entire request to completion before the other issues its
+    first query, especially once SQL echo logging (which was
+    accidentally adding GIL-yielding I/O and masking this) is off, as it
+    is in the real test suite (`echo=settings.DEBUG`, False under
+    pytest).
 
-    This repository waits on a shared 2-party `threading.Barrier`
-    immediately BEFORE issuing the actual write statement — inside
-    `create()`/`update()` (the old check-then-act's write step) and
-    inside `upsert()` (the fix's atomic write step) — so both threads'
-    write attempts are forced to hit Postgres at essentially the same
-    instant regardless of host scheduling or logging. It never waits
-    AFTER a write (`get()` is left unmodified, including the plain
-    `get()` call `upsert()` itself makes once its write has already
-    landed): waiting post-write would deadlock, since the loser's write
-    blocks inside Postgres until the winner commits, and the winner
-    can't reach its own commit (in AttemptService.save_answer(), after
-    upsert() returns) until it passes a wait that requires the loser to
-    also arrive — which it never will while still blocked at the DB
-    level. Verified empirically: 10/10 reproductions of the pre-fix
-    IntegrityError, 20/20 clean successes (no deadlock, no hang) against
-    the fixed code, all with SQL echo off — the same conditions as a
-    real `pytest` run."""
+    Sprint 82 update: since AttemptService.save_answer() now calls
+    self._lock_attempt(attempt) (a real `SELECT ... FOR UPDATE`) BEFORE
+    it ever reaches the answer-repo write step, that write step is no
+    longer the earliest point where two concurrent save_answer() calls
+    on the same attempt actually contend — the attempt-row lock
+    acquisition is. Synchronizing at the OLD (write) point now deadlocks
+    on this host, the way to actually understand this is: the
+    lock-winning thread would acquire the real Postgres row lock,
+    continue to the write step, and then block on this test's own
+    barrier waiting for the lock-losing thread — which can never arrive
+    there because it's still blocked at the DB level waiting for the
+    winner's lock to release. Moving the barrier to wait immediately
+    BEFORE the real locked SELECT (this class, identical technique to
+    test_sprint59_attempt_finalize_race_condition.py's and
+    test_sprint82_answer_saving_attempt_finalize_race.py's own
+    _LockSyncedAttemptRepository) forces both threads' lock requests to
+    hit Postgres at essentially the same instant, with no wait of any
+    kind after a write — so there is no deadlock risk: the lock loser
+    simply queues at the real Postgres row lock (resolved in finite
+    time, exactly as it would in production) while the winner proceeds
+    all the way through its own commit."""
 
     barrier: threading.Barrier | None = None
 
-    def _wait_before_write(self) -> None:
+    def get_by_id_locked(self, attempt_id: uuid.UUID) -> TestAttempt | None:
         if self.barrier is not None:
             self.barrier.wait(timeout=10)
-
-    def create(self, answer: Answer) -> Answer:
-        self._wait_before_write()
-        return super().create(answer)
-
-    def update(self, answer: Answer, data: dict) -> Answer:
-        self._wait_before_write()
-        return super().update(answer, data)
-
-    def upsert(self, attempt_id: uuid.UUID, question_id: uuid.UUID, values: dict) -> Answer:
-        self._wait_before_write()
-        # Delegate to the real, unmodified upsert() logic — its own
-        # internal get() (called AFTER the write) must not wait again.
-        return AnswerRepository.upsert(self, attempt_id, question_id, values)
+        return super().get_by_id_locked(attempt_id)
 
 
 # --- TEST A: true concurrent identical answer requests ---
@@ -159,20 +174,21 @@ def test_concurrent_identical_answer_requests_produce_exactly_one_row():
     # Review finding: neither bare t1.start()/t2.start() nor a barrier
     # placed before save_answer() reliably overlaps on this host once
     # SQL echo logging is off (the real pytest condition — echo is tied
-    # to settings.DEBUG) — see _WriteSyncedAnswerRepository's docstring
-    # for the measurements. Synchronizing immediately before the actual
-    # write statement (inside create()/update()/upsert(), never after)
-    # forces a genuine, deterministic overlap without any deadlock risk.
-    write_barrier = threading.Barrier(2)
+    # to settings.DEBUG). Sprint 82: synchronizing at the attempt-row
+    # lock acquisition (see _LockSyncedAttemptRepository's docstring) is
+    # now the correct point — it's the earliest real contention point
+    # for two concurrent save_answer() calls on the same attempt, and
+    # waiting there (never after a write) carries no deadlock risk.
+    lock_barrier = threading.Barrier(2)
 
-    def _synced_repo(session) -> _WriteSyncedAnswerRepository:
-        repo = _WriteSyncedAnswerRepository(session)
-        repo.barrier = write_barrier
+    def _synced_repo(session) -> _LockSyncedAttemptRepository:
+        repo = _LockSyncedAttemptRepository(session)
+        repo.barrier = lock_barrier
         return repo
 
     def worker(name: str):
         s = Session()
-        svc = _make_service(s, answer_repo=_synced_repo(s))
+        svc = _make_service(s, attempt_repo=_synced_repo(s))
         try:
             svc.save_answer(attempt_id, student_id, question_id, selected_option=correct_option_id)
             outcomes[name] = ("OK", None)

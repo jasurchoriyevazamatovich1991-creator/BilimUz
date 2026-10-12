@@ -24,7 +24,32 @@
  * already-sanitized question_text/option_text/explanation/stimulus_text
  * string bleach always allowed through untouched (bleach has no
  * opinion on `$`), so this is a frontend-only, purely-additive
- * rendering capability. */
+ * rendering capability.
+ *
+ * Sprint 83 — formula matching is now scoped to text nodes only, never
+ * to tag markup/attributes. Before this sprint, FORMULA_PATTERN ran a
+ * single regex pass over the ENTIRE sanitized HTML string with no
+ * awareness of tag boundaries. The only attribute bleach's own
+ * allowlist (backend Sprint 32, RICH_TEXT_ALLOWED_ATTRIBUTES) ever lets
+ * through is `href` on `<a>` — and `$` is a perfectly ordinary,
+ * unescaped URL character bleach has no reason to strip. A single
+ * literal `$` inside an href (e.g. `<a href="https://x.com/$cheap">link
+ * </a> cost is $5 only$`) would pair with a LATER `$` elsewhere in the
+ * text, and the lazily-matched span between them — `$cheap">link</a>
+ * cost is $` — swallowed the attribute's closing quote, the tag's `>`,
+ * and the entire `<a>...</a>` element, handing that corrupted fragment
+ * to katex.renderToString() in place of real markup. Fixed by splitting
+ * the HTML on tag boundaries first (`html.split(/(<[^>]*>)/)` — a
+ * capturing split always alternates [text, tag, text, tag, ...], so
+ * tags land at odd indices and text at even indices) and only ever
+ * running FORMULA_PATTERN against the text segments; every tag segment
+ * (and therefore every attribute, including `href`) is passed through
+ * completely untouched, byte-for-byte. The one accepted behavioral
+ * narrowing: a formula can no longer span across a tag boundary (e.g.
+ * `$a<b>+</b>b$` split across an inline tag) — this was never a tested
+ * or documented convention, and refusing to bridge tag boundaries is
+ * the safe, minimal choice the task's "least invasive reliable fix"
+ * instruction calls for, over inventing a full HTML-aware parser. */
 import { useMemo } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -50,16 +75,32 @@ interface FormulaTextProps {
  * the whole question's rendering. */
 const FORMULA_PATTERN = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
 
+/** Splits sanitized HTML on tag boundaries (`<...>`). `String.split()`
+ * with a capturing group always alternates [text, tag, text, tag, ...,
+ * text] — tag segments land at odd indices, text segments at even
+ * indices — so callers can tell them apart by index parity alone,
+ * with no separate "is this a tag" check needed. */
+const TAG_SPLIT_PATTERN = /(<[^>]*>)/;
+
+function replaceFormula(match: string, blockFormula: string | undefined, inlineFormula: string | undefined): string {
+  const isBlock = blockFormula !== undefined;
+  const formula = isBlock ? blockFormula : (inlineFormula as string);
+  try {
+    return katex.renderToString(formula, { throwOnError: false, displayMode: isBlock });
+  } catch {
+    return match; // malformed LaTeX — show the raw delimited text rather than crashing
+  }
+}
+
 function renderWithFormulas(html: string): string {
-  return html.replace(FORMULA_PATTERN, (match, blockFormula: string | undefined, inlineFormula: string | undefined) => {
-    const isBlock = blockFormula !== undefined;
-    const formula = isBlock ? blockFormula : (inlineFormula as string);
-    try {
-      return katex.renderToString(formula, { throwOnError: false, displayMode: isBlock });
-    } catch {
-      return match; // malformed LaTeX — show the raw delimited text rather than crashing
-    }
-  });
+  // Sprint 83 — only text segments (even indices) are ever scanned for
+  // `$...$`/`$$...$$`; every tag segment (odd indices), attributes
+  // included, is passed through byte-for-byte untouched. See the
+  // module docstring above for the HTML-corruption bug this closes.
+  return html
+    .split(TAG_SPLIT_PATTERN)
+    .map((segment, index) => (index % 2 === 0 ? segment.replace(FORMULA_PATTERN, replaceFormula) : segment))
+    .join("");
 }
 
 export function FormulaText({ html, className }: FormulaTextProps) {

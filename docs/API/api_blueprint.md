@@ -160,13 +160,48 @@ Javobdagi `meta` obyekti: `{ "page": 1, "per_page": 20, "total": 143, "total_pag
 
 ## 8. Rate limiting
 
-| Endpoint turi | Limit |
-|---|---|
-| `/auth/login`, `/auth/register` | 5 so'rov / daqiqa / IP |
-| `/ai/*` | 20 so'rov / soat / foydalanuvchi |
-| Qolgan barchasi | 100 so'rov / daqiqa / foydalanuvchi |
+**Sprint 84 — Package 1 tuzatish**: quyidagi jadval haqiqiy
+implementatsiya bilan bevosita tekshirilib, mos keladigan qiymatlarga
+yangilandi (manba: `backend/app/modules/auth/constants.py`,
+`backend/app/modules/ai/constants.py`,
+`backend/app/modules/certificates/router.py`). Oldingi versiyada: (a)
+`/auth/register` uchun limit noto'g'ri (5 emas, 3) ko'rsatilgan edi,
+(b) `/ai/*` uchun soat/foydalanuvchi birligi noto'g'ri edi (haqiqiyi —
+daqiqa/foydalanuvchi), (c) "Qolgan barchasi" uchun 100 so'rov/daqiqa/
+foydalanuvchi degan GLOBAL limit hech qachon amalga oshirilmagan —
+`rate_limit()` faqat quyida sanab o'tilgan muayyan endpoint'larga
+qo'llanadi, boshqa hech bir endpoint'da (hatto oddiy IP asosida ham)
+umuman rate limit yo'q, va (d) `Retry-After` header hech qachon
+qaytarilmagan (`core/exceptions.py`'ning `app_exception_handler`'i
+faqat JSON tanasini qaytaradi, hech qanday maxsus header
+qo'shmaydi) — bu bo'lim shu uchta noaniqlikni tuzatadi, implementatsiya
+o'zgartirilmagan.
 
-Limit oshganda `429` + `Retry-After` header qaytadi.
+| Endpoint | Limit | Kalit |
+|---|---|---|
+| `POST /auth/register` | 3 so'rov / daqiqa | IP |
+| `POST /auth/login` | 5 so'rov / daqiqa | IP |
+| `POST /auth/verify` | 5 so'rov / daqiqa | IP |
+| `POST /auth/refresh` | 20 so'rov / daqiqa | IP |
+| `POST /auth/change-password` | 5 so'rov / daqiqa | IP |
+| `GET /certificates/verify/{code}` | 20 so'rov / daqiqa | IP |
+| `POST /ai/chats/{id}/messages` | 10 so'rov / daqiqa | foydalanuvchi (autentifikatsiyalangan) |
+| Boshqa barcha endpoint'lar | Hech qanday rate limit yo'q (hozircha) | — |
+
+Limit oshganda faqat `429` status kodi va standart xatolik envelope'i
+(`{success: false, message, data: null, errors}`) qaytadi — hech
+qanday `Retry-After` yoki boshqa maxsus header qo'shilmaydi.
+
+**Bilinadigan cheklov (yashirilmagan)**: barcha limitlar faqat so'rov
+yuboruvchining IP manzili bo'yicha hisoblanadi (bitta `ai/*` endpoint'i
+bundan mustasno — u autentifikatsiyalangan foydalanuvchi bo'yicha
+hisoblanadi). Hech bir auth endpoint so'rov tanasidagi identifikator
+(telefon/email) bo'yicha qo'shimcha cheklov qo'ymaydi — botnet orqali
+IP cheklovini aylanib o'tib, bitta qurbon hisobini cheksiz urinish
+bilan hujjum qilish nazariy jihatdan hali ham mumkin. Bu — ataylab
+qilingan, hujjatlashtirilgan qaror (qarang:
+`backend/app/modules/auth/README.md`'ning "Known deviation" va "Future
+improvements" bo'limlari), shu sprint doirasida o'zgartirilmagan.
 
 ## 9. Frontend integratsiya qoidasi
 

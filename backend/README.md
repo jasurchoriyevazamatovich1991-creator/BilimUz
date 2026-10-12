@@ -55,22 +55,37 @@ Har bir modulda odatda `router.py`, `service.py`, `repository.py`, `schemas.py` 
 
 ```bash
 # To'liq unit/mock-asoslangan to'plam — PostgreSQL/Redis talab qilinmaydi:
-python -m pytest app/ -q
+python -m pytest app/ scripts/ -q
 
-# Faqat ENVIRONMENT/secret-safety testlari (Sprint 81):
+# Faqat core/ testlari (ENVIRONMENT/secret-safety — Sprint 81; rate-limit
+# hujjat muvofiqligi, OpenAPI sxema generatsiyasi, Redis test-izolyatsiya
+# validatsiyasi — Sprint 84):
 python -m pytest app/core/tests/ -q
 
 # Real PostgreSQL integratsiya testlari — ALOHIDA, TEST_DATABASE_URL va
 # ishlab turgan PostgreSQL talab qiladi (DB nomi "_test" bilan tugashi shart,
-# conftest.py shuni tekshiradi):
+# conftest.py shuni tekshiradi). TEST_REDIS_URL — ixtiyoriy (Sprint 84):
+# berilsa, Redis-bog'liq testlar (masalan rate-limit) shu izolyatsiya
+# qilingan DB'ga yo'naltiriladi — DB indeksi 0/1 bo'lishi taqiqlanadi
+# (xavfsizlik gate, conftest.py):
 TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test \
+TEST_REDIS_URL=redis://localhost:6379/15 \
     python -m pytest tests/integration/ -q
+
+# OpenAPI sxema validatsiyasi (Sprint 84) — CI'da ham shu ishga tushadi,
+# PostgreSQL/Redis talab qilinmaydi:
+python -m pytest app/core/tests/test_openapi_schema_generation.py -q
 ```
 
-Bu sandbox muhitida (GitHub Release Preparation vazifasi doirasida) oxirgi marta ishga tushirilganda: `app/` ostidagi to'liq mock/unit to'plam — **608 passed** (shundan 28 tasi `app/core/tests/`da — ENVIRONMENT/secret-safety testlari). `tests/integration/` — PostgreSQL/Redis ishlab turmagani sababli bu muhitda ishga tushirilmagan; TEST_DATABASE_URL'ga ega ishlab turgan PostgreSQL mavjud bo'lsa, boshqa muhitda ishga tushiriladi.
+Bu sandbox muhitida (ushbu GitHub Release Preparation vazifasi doirasida, 2026-10-12'da) qayta tasdiqlangan, haqiqiy natijalar: `app/` ostidagi to'liq mock/unit to'plam — **629 passed, 1 skipped**; `app/ scripts/` birgalikda (yuqoridagi birinchi buyruq, to'liqroq) — **635 passed, 1 skipped** (shundan 42 tasi `app/core/tests/`da). `tests/integration/` — PostgreSQL va Redis ikkalasi ham ishlab turgan holda, `TEST_DATABASE_URL`/`TEST_REDIS_URL` bilan — **321 passed**. `1 skipped` — `TEST_REDIS_URL` berilmagan holatda qasddan skip qilinadigan bitta Redis-redirect tasdiqlash testi (Sprint 84), xato emas.
+
+## CI (Sprint 84)
+
+`../.github/workflows/openapi-schema-validation.yml` — `backend/**`ga tegishli push/PR'da yuqoridagi so'nggi buyruqni (`test_openapi_schema_generation.py`) ishga tushiradi. Bu **to'liq CI emas** — faqat OpenAPI sxemasi haqiqatan generatsiya qilinishini va to'g'ri JSON ekanligini tekshiradi; umumiy test to'plami, linting va build/deploy hamon qo'lda bajariladi.
 
 ## Xavfsizlik eslatmalari
 
 - `.env` faylini hech qachon commit qilmang (`.gitignore`da istisno qilingan).
 - `backend/.env.example` faqat xavfsiz placeholder qiymatlarni o'z ichiga oladi — haqiqiy secretlarni hech qachon bu faylga yoki boshqa versiyalanadigan joyga yozmang.
+- Rate limiting (`app/core/middleware/rate_limit.py`) — haqiqiy, tekshirilgan qiymatlar va bilingan cheklov (faqat IP, `ai/*`dan tashqari) uchun [`../docs/API/api_blueprint.md`](../docs/API/api_blueprint.md)ning 8-bo'limiga qarang (Sprint 84'da hujjat koddan qayta tekshirilib tuzatildi).
 - Production/staging'da standart secret qiymatlari bilan ishga tushirish ataylab bloklanadi — yuqoridagi "Sozlash" bo'limiga qarang.

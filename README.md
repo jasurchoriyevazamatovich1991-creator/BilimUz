@@ -92,7 +92,10 @@ BilimUz/
 │                                eski narrativ changelog), sprint arxitektura
 │                                hujjatlari, va `SPRINT_HISTORY.md` (sprint-by-sprint
 │                                to'liq holat arxivi — ilgari root README bo'lgan)
-├── .github/workflows/         — hozircha bo'sh (`.gitkeep` — real CI workflow yo'q)
+├── .github/workflows/         — `openapi-schema-validation.yml` (Sprint 84 — push/PR'da
+│                                backend/**'ga tegsa, OpenAPI sxemasi generatsiya qilinib
+│                                tekshiriladi; `.gitkeep` ham saqlanib qolgan, bo'limga
+│                                qarang 11-da)
 ├── docker-compose.yml          — Postgres + Redis + backend uchun local dev stack
 ├── nginx/, docker/, scripts/    — hozircha bo'sh (`.gitkeep`)
 ├── .gitignore
@@ -216,16 +219,22 @@ alembic revision -m "tasvir"
 
 ```bash
 # To'liq unit/mock-asoslangan test to'plami (PostgreSQL/Redis talab qilinmaydi):
-python -m pytest app/ -q
+python -m pytest app/ scripts/ -q
 
-# Faqat yangi ENVIRONMENT/secret-safety testlari:
+# Faqat core/ testlari (ENVIRONMENT/secret-safety, rate-limit hujjat
+# muvofiqligi, OpenAPI sxema generatsiyasi, Redis test-izolyatsiya
+# validatsiyasi — Sprint 81/84):
 python -m pytest app/core/tests/ -q
 
-# Real PostgreSQL integratsiya testlari (backend/tests/integration/) — ALOHIDA,
-# TEST_DATABASE_URL muhit o'zgaruvchisi va ishlab turgan PostgreSQL talab qiladi
-# (ma'lumotlar bazasi nomi "_test" bilan tugashi shart — backend/conftest.py
-# shuni tekshiradi):
+# Real PostgreSQL (va, agar rate-limit/Redis-bog'liq testlar kerak bo'lsa,
+# Redis) integratsiya testlari (backend/tests/integration/) — ALOHIDA,
+# TEST_DATABASE_URL muhit o'zgaruvchisi va ishlab turgan PostgreSQL talab
+# qiladi (ma'lumotlar bazasi nomi "_test" bilan tugashi shart —
+# backend/conftest.py shuni tekshiradi). TEST_REDIS_URL — ixtiyoriy (Sprint
+# 84): berilmasa, Redis-bog'liq testlar odatdagi REDIS_URL'ga ulanadi;
+# berilsa, DB indeksi 0/1 bo'lmasligi shart (xavfsizlik gate) — masalan:
 TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test \
+TEST_REDIS_URL=redis://localhost:6379/15 \
     python -m pytest tests/integration/ -q
 ```
 
@@ -240,7 +249,7 @@ npm run lint            # ESLint
 ## 11. Production deployment bo'yicha mavjud cheklovlar
 
 - `docker/`, `nginx/`, root-darajadagi `scripts/` papkalari hozircha **bo'sh** (faqat `.gitkeep`) — production uchun reverse-proxy konfiguratsiyasi, deployment skriptlari hali yozilmagan.
-- `.github/workflows/` bo'sh (faqat `.gitkeep`) — **haqiqiy CI/CD workflow mavjud emas**. Testlar va linting hozircha faqat qo'lda ishga tushiriladi.
+- `.github/workflows/openapi-schema-validation.yml` (Sprint 84) — backend'ga tegishli push/PR'da `app.openapi()` orqali OpenAPI sxemasi haqiqatan generatsiya qilinishini va to'g'ri, serializable JSON ekanligini tekshiradi (PostgreSQL/Redis talab qilinmaydi). **Bu to'liq CI/CD emas** — faqat shu bitta tor tekshiruv; testlarning umumiy to'plami, linting, build/deploy hamon avtomatlashtirilmagan, qo'lda ishga tushiriladi (10-bo'limga qarang).
 - `docker-compose.yml` faqat **local development** stacki — production-darajadagi Compose/Kubernetes konfiguratsiyasi (resurs limitlari, health-check'lar, secret boshqaruvi, TLS) alohida tayyorlanishi kerak.
 - `ENVIRONMENT=production` (yoki `staging`) bilan ishga tushirishda, agar `JWT_SECRET_KEY` yoki `FILE_ENCRYPTION_KEY` (va `STORAGE_BACKEND=r2` bo'lsa, `R2_*` qiymatlari) standart (`CHANGE_ME_IN_PRODUCTION...`) qiymatda qolsa — backend ishga tushishni **rad etadi** (fail-closed xavfsizlik tekshiruvi, 8-bo'limga qarang). Bu — real production checklist emas, faqat eng kritik secret-default tekshiruvi.
 - Xalqaro standartlashtirilgan imtihonlar (IELTS/SAT/GRE) uchun maxsus javob turlari va band/scaled-score konversiyasi hali amalga oshirilmagan.
@@ -255,6 +264,8 @@ npm run lint            # ESLint
 - `settings` moduli maxfiy maydonlarni Fernet (`FILE_ENCRYPTION_KEY`) bilan shifrlangan holda saqlaydi.
 - Production/staging muhitida standart (CHANGE_ME) secret qiymatlari bilan ishga tushirish fail-closed tarzda bloklanadi (11-bo'limga qarang).
 - Rich-text kiritish maydonlari (savol matni, variant matni, izoh, guruh stimulus matni) `bleach` allowlist-sanitizatsiyasidan o'tadi — XSS'ga qarshi.
+- LaTeX formula rendering (`frontend/.../FormulaText.tsx`, KaTeX) — Sprint 83: formula regex'i endi faqat HTML teglar ORASIDAGI matn segmentlariga qo'llaniladi, hech qachon teg/atribut ichiga emas (masalan, `<a href="...$...">` ichidagi `$` endi tegning o'zini buzib yubormaydi).
+- Rate limiting — Redis fixed-window, faqat muayyan auth/certificate/ai endpointlarida (IP yoki foydalanuvchi bo'yicha), global emas; haqiqiy, tekshirilgan qiymatlar va bilingan cheklov uchun [`docs/API/api_blueprint.md`](docs/API/api_blueprint.md)ning 8-bo'limiga qarang (Sprint 84'da hujjat haqiqiy koddan qayta tekshirilib tuzatildi).
 - Repository'da `git ls-files` orqali tasdiqlangan: hech qanday `.env` fayli (root, backend yoki frontend) git tomonidan kuzatilmaydi — bu xavf hozircha yo'q.
 
 ## 13. Litsenziya

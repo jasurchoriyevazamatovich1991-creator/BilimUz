@@ -251,6 +251,32 @@ class AttemptService:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
         self._auto_finish_active_module_if_expired(attempt)
+
+        # Sprint 82 — Package 1 (answer-saving concurrency). Lock the
+        # attempt row BEFORE the active-status check and the answer
+        # upsert below — the same "lock BEFORE the active-status check"
+        # convention _lock_attempt() already documents and every other
+        # finalize-triggering call site in this file already follows
+        # (submit_attempt(), _auto_finish_if_expired(),
+        # _auto_finish_active_module_if_expired(), submit_module()'s
+        # final-module branch). save_answer() was the one entry point
+        # that still read the attempt via the unlocked
+        # _get_owned_attempt() path and never re-checked under a lock,
+        # so a concurrent submit_attempt()/submit_module()/auto-finish
+        # (in a different DB session/transaction) could finalize and
+        # commit AFTER this method's own unlocked status check passed
+        # but BEFORE its answer_repo.upsert()+commit() below — silently
+        # persisting an Answer against an attempt that was already
+        # scored, which the already-committed score/percentage would
+        # never reflect. Each AnswerRepository.upsert() call for a
+        # single (attempt_id, question_id) pair was already atomic
+        # (Sprint 58 — INSERT ... ON CONFLICT DO UPDATE), so that part
+        # was never the problem; this closes the attempt-status race,
+        # not the per-row write race. Only this one attempt's row is
+        # locked (keyed by its own primary key), so concurrent
+        # save_answer calls for a DIFFERENT attempt are never affected
+        # — this does not serialize unrelated attempts.
+        attempt = self._lock_attempt(attempt)
         if attempt.status not in ACTIVE_STATUSES:
             raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
         if question_id not in (attempt.question_order or []):
@@ -337,6 +363,33 @@ class AttemptService:
     def get_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> SubmitResultOut:
         attempt = self._get_owned_attempt(attempt_id, user_id)
         self._auto_finish_if_expired(attempt)
+        # Sprint 82 — Package 2 (result retrieval and expiration). This
+        # call was missing here — every other attempt-lifecycle entry
+        # point (get_attempt(), save_answer(), submit_attempt(),
+        # submit_module()) already calls both
+        # _auto_finish_if_expired() (whole-attempt expiry) AND
+        # _auto_finish_active_module_if_expired() (per-module expiry,
+        # Sprint 79) before doing anything else. get_result() only had
+        # the first. For a modular test whose active module's own
+        # (shorter) expires_at has passed while the whole-attempt
+        # Test.duration/TestAttempt.expires_at has NOT — the normal
+        # configuration for a modular test, see Sprint 79's own CRITICAL
+        # finding — _auto_finish_if_expired() alone is a no-op (the
+        # whole-attempt deadline genuinely hasn't passed), so the
+        # attempt stayed ACTIVE_STATUSES forever unless some OTHER
+        # endpoint happened to be called first to trigger the
+        # module-level check. A student who only ever polled
+        # GET /attempts/{id}/result would see "natija hali tayyor emas"
+        # (ResultNotAvailableException) indefinitely, even though the
+        # exact same expired attempt would have been correctly
+        # auto-finished by a GET /attempts/{id} call instead — an
+        # inconsistency between two read endpoints for the same
+        # underlying state. Reusing the existing, already-idempotent
+        # method (a no-op when there is no active module or it has not
+        # actually expired — see its own docstring) means repeated
+        # get_result() calls remain safe with no duplicate side effects,
+        # exactly as they already were for _auto_finish_if_expired().
+        self._auto_finish_active_module_if_expired(attempt)
         if attempt.status in ACTIVE_STATUSES:
             raise ResultNotAvailableException("Urinish hali yakunlanmagan")
         return self._build_result(attempt)

@@ -1,0 +1,64 @@
+# Sprint 84 — Package 3 (OpenAPI contract validation in CI).
+#
+# Audit finding: this repository had no CI workflow at all (only an
+# empty .github/workflows/.gitkeep placeholder) and nothing anywhere
+# validated that the FastAPI application's OpenAPI schema could even
+# be generated — confirmed by a repo-wide search before this change.
+# This is the smallest focused addition for that gap: it runs the
+# regression tests added in
+# backend/app/core/tests/test_openapi_schema_generation.py, which call
+# the application's own `app.openapi()` (its actual entry point, the
+# same object FastAPI serves at /api/v1/openapi.json) and assert the
+# result is valid, serializable JSON with the expected shape.
+#
+# Deliberately requires no PostgreSQL or Redis service: generating the
+# OpenAPI schema is pure route/Pydantic-model introspection and never
+# opens a live connection to either (verified directly — see that test
+# file's own module docstring, and re-confirmed with both services
+# stopped before this workflow was written). Only `ENVIRONMENT` needs
+# to be set, since Settings() requires it with no default (Sprint 81);
+# every other setting already has a safe default.
+#
+# This workflow intentionally does nothing beyond Package 3's stated
+# scope — no broader test suite, no lint/build step, no deployment —
+# so it does not stand in for the project's actual CI needs, only
+# closes this one previously-unvalidated gap.
+name: OpenAPI Schema Validation
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/openapi-schema-validation.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/openapi-schema-validation.yml"
+
+jobs:
+  validate-openapi-schema:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Matches backend/.env.example and docker-compose.yml's own
+      # ENVIRONMENT=development — required because Settings.ENVIRONMENT
+      # has no default (Sprint 81 Package 1 Follow-up). No other
+      # setting needs a value here: everything else in Settings already
+      # has a safe default, and generating the OpenAPI schema never
+      # reaches a database or cache connection.
+      ENVIRONMENT: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches backend/Dockerfile's python:3.13-slim base image.
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate and validate the OpenAPI schema
+        run: pytest app/core/tests/test_openapi_schema_generation.py -v

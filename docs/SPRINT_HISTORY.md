@@ -165,3 +165,11 @@ To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-
 | Student/Teacher/Admin | Student — to'liq oqim (Video, Progress, Results History, Result Analysis, Certificate, `multiple_choice` va `short_answer`/`essay` attempt UI); Teacher — kontent yaratadi (media UI yo'q); Admin — to'liq |
 
 Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
+
+---
+
+**Addendum (GitHub Release Preparation vazifasi, 2026-10-12)**: yuqoridagi batafsil sprint-by-sprint bayoni Sprint 80/74'da to'xtaydi — Sprint 81–84 bu faylga hali qo'shilmagan (ushbu paketlash/hujjatlashtirish vazifasi doirasida bu uzun tarixiy bayonni to'liq qayta yozish ataylab amalga oshirilmadi, chunki bu yangi development sprint hajmidagi ish bo'lardi). Sprint 81–84'da nima o'zgargani uchun quyidagilarga qarang:
+- **Sprint 81** — `ENVIRONMENT`ni majburiy qilish va production/staging'da standart secret qiymatlari bilan ishga tushirishni bloklash: [`backend/README.md`](../backend/README.md)ning "Sozlash" bo'limi, [`README.md`](../README.md)ning 12-bo'limi ("Xavfsizlik va maxfiy ma'lumotlar").
+- **Sprint 82** — javob saqlash concurrency va adaptiv routing tuzatishlari: `backend/tests/integration/test_sprint58_answer_race_condition.py`.
+- **Sprint 83** — `FormulaText` HTML-teg xavfsizligi tuzatishi: [`frontend/README.md`](../frontend/README.md)ning "Ma'lum xususiyatlar (Sprint 83)" bo'limi, `frontend/src/components/questions/FormulaText.tsx`.
+- **Sprint 84** — rate-limit hujjat muvofiqligi, Redis test-izolyatsiyasi, OpenAPI sxema CI validatsiyasi: [`docs/API/api_blueprint.md`](API/api_blueprint.md)ning 8-bo'limi, [`backend/README.md`](../backend/README.md)ning "Testlash"/"CI (Sprint 84)" bo'limlari.
