@@ -7,6 +7,7 @@
  * backend response shape (see README note below), not a mock.
  */
 import { httpClient, unwrap } from "./client";
+import { readCsrfCookie } from "@/utils/csrfCookie";
 
 export interface RegisterRequest {
   first_name: string;
@@ -40,9 +41,15 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface TokenPair {
+export interface AccessTokenOut {
   access_token: string;
-  refresh_token: string;
+  /**
+   * Sprint 86: deliberately no `refresh_token` field here any more — the
+   * backend (auth/schemas.py's AccessTokenOut) no longer puts it in the
+   * response body at all. It travels only via the HttpOnly `refresh_token`
+   * cookie the backend sets directly; this frontend type simply has no
+   * way to represent a value it will never receive.
+   */
   token_type: string;
 }
 
@@ -69,11 +76,21 @@ export const authApi = {
 
   verify: (data: VerifyRequest) => unwrap<UserPublic>(httpClient.post("/auth/verify", data)),
 
-  login: (data: LoginRequest) => unwrap<TokenPair>(httpClient.post("/auth/login", data)),
+  login: (data: LoginRequest) => unwrap<AccessTokenOut>(httpClient.post("/auth/login", data)),
 
-  refresh: (refresh_token: string) => unwrap<TokenPair>(httpClient.post("/auth/refresh", { refresh_token })),
+  /**
+   * Sprint 86: no longer takes a refresh_token argument — the backend
+   * now reads it from the HttpOnly cookie the browser attaches
+   * automatically (httpClient is configured with withCredentials: true,
+   * see ./client.ts), not from a request body (there is no value here
+   * to put in one any more). The CSRF header is attached the same way.
+   */
+  refresh: () =>
+    unwrap<AccessTokenOut>(
+      httpClient.post("/auth/refresh", null, { headers: { "X-CSRF-Token": readCsrfCookie() ?? "" } }),
+    ),
 
-  logout: (refresh_token: string) => httpClient.post("/auth/logout", { refresh_token }),
+  logout: () => httpClient.post("/auth/logout", null, { headers: { "X-CSRF-Token": readCsrfCookie() ?? "" } }),
 
   me: () => unwrap<UserPublic>(httpClient.get("/auth/me")),
 };

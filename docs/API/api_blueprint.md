@@ -57,17 +57,44 @@ Har bir javob bir xil "konvert" ichida keladi — frontend har doim bir xil stru
 ```
 POST /auth/register        → ro'yxatdan o'tish (telefon/email + parol)
 POST /auth/verify           → SMS/email kodni tasdiqlash
-POST /auth/login             → access_token (15 daq) + refresh_token (30 kun)
-POST /auth/refresh            → yangi access_token
-POST /auth/logout              → sessiyani bekor qilish
-POST /auth/password/forgot      → parolni tiklash kodi yuborish
-POST /auth/password/reset        → yangi parol o'rnatish
+POST /auth/login             → access_token (15 daq) JSON'da + refresh_token (30 kun) HttpOnly cookie'da
+POST /auth/refresh            → yangi access_token (cookie'dagi refresh_token asosida, rotatsiya bilan)
+POST /auth/logout              → sessiyani bekor qilish + cookie'larni tozalash
 GET  /auth/me                     → joriy foydalanuvchi ma'lumoti
 ```
 
-Frontend `access_token`ni xotirada (memory/state) saqlaydi, `refresh_token`ni httpOnly cookie orqali oladi — XSS xavfini kamaytirish uchun localStorage'da JWT saqlanmaydi.
+**Sprint 86 — refresh token endi HttpOnly cookie orqali**: avvalgi versiyada bu hujjat `refresh_token`
+HttpOnly cookie orqali uzatiladi deb da'vo qilgan edi, lekin haqiqiy implementatsiya uni oddiy JSON
+maydonida qaytarar va frontend uni `localStorage`da saqlar edi (`frontend/src/store/authStore.ts`,
+o'sha paytdagi kod sharhida ataylab qabul qilingan xavf sifatida belgilangan). Sprint 86 shu
+nomuvofiqlikni implementatsiyani hujjatga moslashtirish orqali emas, balki haqiqatan ham HttpOnly
+cookie oqimini qurish orqali yopdi:
 
-**401 kelganda**: `apiClient.ts` avtomatik `/auth/refresh`ni chaqiradi, muvaffaqiyatli bo'lsa so'rovni qaytadan yuboradi; muvaffaqiyatsiz bo'lsa foydalanuvchini login sahifasiga yo'naltiradi.
+- `POST /auth/login` va `POST /auth/refresh` javob tanasida (`data`) endi **faqat** `access_token` va
+  `token_type` bor — `refresh_token` maydoni butunlay olib tashlandi, uni frontend hech qachon o'qiy
+  olmaydi.
+- Refresh token ikkita `Set-Cookie` orqali yetkaziladi: `refresh_token` (HttpOnly, `Path=/api/v1/auth`,
+  `Max-Age`=`REFRESH_TOKEN_EXPIRE_DAYS`, `SameSite` — sozlanadigan, standart `Lax`, `Secure` — faqat
+  `ENVIRONMENT != development`da) va `csrf_token` (HttpOnly **emas**, `Path=/`, xuddi shu muddat/SameSite/
+  Secure) — ikkinchisi frontend uchun ataylab o'qilishi mumkin qilib qo'yilgan (quyiga qarang).
+- `POST /auth/refresh` va `POST /auth/logout` endi **CSRF himoyasi** bilan: so'rov `X-CSRF-Token`
+  header'ini `csrf_token` cookie qiymati bilan aynan bir xil holda yuborishi shart (double-submit
+  pattern, `backend/app/core/security/csrf.py`) — mos kelmasa yoki yo'q bo'lsa `403`. `HttpOnly` o'zi
+  CSRF himoyasi emasligi aniq hisobga olingan — brauzer `refresh_token` cookie'ni forged cross-site
+  so'rovga ham avtomatik qo'shib yuboradi, shuning uchun bu ikkinchi, mustaqil tekshiruv kerak.
+- Bu — **moslik nuqtai nazaridan buzuvchi o'zgarish**: `refresh_token`ni javob tanasidan o'qiydigan
+  har qanday eski/tashqi klient (frontenddan tashqari) endi ishlamaydi. Ushbu repository ichida
+  frontend bilan bir vaqtda yangilandi (`frontend/src/api/auth.ts`, `api/client.ts`, `store/authStore.ts`).
+- Batafsil: `backend/README.md`ning "Sprint 86" bo'limi va `backend/app/core/security/cookies.py`/`csrf.py`
+  modullarining o'z hujjat-izohlari (turli domenlarda joylashtirish uchun `REFRESH_TOKEN_COOKIE_DOMAIN`/
+  `SAMESITE` sozlamalari bilan birga).
+
+Frontend `access_token`ni xotirada/`localStorage`da (Zustand `persist`) saqlaydi — bu o'zgarmadi, chunki
+u qisqa muddatli (15 daqiqa); faqat `refresh_token` frontend state'idan butunlay olib tashlandi.
+
+**401 kelganda**: `apiClient.ts` avtomatik `/auth/refresh`ni chaqiradi (cookie avtomatik yuboriladi,
+`X-CSRF-Token` `csrf_token` cookie'dan o'qib qo'shiladi), muvaffaqiyatli bo'lsa so'rovni qaytadan
+yuboradi; muvaffaqiyatsiz bo'lsa foydalanuvchini login sahifasiga yo'naltiradi.
 
 ## 5. Modul bo'yicha endpointlar
 

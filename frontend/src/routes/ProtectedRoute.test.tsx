@@ -31,7 +31,7 @@ describe("ProtectedRoute", () => {
   });
 
   it("renders the protected content when the user's role matches the allowed panel", () => {
-    useAuthStore.getState().setTokens("access", "refresh");
+    useAuthStore.getState().setAccessToken("access");
     useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Admin" });
 
     renderWithRoute("admin");
@@ -39,7 +39,7 @@ describe("ProtectedRoute", () => {
   });
 
   it("redirects to the user's OWN panel when their role doesn't match — never a blank screen", () => {
-    useAuthStore.getState().setTokens("access", "refresh");
+    useAuthStore.getState().setAccessToken("access");
     useAuthStore.getState().setUser({ id: "1", first_name: "A", last_name: "B", phone: null, email: null, role: "Teacher" });
 
     renderWithRoute("admin"); // Teacher trying to access an admin-only route

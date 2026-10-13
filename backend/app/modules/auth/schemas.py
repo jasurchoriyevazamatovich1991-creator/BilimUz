@@ -36,7 +36,24 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
+    """Unused by the router as of Sprint 86 (the refresh token now travels
+    via an HttpOnly cookie, never a request body — see
+    core/security/cookies.py). Left defined, not deleted, since nothing
+    else in this sprint's scope requires removing it and a future
+    non-browser client (CLI, mobile app without cookie support) could
+    still legitimately want a body-based refresh contract."""
     refresh_token: str
+
+
+class AccessTokenOut(BaseModel):
+    """Sprint 86 — the login/refresh response body. Deliberately has NO
+    refresh_token field: that value now travels only via the HttpOnly
+    `refresh_token` cookie (see core/security/cookies.py), never in a
+    response body a script could read. This is a breaking change to the
+    previous TokenPair-shaped response — see backend/README.md's Sprint
+    86 section for the frontend/backend coordination this requires."""
+    access_token: str
+    token_type: str = "bearer"
 
 
 class ChangePasswordRequest(BaseModel):

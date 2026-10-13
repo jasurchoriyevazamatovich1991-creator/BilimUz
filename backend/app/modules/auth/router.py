@@ -4,10 +4,14 @@ delegates to AuthService, wraps the result in the standard envelope.
 No business logic lives here. Brute-forceable endpoints (register, login,
 verify) carry a Redis-backed rate limit per Security Engineer policy.
 """
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 
+from app.core.config import Settings, get_settings
+from app.core.exceptions import InvalidTokenException
 from app.core.middleware.rate_limit import rate_limit
 from app.core.schemas import success_response
+from app.core.security.cookies import clear_refresh_token_cookies, set_refresh_token_cookies
+from app.core.security.csrf import verify_csrf_token
 from app.core.security.dependencies import get_jwt_service, get_password_service
 from app.core.security.jwt_service import JWTService
 from app.core.security.password_service import PasswordService
@@ -21,9 +25,9 @@ from app.modules.auth.constants import (
 from app.modules.auth.dependencies import get_auth_repository, get_current_user
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import (
+    AccessTokenOut,
     ChangePasswordRequest,
     LoginRequest,
-    RefreshRequest,
     RegisterRequest,
     UserPublic,
     VerifyRequest,
@@ -62,23 +66,70 @@ def verify(data: VerifyRequest, service: AuthService = Depends(get_auth_service)
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", *LOGIN_RATE_LIMIT))])
-def login(data: LoginRequest, request: Request, service: AuthService = Depends(get_auth_service)):
+def login(
+    data: LoginRequest,
+    request: Request,
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+):
     tokens = service.login(
         data.identifier, data.password, request.client.host if request.client else None,
         request.headers.get("user-agent"),
     )
-    return success_response(tokens, "Tizimga muvaffaqiyatli kirdingiz.")
+    # Sprint 86: the refresh token is delivered ONLY via the HttpOnly
+    # cookie below — it is never present in this JSON response body (see
+    # auth/schemas.py's AccessTokenOut). Frontend JavaScript cannot read
+    # it, by design.
+    set_refresh_token_cookies(response, settings, tokens.refresh_token)
+    return success_response(
+        AccessTokenOut(access_token=tokens.access_token, token_type=tokens.token_type),
+        "Tizimga muvaffaqiyatli kirdingiz.",
+    )
 
 
-@router.post("/refresh", dependencies=[Depends(rate_limit("refresh", *REFRESH_RATE_LIMIT))])
-def refresh(data: RefreshRequest, service: AuthService = Depends(get_auth_service)):
-    tokens = service.refresh(data.refresh_token)
-    return success_response(tokens, "Token yangilandi.")
+@router.post(
+    "/refresh",
+    dependencies=[Depends(rate_limit("refresh", *REFRESH_RATE_LIMIT)), Depends(verify_csrf_token)],
+)
+def refresh(
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+    refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
+):
+    # Sprint 86: the refresh token now comes from the HttpOnly cookie, not
+    # a request body — a browser-based client can no longer supply one at
+    # all (it was never readable), and a missing cookie is handled the
+    # same way an invalid one always was (InvalidTokenException → 401),
+    # not as a silent no-op.
+    if not refresh_token:
+        raise InvalidTokenException("Refresh token topilmadi")
+    tokens = service.refresh(refresh_token)
+    set_refresh_token_cookies(response, settings, tokens.refresh_token)
+    return success_response(
+        AccessTokenOut(access_token=tokens.access_token, token_type=tokens.token_type),
+        "Token yangilandi.",
+    )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(data: RefreshRequest, service: AuthService = Depends(get_auth_service)):
-    service.logout(data.refresh_token)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(verify_csrf_token)],
+)
+def logout(
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+    refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
+):
+    # Idempotent, same as before Sprint 86: a missing/already-invalid
+    # cookie is not an error — service.logout() already treats an
+    # undecodable token as "nothing to revoke" (see auth/service.py).
+    if refresh_token:
+        service.logout(refresh_token)
+    clear_refresh_token_cookies(response, settings)
 
 
 @router.post("/logout-all")

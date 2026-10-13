@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, unwrap, type ApiEnvelope } from "./client";
+import { ApiError, httpClient, unwrap, type ApiEnvelope } from "./client";
+
+describe("httpClient", () => {
+  it("sends credentials (cookies) on every request — required for the HttpOnly refresh_token / csrf_token cookies (Sprint 86)", () => {
+    expect(httpClient.defaults.withCredentials).toBe(true);
+  });
+});
 
 describe("unwrap", () => {
   it("returns the data field from a successful envelope", async () => {

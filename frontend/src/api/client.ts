@@ -12,6 +12,7 @@
  */
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
+import { readCsrfCookie } from "@/utils/csrfCookie";
 
 // The backend's own ALLOWED_ORIGINS (core/config.py) defaults to this
 // dev port — kept in an env var so production deploys don't hardcode it.
@@ -39,6 +40,14 @@ export class ApiError extends Error {
 export const httpClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
+  // Sprint 86: required for the browser to send/receive the HttpOnly
+  // refresh_token cookie and the readable csrf_token cookie at all —
+  // without this, axios/fetch silently drops cookies on a cross-origin
+  // request (frontend:5173 -> backend:8000 counts as cross-origin even
+  // though they share a cookie jar). The backend's CORS config already
+  // sets allow_credentials=True with an explicit origin allow-list
+  // (never "*") to match — see app/main.py.
+  withCredentials: true,
 });
 
 // --- Request interceptor: attach the access token ---
@@ -57,23 +66,36 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 let refreshPromise: Promise<string> | null = null;
 
 async function performRefresh(): Promise<string> {
-  const refreshToken = useAuthStore.getState().refreshToken;
-  if (!refreshToken) throw new Error("No refresh token available");
+  // Sprint 86: no refresh token to read from the store any more — it's
+  // never stored in JavaScript-reachable state at all. The browser
+  // attaches the HttpOnly refresh_token cookie to this request
+  // automatically (withCredentials: true); the only thing this function
+  // still has to supply itself is the CSRF header, read from the one
+  // cookie the frontend IS allowed to read (see utils/csrfCookie.ts). If
+  // there's no csrf_token cookie at all, there's no session to refresh —
+  // fail fast with the same "nothing to refresh" error as before, rather
+  // than sending a request guaranteed to come back 403.
+  const csrfToken = readCsrfCookie();
+  if (!csrfToken) throw new Error("No refresh session available");
 
   // Deliberately NOT using `httpClient` here — that would re-enter this
   // same interceptor if the refresh call itself ever 401s, which the
   // backend's refresh endpoint does when the refresh token is expired
   // (RateLimitExceededException/InvalidTokenException, unchanged since
   // Sprint 1) — a plain axios call avoids that recursion entirely.
-  const response = await axios.post<ApiEnvelope<{ access_token: string; refresh_token: string }>>(
+  const response = await axios.post<ApiEnvelope<{ access_token: string; token_type: string }>>(
     `${API_BASE_URL}/auth/refresh`,
-    { refresh_token: refreshToken },
+    null,
+    { withCredentials: true, headers: { "X-CSRF-Token": csrfToken } },
   );
-  const { access_token, refresh_token } = response.data.data;
-  // The backend ROTATES refresh tokens on every use (unchanged since
-  // Sprint 4's Auth Cutover) — the old refresh_token is now invalid,
-  // so the new one must be stored, not just the new access_token.
-  useAuthStore.getState().setTokens(access_token, refresh_token);
+  const { access_token } = response.data.data;
+  // The backend still ROTATES the refresh token on every use (unchanged
+  // since Sprint 4's Auth Cutover) — but the rotated value and its new
+  // csrf_token companion arrive as Set-Cookie headers now, not in this
+  // JSON body, so the browser already updated its cookie jar by the
+  // time this line runs. Only the access token still needs to go into
+  // app state.
+  useAuthStore.getState().setAccessToken(access_token);
   return access_token;
 }
 

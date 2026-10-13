@@ -26,7 +26,13 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS,   # never "*" — see .env.example
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    # Sprint 86: X-CSRF-Token added — the frontend must send it on
+    # cookie-authenticated /auth/refresh and /auth/logout calls (see
+    # core/security/csrf.py); without it in this list, the browser's CORS
+    # preflight blocks the header entirely on cross-origin requests
+    # (frontend:5173 -> backend:8000 counts as cross-origin for CORS
+    # purposes, even though they share a cookie jar).
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
 app.add_exception_handler(AppException, app_exception_handler)

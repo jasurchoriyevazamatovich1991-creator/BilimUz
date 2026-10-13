@@ -77,7 +77,51 @@ TEST_REDIS_URL=redis://localhost:6379/15 \
 python -m pytest app/core/tests/test_openapi_schema_generation.py -q
 ```
 
-Bu sandbox muhitida (ushbu GitHub Release Preparation vazifasi doirasida, 2026-10-12'da) qayta tasdiqlangan, haqiqiy natijalar: `app/` ostidagi to'liq mock/unit to'plam — **629 passed, 1 skipped**; `app/ scripts/` birgalikda (yuqoridagi birinchi buyruq, to'liqroq) — **635 passed, 1 skipped** (shundan 42 tasi `app/core/tests/`da). `tests/integration/` — PostgreSQL va Redis ikkalasi ham ishlab turgan holda, `TEST_DATABASE_URL`/`TEST_REDIS_URL` bilan — **321 passed**. `1 skipped` — `TEST_REDIS_URL` berilmagan holatda qasddan skip qilinadigan bitta Redis-redirect tasdiqlash testi (Sprint 84), xato emas.
+Bu sandbox muhitida (2026-10-13'da) qayta tasdiqlangan, haqiqiy natijalar: `app/ scripts/` birgalikda (yuqoridagi birinchi buyruq) — **659 passed, 1 skipped**. `1 skipped` — `TEST_REDIS_URL` berilmagan holatda qasddan skip qilinadigan bitta Redis-redirect tasdiqlash testi (Sprint 84), xato emas.
+
+`tests/integration/` — PostgreSQL va (rate-limit/Redis-bog'liq testlar uchun) Redis talab qiladi. Sprint 86 — Final Integration Verification sessiyasida (2026-10-13) bu to'plam **birinchi marta real Postgres/Redis'ga qarshi to'liq ishga tushirilgan va tasdiqlangan**: izolyatsiya uchun alohida `bilimuz_test` PostgreSQL bazasi (asosiy `bilimuz` bazasidan butunlay alohida, `backend/.env`'dagi `DATABASE_URL` hech qachon ishlatilmagan) va Redis DB indeksi `15` (hech qachon 0/1 emas, har safar ishga tushirishdan oldin `flushdb`) ishlatilgan. Natijalar: Sprint 86'ga bevosita tegishli uch fayl (`test_sprint86_refresh_cookie_flow.py` 5/5, `test_auth_rbac_integration.py` 5/5, `test_sprint73_rate_limiting_and_hardening.py` 4/4) — **14/14 passed**; to'liq `tests/integration/` to'plami — **326 passed, 0 failed** (78 ogohlantirish, barchasi oldindan mavjud/zararsiz — SQLAlchemy model klasslari nomi `Test*` bilan boshlanganligi haqidagi `PytestCollectionWarning`lar va passlib/anyio/FastAPI eskirish ogohlantirishlari). Hech qanday regressiya yoki yangi nosozlik topilmadi.
+
+## Refresh token — HttpOnly cookie (Sprint 86)
+
+Sprint 85'ning auditida aniqlangan nomuvofiqlik (`docs/API/api_blueprint.md` HttpOnly cookie deb da'vo
+qilgan, lekin haqiqiy kod `refresh_token`ni JSON javobida qaytarib, frontend uni `localStorage`da
+saqlar edi) shu sprintda yopildi — hujjat emas, implementatsiyaning o'zi tuzatildi:
+
+- `POST /auth/login` va `POST /auth/refresh`ning JSON javobida (`data`) endi faqat `access_token` va
+  `token_type` bor (`auth/schemas.py::AccessTokenOut`) — `refresh_token` maydoni butunlay yo'q.
+- Refresh token endi faqat ikkita cookie orqali uzatiladi (`app/core/security/cookies.py`):
+  - `refresh_token` — **HttpOnly**, `Path={API_V1_PREFIX}/auth`, `Max-Age=REFRESH_TOKEN_EXPIRE_DAYS`
+    (kun), `SameSite`=`REFRESH_TOKEN_COOKIE_SAMESITE` sozlamasi (standart `lax`), `Secure`=`True` faqat
+    `ENVIRONMENT != development`da (dev'da oddiy HTTP orqali ishlashi uchun).
+  - `csrf_token` — HttpOnly **emas** (frontend ataylab o'qiy oladi), `Path=/`, xuddi shu muddat/attributlar.
+- `POST /auth/refresh` va `POST /auth/logout` endi **double-submit CSRF tekshiruvi** bilan himoyalangan
+  (`app/core/security/csrf.py`): so'rov `X-CSRF-Token` header'ini `csrf_token` cookie qiymati bilan
+  aynan bir xil yuborishi shart, aks holda `403 CSRF_VALIDATION_FAILED`. `HttpOnly` CSRF himoyasi
+  EMASLIGI ataylab hisobga olingan — brauzer `refresh_token` cookie'ni forged cross-site so'rovga ham
+  avtomatik biriktiradi, shuning uchun bu alohida, mustaqil tekshiruv.
+- Yangi, ixtiyoriy sozlamalar (`app/core/config.py`, hammasi xavfsiz standart qiymat bilan — hech biri
+  majburiy emas): `REFRESH_TOKEN_COOKIE_SAMESITE` (`lax`/`strict`/`none`) va `REFRESH_TOKEN_COOKIE_DOMAIN`
+  (standart `None` — host-only cookie). **Muhim**: frontend va backend turli (umumiy registrable domenga
+  ega bo'lmagan) hostnamelarda joylashtirilsa, `csrf_token` cookie frontend JavaScript'ga umuman ko'rinmay
+  qoladi (cookie'lar hostname bo'yicha ajratiladi) — bu holatda yoki `REFRESH_TOKEN_COOKIE_DOMAIN`ni
+  umumiy registrable domenga o'rnating (masalan ikkalasi ham `*.bilimuz.uz` subdomeni bo'lsa), yoki CSRF
+  token'ni boshqa yo'l bilan (masalan javob tanasida) yetkazishni ko'rib chiqing — bu sprintning real
+  deployment-topologiyaga bog'liq, hal qilinmagan tomoni (bir xostname'li joriy dev topologiyasida
+  muammo yo'q, amalda real Postgres/Redis'ga qarshi tasdiqlangan — yuqoridagi "Testlash" bo'limiga qarang).
+- Frontend (`frontend/src/store/authStore.ts`, `api/client.ts`, `api/auth.ts`) mos ravishda yangilandi:
+  `refreshToken` maydoni state'dan butunlay olib tashlandi (eski `localStorage` yozuvidan ham `migrate()`
+  orqali avtomatik tozalanadi), `httpClient` endi `withCredentials: true`, CSRF header
+  `frontend/src/utils/csrfCookie.ts` orqali o'qiladi.
+- **Moslik buzilishi**: bu JSON javob konraktining buzuvchi o'zgarishi — `refresh_token`ni javob
+  tanasidan o'qiydigan har qanday tashqi/eski klient (shu repodagi frontenddan tashqari) endi ishlamaydi;
+  shu sprint doirasida frontend ham bir vaqtda yangilandi.
+- Testlar: `app/modules/auth/tests/test_sprint86_refresh_cookie_auth.py` (real Postgres/Redis'siz,
+  `get_auth_service` dependency-override + monkeypatch'langan Redis orqali, 13/13 passed),
+  `app/core/tests/test_sprint86_cookie_config.py` (config/CORS, 11/11 passed),
+  `tests/integration/test_sprint86_refresh_cookie_flow.py` (real Postgres bilan to'liq login→refresh→
+  logout, rotatsiya, revoke, CSRF-rad etish — Sprint 86 Final Integration Verification sessiyasida
+  (2026-10-13) izolyatsiya qilingan `bilimuz_test` bazasiga qarshi ishga tushirilgan va **5/5 passed**).
+  Batafsil izolyatsiya metodologiyasi uchun yuqoridagi "Testlash" bo'limiga qarang.
 
 ## CI (Sprint 84)
 
@@ -88,4 +132,5 @@ Bu sandbox muhitida (ushbu GitHub Release Preparation vazifasi doirasida, 2026-1
 - `.env` faylini hech qachon commit qilmang (`.gitignore`da istisno qilingan).
 - `backend/.env.example` faqat xavfsiz placeholder qiymatlarni o'z ichiga oladi — haqiqiy secretlarni hech qachon bu faylga yoki boshqa versiyalanadigan joyga yozmang.
 - Rate limiting (`app/core/middleware/rate_limit.py`) — haqiqiy, tekshirilgan qiymatlar va bilingan cheklov (faqat IP, `ai/*`dan tashqari) uchun [`../docs/API/api_blueprint.md`](../docs/API/api_blueprint.md)ning 8-bo'limiga qarang (Sprint 84'da hujjat koddan qayta tekshirilib tuzatildi).
+- Refresh token endi HttpOnly cookie orqali (Sprint 86) — yuqoridagi bo'limga qarang.
 - Production/staging'da standart secret qiymatlari bilan ishga tushirish ataylab bloklanadi — yuqoridagi "Sozlash" bo'limiga qarang.

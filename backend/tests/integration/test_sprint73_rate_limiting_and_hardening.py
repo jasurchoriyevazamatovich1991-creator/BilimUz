@@ -32,14 +32,22 @@ def _create_student(pg_session) -> tuple[str, str]:
 
 
 def test_refresh_endpoint_returns_429_after_exceeding_rate_limit(client):
+    """Sprint 86: /auth/refresh no longer reads a JSON body (the refresh
+    token now comes from the cookie) and is also CSRF-protected, so an
+    un-cookied, un-CSRF'd request now gets 403 on every call that isn't
+    rate-limited — but rate_limit() is listed FIRST in the route's
+    `dependencies=`, so it still runs (and still increments its Redis
+    counter) before the CSRF check gets a chance to reject the request.
+    The 429 threshold is therefore still reached exactly as before; only
+    the non-429 status changes (403 instead of 401)."""
     from app.modules.auth.constants import REFRESH_RATE_LIMIT
     max_requests, _ = REFRESH_RATE_LIMIT
 
     for _ in range(max_requests):
-        response = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-real-token"})
+        response = client.post("/api/v1/auth/refresh")
         assert response.status_code != 429
 
-    response = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-real-token"})
+    response = client.post("/api/v1/auth/refresh")
     assert response.status_code == 429
 
 

@@ -36,6 +36,12 @@ def _create_student(pg_session) -> tuple[str, str]:
 
 
 def test_super_admin_login_returns_real_jwt_tokens(client, pg_session):
+    """Sprint 86: the refresh token no longer appears in this response
+    body at all — it travels only via the HttpOnly `refresh_token`
+    cookie (core/security/cookies.py), never somewhere frontend
+    JavaScript could read it. This replaces the pre-Sprint-86 assertion
+    that `refresh_token` WAS in `body["data"]`, which was the exact
+    JS-readable exposure this sprint closes."""
     email, password = _create_super_admin(pg_session)
 
     response = client.post("/api/v1/auth/login", json={"identifier": email, "password": password})
@@ -44,8 +50,12 @@ def test_super_admin_login_returns_real_jwt_tokens(client, pg_session):
     body = response.json()
     assert body["success"] is True
     assert "access_token" in body["data"]
-    assert "refresh_token" in body["data"]
+    assert "refresh_token" not in body["data"]
     assert body["data"]["token_type"] == "bearer"
+
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert any(h.startswith("refresh_token=") and "httponly" in h.lower() for h in set_cookie_headers)
+    assert any(h.startswith("csrf_token=") for h in set_cookie_headers)
 
 
 def test_super_admin_can_access_protected_endpoint_with_real_token(client, pg_session):

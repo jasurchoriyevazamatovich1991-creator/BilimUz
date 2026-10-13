@@ -110,6 +110,32 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
 
+    # Sprint 86 — Secure refresh-token cookie. Reuses REFRESH_TOKEN_EXPIRE_DAYS
+    # above for Max-Age (no new lifetime var — same policy, just a different
+    # transport). SAMESITE is configurable because the right value depends on
+    # deployment topology: "lax" (default) is correct and sufficient when the
+    # frontend and backend share a hostname (this project's dev setup — cookies
+    # are not port-scoped, so localhost:5173 and localhost:8000 share a cookie
+    # jar) or share a registrable domain via COOKIE_DOMAIN below (e.g. both are
+    # subdomains of bilimuz.uz). "none" (+ Secure, enforced automatically
+    # outside development) is only needed if frontend and backend are on
+    # genuinely unrelated domains — see backend/README.md's Sprint 86 section.
+    REFRESH_TOKEN_COOKIE_NAME: str = "refresh_token"
+    REFRESH_TOKEN_COOKIE_SAMESITE: str = "lax"  # "lax" | "strict" | "none"
+    # None = host-only cookie (default, correct for same-hostname dev and for
+    # a single production hostname). Set to a shared parent domain (e.g.
+    # ".bilimuz.uz") only if frontend and backend are deployed on different
+    # subdomains of the same registrable domain.
+    REFRESH_TOKEN_COOKIE_DOMAIN: str | None = None
+
+    @field_validator("REFRESH_TOKEN_COOKIE_SAMESITE")
+    @classmethod
+    def _validate_samesite(cls, v: str) -> str:
+        valid = {"lax", "strict", "none"}
+        if v.lower() not in valid:
+            raise ValueError(f"REFRESH_TOKEN_COOKIE_SAMESITE={v!r} must be one of {sorted(valid)}")
+        return v.lower()
+
 
 @lru_cache
 def get_settings() -> Settings:

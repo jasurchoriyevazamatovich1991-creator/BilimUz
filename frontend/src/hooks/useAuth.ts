@@ -24,17 +24,21 @@ export function useVerify() {
 }
 
 export function useLogin() {
-  const setTokens = useAuthStore((s) => s.setTokens);
+  const setAccessToken = useAuthStore((s) => s.setAccessToken);
   const setUser = useAuthStore((s) => s.setUser);
   const navigate = useNavigate();
 
   return useMutation({
     mutationFn: (data: LoginRequest) => authApi.login(data),
     onSuccess: async (tokens) => {
-      setTokens(tokens.access_token, tokens.refresh_token);
-      // A second call is required — POST /auth/login only returns
-      // tokens (TokenPair), never the user profile itself (verified
-      // against the real backend router.py before writing this file).
+      // Sprint 86: only the access token comes back in the response body
+      // now — the refresh token arrived as a Set-Cookie header the
+      // browser already stored (HttpOnly, unreadable here, by design).
+      setAccessToken(tokens.access_token);
+      // A second call is required — POST /auth/login only returns the
+      // access token (AccessTokenOut), never the user profile itself
+      // (verified against the real backend router.py before writing
+      // this file).
       const me = await authApi.me();
       setUser({
         id: me.id,
@@ -51,19 +55,17 @@ export function useLogin() {
 
 export function useLogout() {
   const logout = useAuthStore((s) => s.logout);
-  const refreshToken = useAuthStore((s) => s.refreshToken);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      if (refreshToken) {
-        // Best-effort — even if this call fails (e.g. token already
-        // expired), the local logout below still proceeds. The backend
-        // revokes the refresh token server-side; a failed revoke here
-        // just means it expires naturally instead.
-        await authApi.logout(refreshToken).catch(() => undefined);
-      }
+      // Sprint 86: no refresh token to check for in the store any more —
+      // authApi.logout() reads the HttpOnly cookie server-side and sends
+      // the CSRF header itself (see api/auth.ts). Best-effort, same as
+      // before: even if this call fails (e.g. the cookie already expired
+      // or was already cleared), the local logout below still proceeds.
+      await authApi.logout().catch(() => undefined);
     },
     onSettled: () => {
       logout();

@@ -49,6 +49,17 @@ class RateLimitExceededException(AppException):
     error_code = "RATE_LIMIT_EXCEEDED"
 
 
+class CSRFValidationException(AppException):
+    """Sprint 86 — raised by core/security/csrf.py's double-submit check
+    for the cookie-authenticated refresh/logout endpoints. A missing or
+    mismatched X-CSRF-Token header is treated as a forged request, not as
+    an authentication failure (401) — the caller may have a perfectly
+    valid refresh cookie, it just didn't prove it's the same site that
+    received it."""
+    status_code = status.HTTP_403_FORBIDDEN
+    error_code = "CSRF_VALIDATION_FAILED"
+
+
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     """Registered once in main.py — every AppException becomes this envelope.
     Matches the platform-wide response contract: {success, message, data, errors}."""

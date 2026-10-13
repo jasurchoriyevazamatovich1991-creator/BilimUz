@@ -196,7 +196,7 @@ Frontend uchun: [`frontend/.env.example`](frontend/.env.example) — yagona o'zg
 
 ## 9. Ma'lumotlar bazasini sozlash va migratsiyalar
 
-Ma'lumotlar bazasi — PostgreSQL 16, 62 jadval. Haqiqiy migratsiyalar `backend/alembic/versions/`da joylashgan (19 fayl, `0001`'dan `0019`'gacha) — **`database/migrations/` papkasi bo'sh**, haqiqiy migratsiya mexanizmi emas; `database/schema/schema_v2.sql` esa sxemaning hujjatlashtiruvchi (ma'lumot) nusxasi, migratsiyalarni almashtirmaydi.
+Ma'lumotlar bazasi — PostgreSQL 16, **58 jadval** (`__tablename__` e'lonlari bo'yicha tasdiqlangan — Sprint 85 auditida avvalgi "62" raqami noto'g'ri ekanligi aniqlangan edi, shu bilan tuzatilgan). Haqiqiy migratsiyalar `backend/alembic/versions/`da joylashgan (19 fayl, `0001`'dan `0019`'gacha) — **`database/migrations/` papkasi bo'sh**, haqiqiy migratsiya mexanizmi emas; `database/schema/schema_v2.sql` esa sxemaning hujjatlashtiruvchi (ma'lumot) nusxasi, migratsiyalarni almashtirmaydi.
 
 Migratsiyalarni qo'llash:
 
@@ -256,7 +256,29 @@ npm run lint            # ESLint
 - Email/SMS orqali haqiqiy xabar yuborish (notifications/verification) ataylab ulanmagan — joriy holatda tasdiqlash kodi API javobida ko'rinadi (`debug_code`), real email/SMS provayder integratsiyasi yo'q.
 - To'liq production-darajadagi monitoring/alerting, log-aggregatsiya, backup/restore protsedurasi hujjatlashtirilmagan.
 
-## 12. Xavfsizlik va maxfiy ma'lumotlar
+## 12. Distributable ZIP arxiv tayyorlash
+
+Tarqatiladigan (release) ZIP arxivni repository ildizidan tashqarida tayyorlash tavsiya etiladi — shunda arxiv o'z-o'zini ichiga olmaydi. Minimal, qo'lda buyruq (POSIX `zip`, `.gitignore`dagi qoidalarga mos holda eng muhim istisnolarni qo'llab):
+
+```bash
+cd /path/to  # BilimUz/ ning ota-katalogi
+zip -r BilimUz-release.zip BilimUz \
+  -x "BilimUz/.git/*" \
+  -x "BilimUz/*.zip" \
+  -x "BilimUz/backend/.env" \
+  -x "BilimUz/backend/venv/*" "BilimUz/backend/.venv/*" \
+  -x "BilimUz/backend/__pycache__/*" "BilimUz/backend/**/__pycache__/*" \
+  -x "BilimUz/backend/.pytest_cache/*" \
+  -x "BilimUz/backend/storage/uploads/*" \
+  -x "BilimUz/frontend/node_modules/*" \
+  -x "BilimUz/frontend/dist/*" \
+  -x "BilimUz/database/backups/*" \
+  -x "*.log"
+```
+
+Batafsil, tasdiqlangan istisnolar ro'yxati va arxivni tekshirish (integrity + secret-skan) bo'yicha — agar mavjud bo'lsa — [`docs/RELEASE_PACKAGING.md`](docs/RELEASE_PACKAGING.md)ga qarang. Arxiv hech qachon haqiqiy `.env` qiymatlarini, `.git/` tarixini yoki `node_modules/`/`venv/`ni o'z ichiga olmasligi kerak — yuqoridagi 8 va 12 (xavfsizlik) bo'limlariga qarang.
+
+## 13. Xavfsizlik va maxfiy ma'lumotlar
 
 - **Hech qachon** haqiqiy `.env` faylini, maxfiy kalitlarni, parollarni yoki foydalanuvchi ma'lumotlarini ushbu repository'ga commit qilmang. `.gitignore` `.env`, `venv/`/`.venv/`, `node_modules/`, `dist/`, `*.log`, `database/backups/*`, `uploads/*` kabi fayllarni istisno qiladi.
 - `backend/.env.example` va `frontend/.env.example` fayllarida faqat xavfsiz placeholder qiymatlar bor (masalan, `change-me-to-a-random-64-char-string`) — bu reporsitoriyda hech qanday haqiqiy secret saqlanmaydi.
@@ -266,12 +288,13 @@ npm run lint            # ESLint
 - Rich-text kiritish maydonlari (savol matni, variant matni, izoh, guruh stimulus matni) `bleach` allowlist-sanitizatsiyasidan o'tadi — XSS'ga qarshi.
 - LaTeX formula rendering (`frontend/.../FormulaText.tsx`, KaTeX) — Sprint 83: formula regex'i endi faqat HTML teglar ORASIDAGI matn segmentlariga qo'llaniladi, hech qachon teg/atribut ichiga emas (masalan, `<a href="...$...">` ichidagi `$` endi tegning o'zini buzib yubormaydi).
 - Rate limiting — Redis fixed-window, faqat muayyan auth/certificate/ai endpointlarida (IP yoki foydalanuvchi bo'yicha), global emas; haqiqiy, tekshirilgan qiymatlar va bilingan cheklov uchun [`docs/API/api_blueprint.md`](docs/API/api_blueprint.md)ning 8-bo'limiga qarang (Sprint 84'da hujjat haqiqiy koddan qayta tekshirilib tuzatildi).
+- **Refresh token — HttpOnly cookie (Sprint 86)**: `refresh_token` endi `POST /auth/login`/`POST /auth/refresh`ning JSON javobida umuman yo'q — faqat HttpOnly, `Path`-chegaralangan cookie orqali uzatiladi, frontend JavaScript uni hech qachon o'qiy olmaydi. `/auth/refresh`/`/auth/logout` endi double-submit CSRF tekshiruvi (`X-CSRF-Token` header + `csrf_token` cookie) bilan himoyalangan. Batafsil: [`docs/API/api_blueprint.md`](docs/API/api_blueprint.md)ning 4-bo'limi va `backend/README.md`ning Sprint 86 bo'limi.
 - Repository'da `git ls-files` orqali tasdiqlangan: hech qanday `.env` fayli (root, backend yoki frontend) git tomonidan kuzatilmaydi — bu xavf hozircha yo'q.
 
-## 13. Litsenziya
+## 14. Litsenziya
 
 Repository ildizidagi `LICENSE` fayli **bo'sh** (0 bayt). **Loyiha uchun hech qanday litsenziya aniq belgilanmagan.** GitHub'ga chiqarishdan oldin loyiha egasi litsenziya turini (masalan, MIT, Apache 2.0, yoki "All rights reserved") tanlashi va ushbu faylni to'ldirishi tavsiya etiladi.
 
 ---
 
-**Qo'shimcha hujjatlar**: [`backend/README.md`](backend/README.md) (backend uchun batafsil), [`frontend/README.md`](frontend/README.md) (frontend uchun batafsil), [`docs/SPRINT_HISTORY.md`](docs/SPRINT_HISTORY.md) (to'liq sprint-by-sprint tarix va joriy holat jadvali), [`docs/`](docs/) (SRS, Database, API, UI-UX, Security, Deployment, Roadmap, ADR, CONTRIBUTING).
+**Qo'shimcha hujjatlar**: [`backend/README.md`](backend/README.md) (backend uchun batafsil), [`frontend/README.md`](frontend/README.md) (frontend uchun batafsil), [`docs/SPRINT_HISTORY.md`](docs/SPRINT_HISTORY.md) (to'liq sprint-by-sprint tarix va joriy holat jadvali), [`docs/RELEASE_PACKAGING.md`](docs/RELEASE_PACKAGING.md) (distributable ZIP — istisnolar sababi va tekshirish bosqichlari), [`docs/`](docs/) (SRS, Database, API, UI-UX, Security, Deployment, Roadmap, ADR, CONTRIBUTING).
