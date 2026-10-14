@@ -1,0 +1,88 @@
+# BilimUz Backend — PRODUCTION image.
+#
+# Separate from the existing `backend/Dockerfile`, which is used by the
+# local-dev `docker-compose.yml` (bind-mounts the source tree, runs
+# `uvicorn --reload`, keeps build tools in the image because the image is
+# rebuilt rarely and dev convenience matters more than size there). This
+# file is a true multi-stage build: compilers and -dev headers needed to
+# build psycopg2 never reach the final image, only the installed Python
+# packages and runtime shared libraries do. Used by docker-compose.prod.yml.
+#
+# Build (from the repository root, so the build context can see this
+# file via -f while keeping paths relative to backend/):
+#   docker build -f backend/Dockerfile.prod -t bilimuz-backend:latest backend/
+
+# ---- Stage 1: build ---------------------------------------------------
+FROM python:3.13-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Build-time only: gcc + libpq-dev are needed to compile psycopg2 from
+# source on platforms without a matching prebuilt wheel for
+# psycopg2-binary. Neither survives into the final image (stage 2).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install into an isolated venv rather than system site-packages so the
+# whole, self-contained result can be copied to stage 2 in one COPY.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---- Stage 2: runtime ---------------------------------------------------
+FROM python:3.13-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Runtime-only: libpq5 (the psycopg2 shared library dependency) without
+# the -dev headers or a compiler — gcc/libpq-dev from stage 1 are not
+# present here at all.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+COPY . .
+
+# Non-root user — never run the app as root in production.
+RUN useradd --create-home --shell /bin/bash bilimuz \
+    && chown -R bilimuz:bilimuz /app
+USER bilimuz
+
+EXPOSE 8000
+
+# Dependency-free-ish healthcheck (curl, installed above specifically for
+# this — it's a small package). Hits the real health endpoint
+# (app/api/v1/health.py), which checks DB connectivity, not just process
+# liveness. Note: health.py always returns HTTP 200 even when the
+# database is unreachable (body reports "degraded" in that case) — a
+# raw curl -f healthcheck only catches the process being down or
+# unresponsive, not a degraded DB. See docs/Deployment/ for a
+# body-aware check if stricter monitoring is wanted.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS http://localhost:8000/api/v1/health || exit 1
+
+# --proxy-headers + --forwarded-allow-ips='*': safe ONLY because this
+# container is never published to the host or the public internet in
+# docker-compose.prod.yml — it is reached exclusively through the
+# `web` (nginx) service over the internal Docker network. Without
+# --proxy-headers, request.client.host (used by app/core/middleware/
+# rate_limit.py for IP-based rate limiting — see that file) would see
+# every request as coming from the nginx container's own IP, collapsing
+# every real visitor into one shared rate-limit bucket. --forwarded-
+# allow-ips='*' tells uvicorn to trust X-Forwarded-For/-Proto from
+# WHOEVER connects to it directly — which, again, is only the nginx
+# container on the internal network, never the public internet.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips=*"]

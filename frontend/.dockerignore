@@ -1,0 +1,15 @@
+# Never baked into the frontend build image — see frontend/Dockerfile.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+node_modules/
+dist/
+.vite/
+
+.git/
+.gitignore
+*.log
+.DS_Store
+coverage/

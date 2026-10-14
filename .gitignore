@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 .env
+.env.production
+.env.production.local
+!.env.production.example
 venv/
 .venv/
 .pytest_cache/
@@ -11,6 +14,11 @@ venv/
 node_modules/
 dist/
 .vite/
+frontend/.env
+frontend/.env.production
+frontend/.env.production.local
+!frontend/.env.example
+!frontend/.env.production.example
 
 # Editor / machine-specific
 .vscode/

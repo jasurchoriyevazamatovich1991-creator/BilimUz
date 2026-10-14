@@ -1,0 +1,130 @@
+# BilimUz — PRODUCTION single-server stack.
+#
+# Separate from the existing docker-compose.yml, which is explicitly a
+# local-dev stack (bind-mounts backend/ source, runs uvicorn --reload,
+# publishes postgres/redis directly to the host for local tool access —
+# see that file's own header comment). This file is for an actual
+# server: Postgres/Redis are NOT published to the host, images are
+# built from the *.prod / Dockerfile production files, and the web
+# service terminates/proxies HTTP(S) for both the frontend and the API
+# on one origin (see nginx/nginx.conf for why that matters for this
+# app's cookies).
+#
+# Deploy: see docs/Deployment/PRODUCTION.md for the full procedure
+# (first deploy, migrations, backups). Quick reference:
+#
+#   cp backend/.env.production.example backend/.env.production
+#   # edit backend/.env.production with real secrets — never commit it
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml ps
+#
+# Pinned image versions throughout (postgres:16-alpine, redis:7-alpine —
+# same as the dev stack's already-pinned choices; node:20-alpine,
+# nginx:1.27-alpine, python:3.13-slim in the Dockerfiles) — no `latest`
+# tags, so a `docker compose pull` doesn't silently change what's
+# running.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bilimuz_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      # Must match backend/.env.production's DATABASE_URL password.
+      # Set via a .env file next to this compose file (see
+      # docs/Deployment/PRODUCTION.md) — never hardcode it here.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see docs/Deployment/PRODUCTION.md)}
+      POSTGRES_DB: bilimuz
+    # No `ports:` mapping — deliberately NOT published to the host or
+    # the public internet. Only reachable by other services on the
+    # `internal` network below (same requirement the task spec calls
+    # for: "Keep PostgreSQL and Redis inaccessible from the public
+    # internet by default").
+    volumes:
+      - bilimuz_postgres_data:/var/lib/postgresql/data
+      - ./database/backups:/backups  # host-visible, for pg_dump output — see scripts/backup_db.sh
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bilimuz_redis_prod
+    restart: unless-stopped
+    # No `ports:` mapping — internal network only, same reasoning as
+    # postgres above. Used for rate-limiting (app/core/middleware/
+    # rate_limit.py) and refresh/CSRF-related short-lived state; no
+    # durable data lives here that would need its own backup.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: bilimuz_backend_prod
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production   # operator-created, gitignored — see backend/.env.production.example
+    # No `ports:` mapping to the host — reached only via the `web`
+    # (nginx) service on the `internal` network, which is exactly what
+    # makes --forwarded-allow-ips='*' in Dockerfile.prod's CMD safe
+    # (see that file's comment).
+    volumes:
+      - backend_uploads:/app/storage/uploads  # only used when STORAGE_BACKEND=local
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Migrations are NOT run automatically on every container start —
+    # see docs/Deployment/PRODUCTION.md. Auto-migrating on boot is risky
+    # with any future multi-replica setup (a migration race) and hides
+    # a failed migration behind a container restart loop instead of a
+    # clear, operator-visible step. Run
+    # `docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head`
+    # explicitly before (first deploy) or after (update) bringing this
+    # service up.
+
+  web:
+    build:
+      context: .                     # repo root — see frontend/Dockerfile's own note on why
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1   # same-origin — see nginx/nginx.conf
+    container_name: bilimuz_web_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"      # the only service exposed to the host/public internet
+      # - "443:443"  # uncomment once HTTPS is configured — see nginx/nginx.conf
+    # volumes:
+    #   - ./certs:/etc/nginx/certs:ro   # uncomment alongside the 443 port and
+    #                                    # nginx.conf's commented HTTPS server
+    #                                    # block, once you have real certs
+    networks:
+      - internal
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  bilimuz_postgres_data:
+  backend_uploads:

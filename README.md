@@ -251,7 +251,7 @@ npm run lint            # ESLint
 
 ## 11. Production deployment bo'yicha mavjud cheklovlar
 
-- `docker/`, `nginx/`, root-darajadagi `scripts/` papkalari hozircha **bo'sh** (faqat `.gitkeep`) — production uchun reverse-proxy konfiguratsiyasi, deployment skriptlari hali yozilmagan.
+- **Production deployment tayyorlandi (Sprint 90)**: `docker-compose.prod.yml`, `backend/Dockerfile.prod`, `frontend/Dockerfile`, `nginx/nginx.conf` (reverse-proxy + statik frontend xizmat ko'rsatish), `scripts/backup_db.sh`/`scripts/restore_db.sh` — barchasi haqiqiy, sinovdan o'tkazilgan (statik validatsiya — `docker compose config`, backend/frontend testlar) tarkib, lekin **haqiqiy serverda hali joylashtirilmagan va tekshirilmagan**. To'liq protsedura, cheklovlar va HTTPS sozlash bo'yicha — [`docs/Deployment/PRODUCTION.md`](docs/Deployment/PRODUCTION.md). `docker/` papkasi hozircha bo'sh qolmoqda (hech narsa kerak bo'lmadi — barcha production tarkib `nginx/`, ikkita Dockerfile va `docker-compose.prod.yml` ichida).
 - **CI (Sprint 84, kengaytirilgan Sprint 87'da)** — `main` branch'ga push va unga qaratilgan PR'larda uchta GitHub Actions workflow avtomatik ishga tushadi (`.github/workflows/`):
   - `openapi-schema-validation.yml` (Sprint 84, faqat `backend/**`) — `app.openapi()` orqali OpenAPI sxemasi haqiqatan generatsiya qilinishini tekshiradi. PostgreSQL/Redis talab qilinmaydi.
   - `backend-ci.yml` (Sprint 87, faqat `backend/**`) — ikkita job: `unit-tests` (`pytest app/ scripts/`, PostgreSQL/Redis talab qilinmaydi) va `integration-tests` (izolyatsiya qilingan Postgres 16 + Redis 7 service container'lari, `bilimuz_test` bazasini yaratib `alembic upgrade head` qo'llaydi, keyin `pytest tests/integration/`).

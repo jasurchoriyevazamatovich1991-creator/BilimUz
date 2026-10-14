@@ -4,7 +4,7 @@
 Use Docker for local development and deployment
 
 ## Status
-Accepted, **implemented** — `backend/Dockerfile` and root `docker-compose.yml` are real and runnable (Postgres + Redis + backend, `docker-compose up --build`). `nginx/` reverse-proxy config remains a placeholder until the frontend has real content to serve.
+Accepted, **implemented**. `backend/Dockerfile` and root `docker-compose.yml` are the real, runnable local-dev stack (Postgres + Redis + backend, `docker-compose up --build`). As of Sprint 90, the production side is also real: `nginx/nginx.conf` (reverse proxy + static frontend serving), `frontend/Dockerfile` (multi-stage Vite build → nginx), `backend/Dockerfile.prod` (multi-stage, no build tools in the final image), and `docker-compose.prod.yml` (the production stack — Postgres/Redis not published to the host, only `web` exposed). See `docs/Deployment/PRODUCTION.md` for the operational procedure.
 
 ## Context
 BilimUz's stack has four runtime dependencies that must run identically across every developer's machine and every environment (staging, production): FastAPI backend, React frontend (built to static files), PostgreSQL, and Redis. Without containerization, "works on my machine" schema/dependency drift is a near-certainty across a multi-year, multi-developer project — especially with PostgreSQL-specific types (`UUID`, `INET`, `JSONB`) that don't behave identically across local installs and CI.
@@ -21,7 +21,7 @@ Use **Docker** (one `Dockerfile` per service: `backend`, `frontend`) orchestrate
 
 **Negative:**
 - Adds an operational layer (image builds, registry, orchestration) that a single-server deployment doesn't strictly need at very small scale — accepted because BilimUz's stated target ("millions of users") makes this investment pay off early rather than requiring a painful retrofit later.
-- Currently a known gap: none of `docker/`, `nginx/`, `docker-compose.yml` have real content yet. This ADR records the *decision*; `docs/Deployment/` (not yet written) will record the *implementation*.
+- `docker/` remains an empty placeholder (`.gitkeep` only) — no content has been needed there yet; everything production-specific landed directly in `nginx/`, `docker-compose.prod.yml`, and the two `Dockerfile`/`Dockerfile.prod` files instead (Sprint 90). `docs/Deployment/PRODUCTION.md` records the implementation this ADR anticipated.
 
 ## Alternatives
 

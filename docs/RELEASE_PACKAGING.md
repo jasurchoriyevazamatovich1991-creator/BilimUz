@@ -13,6 +13,7 @@ Bu hujjat repository ildizidagi `README.md`ning 12-bo'limini ("Distributable ZIP
 | `BilimUz/.git/*` | To'liq commit tarixi, hajmi katta, distributable arxivga kerak emas (manba kod snapshot yetarli) |
 | `BilimUz/*.zip` | Eski/pre-commit backup arxivlar o'zini-o'zi ichiga olmasligi uchun (bular `.gitignore`da ham `*.zip` bilan istisno qilingan) |
 | `BilimUz/backend/.env` | **Haqiqiy** maxfiy qiymatlar (`JWT_SECRET_KEY`, `FILE_ENCRYPTION_KEY`, DB parollari) — hech qachon tarqatilmasligi kerak. `.env.example` (placeholder qiymatlar bilan) saqlanadi. |
+| `BilimUz/backend/.env.production`, `BilimUz/frontend/.env.production` | Sprint 90 — production deployment uchun haqiqiy maxfiy qiymatlar (`docs/Deployment/PRODUCTION.md`ga qarang). `.env.production.example` fayllari (faqat placeholder) saqlanadi. |
 | `backend/venv/`, `backend/.venv/` | Mahalliy Python virtual muhit — platforma-bog'liq, `requirements.txt`dan qayta generatsiya qilinadi |
 | `**/__pycache__/*`, `*.pyc` | Compile-time bayt-kod keshi, manba kod emas |
 | `backend/.pytest_cache/`, `**/.pytest_cache/*` | Test-run keshi, versiyalanmasligi kerak |
@@ -24,7 +25,7 @@ Bu hujjat repository ildizidagi `README.md`ning 12-bo'limini ("Distributable ZIP
 | `frontend/tsconfig.*.tsbuildinfo` | TypeScript incremental-build keshi, platforma/mashina-bog'liq |
 | `*.DS_Store` | macOS Finder meta-fayli |
 
-Arxivga **kiritiladigan** narsalar: to'liq backend (`app/`, `alembic/`, `scripts/`, `conftest.py`, `requirements.txt`, `Dockerfile`, `.env.example`, `README.md`, `tests/`), to'liq frontend manba kodi (`src/`, `public/`, `package.json`, `package-lock.json`, `.env.example`, config fayllari — `node_modules/`/`dist/` dan tashqari), `docs/` (API blueprint, ADR, SRS, sprint tarixi), `database/schema/schema_v2.sql`, `docker-compose.yml`, `nginx/`/`docker/` (hozircha bo'sh, `.gitkeep` bilan), `.github/workflows/`.
+Arxivga **kiritiladigan** narsalar: to'liq backend (`app/`, `alembic/`, `scripts/` [root-darajadagi `scripts/` ham, Sprint 90'dan — `backup_db.sh`/`restore_db.sh`], `conftest.py`, `requirements.txt`, `Dockerfile`, `Dockerfile.prod` [Sprint 90], `.env.example`, `.env.production.example` [Sprint 90], `README.md`, `tests/`), to'liq frontend manba kodi (`src/`, `public/`, `package.json`, `package-lock.json`, `Dockerfile` [Sprint 90], `.env.example`, `.env.production.example` [Sprint 90], config fayllari — `node_modules/`/`dist/` dan tashqari), `docs/` (API blueprint, ADR, SRS, sprint tarixi, `Deployment/PRODUCTION.md` — Sprint 90), `database/schema/schema_v2.sql`, `docker-compose.yml`, `docker-compose.prod.yml` (Sprint 90), `nginx/nginx.conf` (Sprint 90 — avval bo'sh edi), `docker/` (hozircha bo'sh, `.gitkeep` bilan), `.github/workflows/`.
 
 ## Arxivni yaratish
 
