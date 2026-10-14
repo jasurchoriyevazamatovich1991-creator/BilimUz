@@ -51,6 +51,7 @@ import { ResultPage } from "@/pages/student/ResultPage";
 import { ResultsHistoryPage } from "@/pages/student/ResultsHistoryPage";
 import { CertificatesListPage } from "@/pages/student/CertificatesListPage";
 import { NotificationsPage } from "@/pages/student/NotificationsPage";
+import { AiCenterPage } from "@/pages/student/AiCenterPage";
 import { CertificateDetailPage } from "@/pages/student/CertificateDetailPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -191,6 +192,10 @@ export function AppRoutes() {
           <Route path="/student/certificates" element={<CertificatesListPage />} />
           <Route path="/student/certificates/:certificateId" element={<CertificateDetailPage />} />
           <Route path="/student/notifications" element={<NotificationsPage />} />
+          {/* Sprint 88 — real AI Center chat page. Scoped to /student only
+              (Applicant/Student roles); /admin/ai remains an untouched
+              PlaceholderPage since no admin-facing AI feature exists. */}
+          <Route path="/student/ai" element={<AiCenterPage />} />
           {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", [
             "/student/tests",
             "/student/certificates",
@@ -198,6 +203,7 @@ export function AppRoutes() {
             "/student/subjects",
             "/student/lessons",
             "/student/results",
+            "/student/ai",
           ])}
         </Route>
       </Route>

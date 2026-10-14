@@ -1,0 +1,184 @@
+# Sprint 87 — Backend CI: unit/mock tests + real-service integration
+# tests. Complements (does not duplicate) .github/workflows/
+# openapi-schema-validation.yml (Sprint 84), which already covers
+# OpenAPI schema generation/validation in its own focused workflow —
+# that check is NOT re-run here on purpose, since `pytest app/
+# scripts/` below already includes app/core/tests/
+# test_openapi_schema_generation.py as part of the full unit sweep.
+#
+# Two independent jobs, matching this repo's own two-tier test
+# convention (see backend/README.md's "Testlash" section):
+#   - unit-tests: zero external dependencies, always runs.
+#   - integration-tests: real, ISOLATED PostgreSQL 16 + Redis 7 service
+#     containers (same images as docker-compose.yml), using the exact
+#     same TEST_DATABASE_URL/TEST_REDIS_URL safety-gated mechanism
+#     backend/conftest.py already enforces locally (DB name must end
+#     "_test"; Redis logical DB index must not be 0 or 1). Nothing here
+#     weakens, bypasses, or duplicates those guards — the service
+#     containers are ephemeral, freshly created per run, and never
+#     point at any real/production resource; there is no secret or
+#     credential involved (the "postgres"/"postgres" user/password
+#     below exist only inside this run's throwaway container).
+name: Backend CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit / mock tests (no external services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches backend/Dockerfile's python:3.13-slim base image.
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create a minimal backend/.env for this run
+        # Settings.ENVIRONMENT has no default (Sprint 81) and most of
+        # app/ constructs a real Settings()/get_settings() (e.g. the
+        # OpenAPI schema-generation test imports app.main directly), so
+        # something has to supply ENVIRONMENT. Deliberately writing it
+        # to backend/.env here — NOT to a job/step-level `env:` OS
+        # variable — matters: app/core/tests/
+        # test_config_production_validation.py::
+        # test_environment_completely_unset_is_rejected_fail_closed
+        # calls Settings(_env_file=None) and asserts construction FAILS
+        # when ENVIRONMENT is supplied by no source at all. _env_file=None
+        # only disables pydantic-settings' dotenv loading — it does NOT
+        # ignore a real OS environment variable — so setting
+        # `ENVIRONMENT: development` at job/env scope (as this repo's
+        # own openapi-schema-validation.yml workflow does for its one
+        # narrowly-targeted test file) would make that fail-closed test
+        # fail every time it runs alongside the rest of app/. Writing a
+        # throwaway .env file instead reproduces exactly what a local
+        # developer's own checkout already looks like (backend/.env is
+        # gitignored, created once from .env.example, never an OS env
+        # var) — the file supplies ENVIRONMENT to every normal
+        # Settings() call, while the one `_env_file=None` test still
+        # correctly sees no OS-level ENVIRONMENT and still raises.
+        # Nothing here is a real secret — single non-sensitive line,
+        # never committed, discarded with the runner.
+        run: echo "ENVIRONMENT=development" > .env
+
+      - name: Run full unit/mock test suite (app/ + scripts/)
+        # Matches backend/README.md's own documented command exactly.
+        # Includes app/core/tests/test_openapi_schema_generation.py
+        # (already covered by the Sprint 84 workflow — running once
+        # here as part of the full sweep is the full-suite's normal
+        # behavior, not an extra duplicate workflow) and the Sprint 86
+        # cookie/CSRF unit tests (app/modules/auth/tests/
+        # test_sprint86_refresh_cookie_auth.py,
+        # app/core/tests/test_sprint86_cookie_config.py), none of
+        # which need a live database or Redis.
+        run: pytest app/ scripts/ -v
+
+  integration-tests:
+    name: Integration tests (isolated PostgreSQL + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        # Same major version as docker-compose.yml's postgres service.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          # Default admin/bootstrap database only — the actual isolated
+          # test database (bilimuz_test) is created explicitly below,
+          # exactly like backend/conftest.py's pg_test_database fixture
+          # does for a local run. This container is destroyed at the
+          # end of the job; nothing here is a real credential.
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        # Same major version as docker-compose.yml's redis service.
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENVIRONMENT: development
+      # Sprint 86's safety gate (backend/conftest.py) refuses any
+      # TEST_DATABASE_URL whose database name doesn't end in "_test" —
+      # this is deliberately the same name used in this project's own
+      # documented local workflow (backend/README.md, root README §10),
+      # never the "bilimuz" dev/prod name.
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test
+      # Sprint 84's safety gate refuses DB index 0 or 1 — 15 matches
+      # this project's own documented convention (same index used in
+      # the Sprint 86 Final Integration Verification session).
+      TEST_REDIS_URL: redis://localhost:6379/15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create isolated test database
+        # The postgres:16-alpine service container starts fresh for
+        # every job run, so bilimuz_test never pre-exists — this always
+        # creates it from scratch. (backend/conftest.py's
+        # pg_test_database fixture would also create it on first use
+        # if this step were skipped; running it explicitly here, before
+        # any test collection, makes the "migrations applied before
+        # integration tests run" requirement an explicit, independently
+        # failing CI step instead of an implicit fixture side effect.)
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE bilimuz_test;"
+
+      - name: Apply Alembic migrations to the isolated test database
+        env:
+          DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test
+        run: alembic upgrade head
+
+      - name: Run integration test suite (tests/integration/)
+        # Fails loudly (non-zero exit) if PostgreSQL/Redis are
+        # unreachable or TEST_DATABASE_URL/TEST_REDIS_URL are missing —
+        # backend/conftest.py's _require_test_database_url()/
+        # _require_test_redis_url() call pytest.fail() rather than
+        # skipping, so this step can never silently pass over a missing
+        # service. Both env vars are set above at job scope.
+        run: pytest tests/integration/ -v

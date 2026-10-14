@@ -136,6 +136,33 @@ class Settings(BaseSettings):
             raise ValueError(f"REFRESH_TOKEN_COOKIE_SAMESITE={v!r} must be one of {sorted(valid)}")
         return v.lower()
 
+    # AI provider (Sprint 88). Defaults to "none" — explicit opt-in only,
+    # so no environment (including this project's own CI and every
+    # existing local/dev setup) accidentally starts making real, billed
+    # calls to a vendor just because it upgraded. "anthropic" is the only
+    # real implementation this sprint (app/modules/ai/providers.py —
+    # AnthropicProvider, plain httpx HTTP calls to the Messages API, no
+    # vendor SDK dependency added). AI_API_KEY's default mirrors the
+    # existing JWT_SECRET_KEY/FILE_ENCRYPTION_KEY/R2_* placeholder
+    # convention exactly (same literal, see _DEFAULT_AI_API_KEY below) —
+    # app/modules/ai/dependencies.py treats that literal as "not really
+    # configured" and falls back to the honest UnconfiguredAIProvider
+    # (501) rather than attempting a doomed real call with a placeholder
+    # key.
+    AI_PROVIDER: str = "none"  # "none" | "anthropic"
+    AI_API_KEY: str = "CHANGE_ME_IN_PRODUCTION"
+    AI_MODEL: str = "claude-3-5-haiku-20241022"
+    AI_MAX_OUTPUT_TOKENS: int = 1024  # cost control — caps the provider's own output length
+    AI_REQUEST_TIMEOUT_SECONDS: float = 30.0  # bounded timeout — never hang indefinitely on an upstream call
+
+    @field_validator("AI_PROVIDER")
+    @classmethod
+    def _validate_ai_provider(cls, v: str) -> str:
+        valid = {"none", "anthropic"}
+        if v.lower() not in valid:
+            raise ValueError(f"AI_PROVIDER={v!r} must be one of {sorted(valid)}")
+        return v.lower()
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -188,6 +215,15 @@ _PRODUCTION_UNSAFE_R2_DEFAULTS = {
     "R2_SECRET_ACCESS_KEY": "CHANGE_ME_IN_PRODUCTION",
     "R2_BUCKET_NAME": "CHANGE_ME_IN_PRODUCTION",
 }
+# Sprint 88 — same literal as Settings.AI_API_KEY's own default above
+# (single source of truth: both this gate and
+# app/modules/ai/dependencies.py's "is this really configured?" check
+# compare against the exact same constant, imported from here, never
+# duplicated as a second hardcoded string).
+DEFAULT_AI_API_KEY = "CHANGE_ME_IN_PRODUCTION"
+_PRODUCTION_UNSAFE_AI_DEFAULTS = {
+    "AI_API_KEY": DEFAULT_AI_API_KEY,
+}
 
 
 def validate_production_secrets(settings: Settings) -> list[str]:
@@ -205,4 +241,6 @@ def validate_production_secrets(settings: Settings) -> list[str]:
     unsafe = [name for name, default in _PRODUCTION_UNSAFE_DEFAULTS.items() if getattr(settings, name) == default]
     if settings.STORAGE_BACKEND == "r2":
         unsafe += [name for name, default in _PRODUCTION_UNSAFE_R2_DEFAULTS.items() if getattr(settings, name) == default]
+    if settings.AI_PROVIDER == "anthropic":
+        unsafe += [name for name, default in _PRODUCTION_UNSAFE_AI_DEFAULTS.items() if getattr(settings, name) == default]
     return unsafe

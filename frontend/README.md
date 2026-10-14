@@ -46,12 +46,24 @@ npm run preview     # yig'ilgan build'ni mahalliy ko'rish uchun
 ```bash
 npm run test          # vitest run — bir martalik ishga tushirish
 npm run test:watch     # vitest — watch rejimi
-npm run lint            # ESLint
+npx tsc -b --noEmit     # TypeScript type-check (build qilmasdan)
+npm run lint              # ESLint
+npm run build               # tsc -b && vite build — production build (type-check + bundle)
 ```
+
+## CI (Sprint 87)
+
+`../.github/workflows/frontend-ci.yml` — `frontend/**`ga tegishli push (`main` branch) va PR'da avtomatik ishga tushadi: `npm ci` (lockfile'dan reproducible install) → `npm run test` → `npx tsc -b --noEmit` → `npm run lint` → `npm run build`. Barchasi yuqoridagi xuddi shu buyruqlar — workflow hech qanday yangi npm script qo'shmagan. Minimal `permissions: contents: read` bilan ishlaydi, real secret ishlatmaydi.
+
+Sprint 87 validatsiyasida aniqlangan va tuzatilgan: `src/components/questions/FormulaText.tsx`da `eslint-plugin-react`dan (bu loyihada o'rnatilmagan — `eslint.config.js` faqat `typescript-eslint`/`react-hooks`/`react-refresh`ni yuklaydi) `react/no-danger` qoidasiga ishora qiluvchi "osilib qolgan" `eslint-disable-next-line` izohi bor edi — ESLint v9 flat config buni xato (error) deb hisoblaydi, shuning uchun `npm run lint` har doim muvaffaqiyatsiz tugardi. Izoh olib tashlandi (u hech qachon hech narsani bostirmagan edi, chunki qoidaning o'zi yuklanmagan edi) — xatti-harakat o'zgarmadi, faqat o'lik izoh tozalandi.
 
 ## Ma'lum xususiyatlar (Sprint 83)
 
 `components/questions/FormulaText.tsx` — savol matnidagi HTML va `$..$`/`$$..$$` formula (KaTeX) belgilarini birga render qiladi. Sprint 83'da HTML teg chegaralarini buzadigan bug tuzatildi: formula regex'i endi faqat matn segmentlariga (teg ichidagi atributlarga emas) qo'llanadi — `html.split(/(<[^>]*>)/)` orqali tegdan ajratilgan juft-indeksli segmentlarga. Tekshirilgan cheklov: formula endi bitta teg chegarasidan oshib keta olmaydi (ataylab qilingan, xavfsiz trade-off). To'liq testlar: `FormulaText.test.tsx` (20 test).
+
+## AI Ustoz (Sprint 88)
+
+`pages/student/AiCenterPage.tsx` (`/student/ai`, faqat Applicant/Student panelida) — backend'ning haqiqiy `app/modules/ai/` kontraktiga ulangan minimal chat UI: `api/ai.ts` (`startChat`, `getChat`, `sendMessage`), `hooks/useAi.ts` (foydalanuvchining eng so'nggi suhbatini qayta ishlatadi, yo'q bo'lsa bittasini boshlaydi — har safar yangi suhbat yaratmaydi). Xususiyatlar: 4000 belgi client-side cheklovi (backenddagi bilan bir xil), yuklanish/xato holatlari, muvaffaqiyatsiz yuborishda avtomatik qayta urinish YO'Q — qo'lda "Qayta urinish" tugmasi (backend'ning rate-limit'ini ikki marta urib ko'rmaslik uchun ataylab). `AI_PROVIDER` sozlanmagan bo'lsa, backend halol `501` qaytaradi va sahifa shuni xato sifatida ko'rsatadi — soxta javob yo'q. `/admin/ai` ataylab o'zgartirilmagan (PlaceholderPage) — bu sprintda admin-tomonlama AI funksiyasi yo'q. Testlar: `AiCenterPage.test.tsx` (11 test) — yuklanish, mavjud suhbatni qayta ishlatish, yangi suhbat yaratish, tarixni ko'rsatish, xabar yuborish/muvaffaqiyat, xato holatlari.
 
 ## Folder tuzilmasi
 

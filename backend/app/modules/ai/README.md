@@ -6,9 +6,13 @@ Full design rationale: `docs/Sprint9_AI_Payments_Architecture.md` (approved).
 
 Same 8-layer pattern. `providers.py` (inside this module) defines `AIProvider` — same relationship `EmailProvider`/`StorageBackend` have to their services (Sprint 8). **No vendor SDK import anywhere** (no `openai`, `anthropic`, `google-generativeai`, etc.) — verified as part of Sprint 9 validation.
 
-## ⚠️ Approved scope boundary: no real AI vendor this sprint
+## Real AI provider (Sprint 88)
 
-`UnconfiguredAIProvider.generate()` raises `AIProviderNotConfiguredException` (501) — an honest refusal, not a fake response. A future sprint adds a real implementation and wires it in via `get_ai_provider()` — zero change to `AIChatService`.
+`AnthropicProvider` (`providers.py`) is the first real `AIProvider` implementation — calls Anthropic's Messages API directly over plain `httpx` (no vendor SDK added as a dependency). Wired in via `get_ai_provider()`/`select_ai_provider()` (`dependencies.py`) — **zero change to `AIChatService`**, exactly as the Sprint 9 docstring said a future sprint would do.
+
+**Opt-in only**: `AI_PROVIDER` defaults to `"none"` — `UnconfiguredAIProvider.generate()` still raises `AIProviderNotConfiguredException` (501, an honest refusal, never a fake response) unless `AI_PROVIDER=anthropic` is explicitly set AND `AI_API_KEY` is a real key (not left at its public placeholder default — `select_ai_provider()` checks this and falls back to `UnconfiguredAIProvider` otherwise, so a half-configured deployment fails with a clear 501, never a confusing provider-side 401). See root/backend README for the full environment-variable table and how to obtain a key.
+
+Every provider failure mode (not configured, provider auth failure, provider rate-limited, timeout, unavailable) is now a subclass of `AIProviderException` (`exceptions.py`) — `AIChatService.send_message` catches that one base class and logs usage the same way for all of them (`exc.error_code.lower()`), never the prompt or response content.
 
 ## Business rules
 
@@ -29,13 +33,13 @@ Tables: `ai_chats`, `ai_history`, `ai_recommendations`, `study_plans` (Module 21
 POST /api/v1/ai/chats                       — start a conversation                    Authenticated
 GET  /api/v1/ai/chats/me                      — list mine                                 Authenticated
 GET  /api/v1/ai/chats/{id}                      — get + full history                          Authenticated (owner)
-POST /api/v1/ai/chats/{id}/messages               — send a message (501 this sprint), rate-limited  Authenticated (owner), 10/min
+POST /api/v1/ai/chats/{id}/messages               — send a message, rate-limited                     Authenticated (owner), 10/min
 GET  /api/v1/ai/recommendations/me                  — my recommendations                                Authenticated
 GET  /api/v1/ai/study-plans/me                        — my study plans                                      Authenticated
 POST /api/v1/ai/study-plans                             — create a study plan                                  Authenticated
 ```
 
-## Flow — send a message (this sprint's actual behavior)
+## Flow — send a message
 
 ```
 POST /ai/chats/{id}/messages {content}
@@ -43,10 +47,20 @@ POST /ai/chats/{id}/messages {content}
   → AIChatService.send_message(chat_id, user_id, content)
       → ownership check
       → history = history_repo.list_recent_for_context(chat_id)   [bounded, oldest-first]
-      → save the user's message FIRST
-      → UnconfiguredAIProvider.generate(request) → raises AIProviderNotConfiguredException
-      → log_action('ai.message_sent', metadata={status: 'provider_not_configured', ...})
-      → commit → exception propagates → 501 response
+      → save the user's message FIRST (never lost even if the provider call fails)
+      → provider.generate(request)
+          → AI_PROVIDER=none (default) or AI_API_KEY still a placeholder:
+              UnconfiguredAIProvider raises AIProviderNotConfiguredException → 501
+          → AI_PROVIDER=anthropic + a real key: AnthropicProvider calls the
+            real Messages API (bounded by AI_REQUEST_TIMEOUT_SECONDS) and
+            either returns a real AIResponse, or raises one of
+            AIProviderAuthenticationException (502) / AIProviderRateLimitedException (429) /
+            AIProviderTimeoutException (504) / AIProviderUnavailableException (503) /
+            AIProviderException (502, generic upstream failure)
+      → on failure (any AIProviderException subclass): log_action('ai.message_sent',
+        metadata={status: exc.error_code.lower(), ...}) → commit → exception propagates
+      → on success: save the assistant's message, log_action(..., status: 'success',
+        provider, model, tokens_used) → commit → 200 response (MessageResponseOut, unchanged contract)
 ```
 
 ## Tests
@@ -54,6 +68,6 @@ POST /ai/chats/{id}/messages {content}
 Four files, 16 tests: `test_ai_validators.py` (6 — message length boundaries, date-range validation), `test_ai_providers.py` (3 — honest refusal, 501 status, history carried in `AIRequest`), `test_ai_chat_service.py` (7 — ownership, provider-not-configured propagation, usage logged on failure, user message saved before provider call, successful two-message save, prior history correctly assembled as context), `test_study_plan_service.py` (3 — including a duplicate of the schema-level date validation, intentionally, to prove both layers agree).
 
 ## Future improvements
-- Real `AIProvider` implementation(s) — e.g. `OpenAIProvider`, `AnthropicProvider` — each a separate future plugin, `AIChatService` unchanged.
-- Token-cost budgeting (usage is *logged*, not *cost-limited*, this sprint — only request-rate is limited).
+- Additional `AIProvider` implementation(s) — e.g. `OpenAIProvider` — each a separate future plugin, `AIChatService` unchanged (same pattern `AnthropicProvider` just proved).
+- Token-cost budgeting beyond `AI_MAX_OUTPUT_TOKENS` (usage is *logged*, request-rate and output-length are *limited*, but there is no running cost/spend budget this sprint).
 - `subjects`-scoped recommendation generation (currently `ai_recommendations.subject_id` exists in the schema and is exposed in `RecommendationOut`, but nothing generates a recommendation yet — that's tied to having a real provider).

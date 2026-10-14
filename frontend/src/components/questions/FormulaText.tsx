@@ -105,9 +105,19 @@ function renderWithFormulas(html: string): string {
 
 export function FormulaText({ html, className }: FormulaTextProps) {
   const rendered = useMemo(() => renderWithFormulas(html), [html]);
-  // eslint-disable-next-line react/no-danger -- `html` is always the
-  // backend's own Sprint 32 bleach-sanitized output (see the module
-  // docstring above); katex.renderToString's own output is also safe,
-  // well-known-safe markup, not arbitrary user HTML.
+  // Sprint 87 — removed a dangling `eslint-disable-next-line
+  // react/no-danger` comment here: `eslint-plugin-react` is not a
+  // dependency of this project (eslint.config.js only loads
+  // typescript-eslint, react-hooks, react-refresh), so that rule was
+  // never registered and the comment never actually suppressed
+  // anything — it only tripped ESLint v9's flat-config error for a
+  // disable comment targeting an unknown rule, which is what broke
+  // `npm run lint` (surfaced by adding the Sprint 87 frontend CI lint
+  // step). `html` is always the backend's own Sprint 32
+  // bleach-sanitized output (see the module docstring above);
+  // katex.renderToString's own output is also safe, well-known-safe
+  // markup, not arbitrary user HTML — dangerouslySetInnerHTML is still
+  // intentional and correct here, just no longer paired with a
+  // disable comment for a rule this project doesn't load.
   return <span className={className} dangerouslySetInnerHTML={{ __html: rendered }} />;
 }

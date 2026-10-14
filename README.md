@@ -13,7 +13,7 @@ Quyidagilar faqat haqiqiy backend kodi (`backend/app/modules/`, 27 modul) va fro
 - **Test/imtihon dvigateli**: testlar va savollar (`single_choice`, `multiple_choice`, `true_false`, `short_answer`, `essay`), variantlar, media, timer, savol/variantlarni aralashtirish, scoring, modul-darajasidagi adaptiv yo'naltirish (routing), modul-timer bilan avtomatik yakunlash.
 - **Natijalar va sertifikatlar**: natijalarni hisoblash, bo'lim bo'yicha natija tahlili, PDF sertifikat generatsiyasi (QR-kod bilan tasdiqlash), reyting (ranking) hisoblash.
 - **Media saqlash**: Cloudflare R2 orqali private, presigned upload/download, 2GB'gacha multipart yuklash (dars videosi, savol media, sertifikat PDF uchun) — yoki mahalliy disk (`STORAGE_BACKEND=local`, standart rejim).
-- **Qo'shimcha modullar**: bildirishnomalar (notifications), sozlamalar (Fernet shifrlash bilan maxfiy maydonlar), audit/system loglar, AI interfeysi (vendor-agnostik, haqiqiy AI ulanishi yo'q — faqat interfeys), to'lovlar (payments, vendor-agnostik, idempotent), maktablar/o'quv markazlari katalogi, foydalanuvchi profillari, student progress (dars tugatish holati).
+- **Qo'shimcha modullar**: bildirishnomalar (notifications), sozlamalar (Fernet shifrlash bilan maxfiy maydonlar), audit/system loglar, AI Ustoz — haqiqiy AI provayder integratsiyasi (Sprint 88: Anthropic, `AI_PROVIDER` orqali sozlanadi; konfiguratsiya bo'lmasa halol `501` qaytaradi, hech qachon soxta javob bermaydi — tafsilotlar: [`backend/README.md`](backend/README.md#ai-provayder-sprint-88)), to'lovlar (payments, vendor-agnostik, idempotent), maktablar/o'quv markazlari katalogi, foydalanuvchi profillari, student progress (dars tugatish holati).
 - **Admin panel**: barcha modullar uchun to'liq CRUD UI, imtihon tuzilmasini (bo'lim/modul/guruh) va adaptiv yo'naltirish qoidalarini sozlash UI.
 - **Teacher panel**: kontent yaratish (fayl boshqaruvi UI'siz).
 - **Student panel**: darslarni ko'rish, testlarni topshirish (shu jumladan modulli/adaptiv testlar), natijalar tarixi, sertifikatlar, progress.
@@ -92,10 +92,10 @@ BilimUz/
 │                                eski narrativ changelog), sprint arxitektura
 │                                hujjatlari, va `SPRINT_HISTORY.md` (sprint-by-sprint
 │                                to'liq holat arxivi — ilgari root README bo'lgan)
-├── .github/workflows/         — `openapi-schema-validation.yml` (Sprint 84 — push/PR'da
-│                                backend/**'ga tegsa, OpenAPI sxemasi generatsiya qilinib
-│                                tekshiriladi; `.gitkeep` ham saqlanib qolgan, bo'limga
-│                                qarang 11-da)
+├── .github/workflows/         — `openapi-schema-validation.yml` (Sprint 84), `backend-ci.yml`
+│                                va `frontend-ci.yml` (Sprint 87) — 3 ta GitHub Actions
+│                                workflow, `main`ga push va PR'da avtomatik ishga tushadi;
+│                                `.gitkeep` ham saqlanib qolgan, batafsil 11-bo'limga qarang
 ├── docker-compose.yml          — Postgres + Redis + backend uchun local dev stack
 ├── nginx/, docker/, scripts/    — hozircha bo'sh (`.gitkeep`)
 ├── .gitignore
@@ -191,6 +191,9 @@ Backend o'zining barcha sozlamalarini `backend/app/core/config.py`'dagi `Setting
 | `STORAGE_BACKEND` | Yo'q (standart: `local`) | `local` yoki `r2` |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT` | Faqat `STORAGE_BACKEND=r2` bo'lsa, production/staging'da ha | Cloudflare R2 hisob ma'lumotlari |
 | `ALLOWED_ORIGINS` | Yo'q (standart: `["http://localhost:5173"]`) | CORS uchun ruxsat etilgan origin'lar ro'yxati (JSON massiv) |
+| `AI_PROVIDER` | Yo'q (standart: `none`) | `none` yoki `anthropic` — Sprint 88, haqiqiy AI integratsiyasi. `none` bo'lsa, AI Center endpointi halol `501` qaytaradi. |
+| `AI_API_KEY` | Faqat `AI_PROVIDER=anthropic` bo'lganda, production/staging'da ha | Haqiqiy Anthropic API kaliti. Batafsil: [`backend/README.md`](backend/README.md#ai-provayder-sprint-88) |
+| `AI_MODEL` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_SECONDS` | Yo'q | Model tanlash, javob uzunligi va so'rov vaqti chegaralari — xarajat/abuse nazorati uchun |
 
 Frontend uchun: [`frontend/.env.example`](frontend/.env.example) — yagona o'zgaruvchi `VITE_API_BASE_URL` (standart: `http://localhost:8000/api/v1`).
 
@@ -249,7 +252,12 @@ npm run lint            # ESLint
 ## 11. Production deployment bo'yicha mavjud cheklovlar
 
 - `docker/`, `nginx/`, root-darajadagi `scripts/` papkalari hozircha **bo'sh** (faqat `.gitkeep`) — production uchun reverse-proxy konfiguratsiyasi, deployment skriptlari hali yozilmagan.
-- `.github/workflows/openapi-schema-validation.yml` (Sprint 84) — backend'ga tegishli push/PR'da `app.openapi()` orqali OpenAPI sxemasi haqiqatan generatsiya qilinishini va to'g'ri, serializable JSON ekanligini tekshiradi (PostgreSQL/Redis talab qilinmaydi). **Bu to'liq CI/CD emas** — faqat shu bitta tor tekshiruv; testlarning umumiy to'plami, linting, build/deploy hamon avtomatlashtirilmagan, qo'lda ishga tushiriladi (10-bo'limga qarang).
+- **CI (Sprint 84, kengaytirilgan Sprint 87'da)** — `main` branch'ga push va unga qaratilgan PR'larda uchta GitHub Actions workflow avtomatik ishga tushadi (`.github/workflows/`):
+  - `openapi-schema-validation.yml` (Sprint 84, faqat `backend/**`) — `app.openapi()` orqali OpenAPI sxemasi haqiqatan generatsiya qilinishini tekshiradi. PostgreSQL/Redis talab qilinmaydi.
+  - `backend-ci.yml` (Sprint 87, faqat `backend/**`) — ikkita job: `unit-tests` (`pytest app/ scripts/`, PostgreSQL/Redis talab qilinmaydi) va `integration-tests` (izolyatsiya qilingan Postgres 16 + Redis 7 service container'lari, `bilimuz_test` bazasini yaratib `alembic upgrade head` qo'llaydi, keyin `pytest tests/integration/`).
+  - `frontend-ci.yml` (Sprint 87, faqat `frontend/**`) — `npm ci` → `npm run test` → `npx tsc -b --noEmit` → `npm run lint` → `npm run build`.
+
+  Uchalasi ham minimal `permissions: contents: read` bilan ishlaydi, real secret ishlatmaydi (faqat CI konteynerining o'z vaqtinchalik test-only ma'lumotlari), hech qanday auto-deploy/auto-commit qadami yo'q. **Bu hamon to'liq CI/CD emas** — deployment, load testing va production monitoring hamon avtomatlashtirilmagan. Batafsil (lokal ekvivalent buyruqlar, izolyatsiya mexanizmi) — `backend/README.md`ning "CI" bo'limi va `frontend/README.md`ning "CI" bo'limi.
 - `docker-compose.yml` faqat **local development** stacki — production-darajadagi Compose/Kubernetes konfiguratsiyasi (resurs limitlari, health-check'lar, secret boshqaruvi, TLS) alohida tayyorlanishi kerak.
 - `ENVIRONMENT=production` (yoki `staging`) bilan ishga tushirishda, agar `JWT_SECRET_KEY` yoki `FILE_ENCRYPTION_KEY` (va `STORAGE_BACKEND=r2` bo'lsa, `R2_*` qiymatlari) standart (`CHANGE_ME_IN_PRODUCTION...`) qiymatda qolsa — backend ishga tushishni **rad etadi** (fail-closed xavfsizlik tekshiruvi, 8-bo'limga qarang). Bu — real production checklist emas, faqat eng kritik secret-default tekshiruvi.
 - Xalqaro standartlashtirilgan imtihonlar (IELTS/SAT/GRE) uchun maxsus javob turlari va band/scaled-score konversiyasi hali amalga oshirilmagan.

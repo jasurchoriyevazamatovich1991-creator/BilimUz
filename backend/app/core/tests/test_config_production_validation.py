@@ -230,3 +230,58 @@ def test_production_with_r2_storage_and_real_r2_credentials_is_safe():
         R2_BUCKET_NAME="real-bucket",
     )
     assert validate_production_secrets(settings) == []
+
+
+# --- Sprint 88 — AI_API_KEY secret-safety, same pattern as R2 above ---
+
+
+def test_production_with_ai_provider_none_never_checks_ai_api_key_default():
+    """AI_PROVIDER defaults to "none" — AI_API_KEY is never read in that
+    mode, so it must not be flagged even though it's still at its
+    CHANGE_ME default (mirrors test_production_with_local_storage_never_
+    checks_r2_defaults above)."""
+    settings = _settings(
+        ENVIRONMENT="production",
+        JWT_SECRET_KEY="a-real-secret",
+        FILE_ENCRYPTION_KEY="a-real-fernet-key",
+        AI_PROVIDER="none",
+    )
+    assert validate_production_secrets(settings) == []
+
+
+def test_production_with_anthropic_provider_and_default_ai_api_key_is_flagged():
+    settings = _settings(
+        ENVIRONMENT="production",
+        JWT_SECRET_KEY="a-real-secret",
+        FILE_ENCRYPTION_KEY="a-real-fernet-key",
+        AI_PROVIDER="anthropic",
+    )
+    unsafe = validate_production_secrets(settings)
+    assert "AI_API_KEY" in unsafe
+
+
+def test_production_with_anthropic_provider_and_real_ai_api_key_is_safe():
+    settings = _settings(
+        ENVIRONMENT="production",
+        JWT_SECRET_KEY="a-real-secret",
+        FILE_ENCRYPTION_KEY="a-real-fernet-key",
+        AI_PROVIDER="anthropic",
+        AI_API_KEY="sk-ant-a-real-key-issued-by-anthropic",
+    )
+    assert validate_production_secrets(settings) == []
+
+
+def test_staging_with_anthropic_provider_and_default_ai_api_key_is_flagged():
+    settings = _settings(
+        ENVIRONMENT="staging",
+        JWT_SECRET_KEY="a-real-secret",
+        FILE_ENCRYPTION_KEY="a-real-fernet-key",
+        AI_PROVIDER="anthropic",
+    )
+    unsafe = validate_production_secrets(settings)
+    assert "AI_API_KEY" in unsafe
+
+
+def test_ai_provider_invalid_value_is_rejected():
+    with pytest.raises(ValidationError, match="AI_PROVIDER"):
+        _settings(AI_PROVIDER="openai")

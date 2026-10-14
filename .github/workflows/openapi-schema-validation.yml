@@ -25,6 +25,14 @@
 # closes this one previously-unvalidated gap.
 name: OpenAPI Schema Validation
 
+# Sprint 87 — explicit minimum permissions (GitHub Actions security
+# review). This workflow only reads the checkout and runs a read-only
+# schema-generation test; it never needs to write to the repo, open
+# issues/PRs, or touch packages, so GITHUB_TOKEN is restricted to
+# read-only `contents` instead of the default read-write grant.
+permissions:
+  contents: read
+
 on:
   push:
     paths:

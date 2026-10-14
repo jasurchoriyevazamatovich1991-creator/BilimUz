@@ -4,7 +4,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.modules.ai.exceptions import AIProviderNotConfiguredException, ChatNotFoundException
+from app.modules.ai.exceptions import (
+    AIProviderAuthenticationException,
+    AIProviderNotConfiguredException,
+    AIProviderRateLimitedException,
+    AIProviderTimeoutException,
+    AIProviderUnavailableException,
+    ChatNotFoundException,
+)
 from app.modules.ai.providers import AIResponse
 from app.modules.ai.service import AIChatService
 
@@ -93,6 +100,38 @@ def test_send_message_succeeds_and_saves_both_messages(service, mock_chat_repo, 
 
     assert mock_history_repo.create.call_count == 2
     mock_chat_repo.commit.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "provider_exception",
+    [
+        AIProviderNotConfiguredException("not configured"),
+        AIProviderAuthenticationException("auth failed"),
+        AIProviderRateLimitedException("rate limited"),
+        AIProviderTimeoutException("timed out"),
+        AIProviderUnavailableException("unavailable"),
+    ],
+)
+def test_send_message_propagates_and_logs_every_provider_failure_mode(
+    service, mock_chat_repo, mock_history_repo, mock_provider, provider_exception
+):
+    """Sprint 88 — every AIProviderException subclass (not just
+    NotConfigured) must: (1) propagate unchanged to the caller, (2)
+    still have saved the user's message first, (3) still commit the
+    usage-log. Parametrized over all five failure modes to prove the
+    broadened `except AIProviderException` in service.py actually
+    catches each one, not just the one it used to catch."""
+    user_id = uuid.uuid4()
+    chat_id = uuid.uuid4()
+    mock_chat_repo.get_by_id.return_value = MagicMock(id=chat_id, user_id=user_id)
+    mock_history_repo.list_recent_for_context.return_value = []
+    mock_provider.generate.side_effect = provider_exception
+
+    with pytest.raises(type(provider_exception)):
+        service.send_message(chat_id, user_id, "Salom")
+
+    mock_history_repo.create.assert_called_once()  # user message saved before the provider call
+    mock_chat_repo.commit.assert_called_once()  # usage-log commit still happened
 
 
 def test_send_message_includes_prior_history_as_context(service, mock_chat_repo, mock_history_repo, mock_provider):

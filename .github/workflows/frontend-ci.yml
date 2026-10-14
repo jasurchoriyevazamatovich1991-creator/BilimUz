@@ -1,0 +1,64 @@
+# Sprint 87 — Frontend CI: test, type-check, lint, production build.
+# Uses only the commands already defined in frontend/package.json
+# (`npm run test`, `npm run lint`, `npm run build`) plus the TypeScript
+# compiler's own project-reference check (`tsc -b --noEmit`) that
+# `npm run build` already runs as its first half (`tsc -b && vite
+# build`) — split out here as its own step purely so a type error and
+# a bundler/build error are reported as distinct CI failures; no new
+# package.json script was added for this; `--noEmit` is just an extra
+# flag on the existing `tsc -b` invocation so this step never writes
+# build output.
+name: Frontend CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-checks:
+    name: Test, type-check, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the root README's documented prerequisite
+          # ("Node.js 20+ va npm", README.md §5).
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies (reproducible, from package-lock.json)
+        run: npm ci
+
+      - name: Run frontend test suite
+        run: npm run test
+
+      - name: TypeScript type check
+        run: npx tsc -b --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build

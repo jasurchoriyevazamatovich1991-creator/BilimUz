@@ -6,7 +6,7 @@ per the approved decision to reuse audit_logs instead of a new table.
 import uuid
 
 from app.core.audit import log_action
-from app.modules.ai.exceptions import AIProviderNotConfiguredException, ChatNotFoundException, StudyPlanNotFoundException
+from app.modules.ai.exceptions import AIProviderException, ChatNotFoundException, StudyPlanNotFoundException
 from app.modules.ai.models import AiChat, AiHistoryEntry, StudyPlan
 from app.modules.ai.providers import AIMessage, AIProvider, AIRequest
 from app.modules.ai.repository import ChatRepository, HistoryRepository, RecommendationRepository, StudyPlanRepository
@@ -47,9 +47,16 @@ class AIChatService:
 
         try:
             response = self.provider.generate(request)
-        except AIProviderNotConfiguredException:
+        except AIProviderException as exc:
+            # Sprint 88 — catches every AIProvider failure mode uniformly
+            # (not configured, auth failure, rate limited, timeout,
+            # unavailable — all subclass AIProviderException), so every
+            # one is logged the same way. Deliberately logs only
+            # exc.error_code (e.g. "AI_PROVIDER_TIMEOUT"), never
+            # exc.message's full text and never the prompt/response
+            # content — metadata stays a safe, non-identifying signal.
             log_action(self.chat_repo.db, action="ai.message_sent", user_id=user_id, metadata={
-                "chat_id": str(chat_id), "status": "provider_not_configured",
+                "chat_id": str(chat_id), "status": exc.error_code.lower(),
             })
             self.chat_repo.commit()
             raise

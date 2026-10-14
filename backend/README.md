@@ -123,9 +123,43 @@ saqlar edi) shu sprintda yopildi — hujjat emas, implementatsiyaning o'zi tuzat
   (2026-10-13) izolyatsiya qilingan `bilimuz_test` bazasiga qarshi ishga tushirilgan va **5/5 passed**).
   Batafsil izolyatsiya metodologiyasi uchun yuqoridagi "Testlash" bo'limiga qarang.
 
-## CI (Sprint 84)
+## CI (Sprint 84, kengaytirilgan Sprint 87'da)
 
-`../.github/workflows/openapi-schema-validation.yml` — `backend/**`ga tegishli push/PR'da yuqoridagi so'nggi buyruqni (`test_openapi_schema_generation.py`) ishga tushiradi. Bu **to'liq CI emas** — faqat OpenAPI sxemasi haqiqatan generatsiya qilinishini va to'g'ri JSON ekanligini tekshiradi; umumiy test to'plami, linting va build/deploy hamon qo'lda bajariladi.
+Uchta GitHub Actions workflow (`../.github/workflows/`), `backend/**` yoki `frontend/**`ga tegishli push (`main`) va PR'da ishga tushadi:
+
+- **`openapi-schema-validation.yml`** (Sprint 84) — faqat `test_openapi_schema_generation.py`ni ishga tushiradi; OpenAPI sxemasi haqiqatan generatsiya qilinishini va to'g'ri JSON ekanligini tekshiradi. PostgreSQL/Redis talab qilinmaydi.
+- **`backend-ci.yml`** (Sprint 87) — ikkita alohida job:
+  - `unit-tests` — yuqoridagi "Testlash" bo'limining birinchi buyrug'ini (`pytest app/ scripts/`) ishga tushiradi. PostgreSQL/Redis kerak emas. **Muhim**: `ENVIRONMENT` bu yerda oddiy job-darajasidagi OS env var sifatida emas, balki ishga tushirishdan oldin yozilgan vaqtinchalik `backend/.env` fayli orqali beriladi — sababi: `app/core/tests/test_config_production_validation.py::test_environment_completely_unset_is_rejected_fail_closed` `Settings(_env_file=None)` orqali ENVIRONMENT hech qaysi manbadan kelmasligini tekshiradi, va `_env_file=None` faqat `.env` faylini o'chiradi, OS env varini emas — shuning uchun `ENVIRONMENT`ni job-darajasida OS env var qilib qo'yish shu testni doimo sindiradi (Sprint 87 validatsiyasida aniqlangan va tuzatilgan).
+  - `integration-tests` — Postgres 16 va Redis 7 service container'lari (`docker-compose.yml` bilan bir xil image'lar), `TEST_DATABASE_URL`/`TEST_REDIS_URL` orqali izolyatsiya qilingan (yuqoridagi "Testlash" bo'limidagi xavfsizlik gate'lari bilan bir xil), `bilimuz_test` bazasini yaratib, `alembic upgrade head`ni qo'llab, keyin `pytest tests/integration/`ni ishga tushiradi.
+- **`frontend-ci.yml`** (Sprint 87) — `frontend/README.md`ga qarang.
+
+Barcha uchta workflow minimal `permissions: contents: read` bilan ishlaydi (yozish huquqi yo'q), real secret ishlatmaydi (faqat CI konteynerining o'z ichidagi vaqtinchalik test-only `postgres`/`postgres` login), va hech qanday auto-deploy/auto-commit qadam yo'q. Bu hamon **to'liq CI/CD emas** — deployment, load testing, va production monitoring hamon avtomatlashtirilmagan (11-bo'limga qarang).
+
+## AI provayder (Sprint 88)
+
+`app/modules/ai/` moduli endi, konfiguratsiya mavjud bo'lsa, haqiqiy AI javob beradi — default holatda esa (`AI_PROVIDER=none`, boshlang'ich holat) halol `501 Not Implemented` qaytaradi, hech qachon soxta javob ixtiyoriy qilmaydi. To'liq arxitektura va xatolik-rejimlari uchun [`app/modules/ai/README.md`](app/modules/ai/README.md)ga qarang — bu bo'lim faqat sozlash va test qilishni qisqacha tushuntiradi.
+
+**Kerakli `.env` o'zgaruvchilari** (`.env.example`da izohli qoldirilgan, default holatda o'chiq):
+
+| O'zgaruvchi | Default | Tavsif |
+|---|---|---|
+| `AI_PROVIDER` | `none` | `none` yoki `anthropic`. `none` bo'lsa, `AI_API_KEY` hech qachon o'qilmaydi va endpoint 501 qaytaradi. |
+| `AI_API_KEY` | `CHANGE_ME_IN_PRODUCTION` | Haqiqiy Anthropic API kaliti (`sk-ant-...`). Placeholder qolsa — `AI_PROVIDER=anthropic` bo'lsa ham — xavfsiz tarzda 501'ga qaytadi (`select_ai_provider()`, `app/modules/ai/dependencies.py`). |
+| `AI_MODEL` | `claude-3-5-haiku-20241022` | Anthropic Messages API model nomi. |
+| `AI_MAX_OUTPUT_TOKENS` | `1024` | Har bir javobdagi maksimal token soni — xarajat nazorati. |
+| `AI_REQUEST_TIMEOUT_SECONDS` | `30.0` | Provayderga yuborilgan so'rovning maksimal kutish vaqti. |
+
+**Haqiqiy kalitni qayerdan olish mumkin**: https://console.anthropic.com/ saytida ro'yxatdan o'ting va API Keys bo'limidan kalit yarating. **Bu loyihada hech qachon haqiqiy kalit ishlatilmagan** — barcha testlar (`app/modules/ai/tests/test_anthropic_provider.py`, `test_ai_provider_selection.py`, `tests/integration/test_sprint88_ai_provider_integration.py`) `httpx.post`'ni yoki butun provayderni mock/fake qiladi, hech qachon haqiqiy tarmoqqa chiqmaydi.
+
+**Haqiqiy kalitsiz test qilish**: hech narsa qilish kerak emas — `AI_PROVIDER` o'rnatilmagan holatda barcha AI testlari fake provayderlar bilan ishlaydi (`app.dependency_overrides[get_ai_provider]`, integration testlarda; `MagicMock`, unit testlarda). Sprint 87'ning CI workflow'lari (`backend-ci.yml`) ham hech qanday haqiqiy AI secret talab qilmaydi.
+
+**Nazorat qilinadigan cheklovlar** (barchasi shu sprintda, provayderga bog'liq bo'lmagan holda amalga oshirilgan):
+- Xabar uzunligi: 4000 belgi (`MAX_MESSAGE_LENGTH`, `app/modules/ai/constants.py`) — provayderga yetmasdan oldin rad etiladi.
+- Tezlik cheklovi: foydalanuvchi boshiga 10 so'rov/daqiqa (`rate_limit_by_user()`, auth modulidan qayta ishlatilgan, o'zgarishsiz).
+- So'rov vaqti: `AI_REQUEST_TIMEOUT_SECONDS` bilan chegaralangan (default 30s) — provayder javob bermasa, `AIProviderTimeoutException` (504).
+- Javob uzunligi: `AI_MAX_OUTPUT_TOKENS` bilan chegaralangan — xarajat nazorati provayder darajasida.
+- Avtomatik qayta urinish yo'q — muvaffaqiyatsiz so'rov bir marta urinadi va xatoni aniq qaytaradi (frontend qo'lda "Qayta urinish" tugmasini taklif qiladi).
+- Provayder xarajat/kvota siyosati (masalan, Anthropic'ning o'zidagi rate limit yoki billing) — bu Anthropic tomonidan boshqariladi, bu loyihada takrorlanmagan yoki o'ylab topilmagan.
 
 ## Xavfsizlik eslatmalari
 

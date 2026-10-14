@@ -1,9 +1,11 @@
 """
 HTTP layer for /api/v1/ai/*. Every endpoint requires authentication, no
 Admin-tier endpoints this sprint. POST /chats/{id}/messages is rate-
-limited (10/minute per user, approved decision) via the new
-rate_limit_by_user() dependency (auth module) — returns 501 this sprint
-since no real AIProvider is configured (honest, not faked).
+limited (10/minute per user, approved decision) via the
+rate_limit_by_user() dependency (auth module). Sprint 88: returns a real
+AI-generated response when AI_PROVIDER=anthropic is configured with a
+real key; otherwise still returns 501 (honest, not faked) — see
+app/modules/ai/README.md's "Real AI provider (Sprint 88)" section.
 """
 import uuid
 
@@ -74,8 +76,9 @@ def get_chat(
     "/chats/{chat_id}/messages",
     summary="Send a message and get an AI response",
     description=f"Rate-limited: {MESSAGE_RATE_LIMIT_MAX_REQUESTS} requests/{MESSAGE_RATE_LIMIT_WINDOW_SECONDS}s per user. "
-                "501 Not Implemented — no real AI provider is configured this sprint "
-                "(approved scope boundary: provider abstraction only).",
+                "Returns a real AI-generated response when a provider is configured "
+                "(AI_PROVIDER=anthropic + a real AI_API_KEY); otherwise 501 Not Implemented "
+                "(honest refusal — see app/modules/ai/README.md).",
 )
 def send_message(
     chat_id: uuid.UUID,
