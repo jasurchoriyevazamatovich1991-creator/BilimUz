@@ -9,6 +9,7 @@ import { RegisterPage } from "@/pages/public/RegisterPage";
 import { VerifyPage } from "@/pages/public/VerifyPage";
 import { VerifyCertificatePage } from "@/pages/public/VerifyCertificatePage";
 import { UnsupportedRolePage } from "@/pages/public/UnsupportedRolePage";
+import { NotFoundPage } from "@/pages/public/NotFoundPage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
 import { UsersListPage } from "@/pages/admin/UsersListPage";
 import { UserDetailPage } from "@/pages/admin/UserDetailPage";
@@ -207,6 +208,13 @@ export function AppRoutes() {
           ])}
         </Route>
       </Route>
+
+      {/* Sprint 89 — catch-all. Must stay last: React Router matches
+          routes in declaration order, and "*" would otherwise shadow
+          every route below it. No layout wrapper (works for both
+          authenticated and unauthenticated visitors) — see
+          NotFoundPage.tsx. */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

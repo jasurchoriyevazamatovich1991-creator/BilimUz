@@ -5,6 +5,7 @@ import { useLogout } from "@/hooks/useAuth";
 import { resolvePanel, panelBasePath } from "@/utils/roleConfig";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { useThemeStore } from "@/store/themeStore";
+import { useUiStore } from "@/store/uiStore";
 
 /**
  * Sprint 14: replaces Sprint 13's single flat "Chiqish" button with a
@@ -37,6 +38,7 @@ export function Header() {
   const { data: unreadCount } = useUnreadNotificationCount(isStudent);
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const toggleMobileNav = useUiStore((s) => s.toggleMobileNav);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -62,26 +64,37 @@ export function Header() {
   const settingsPath = `${basePath}/settings`;
 
   return (
-    <header className="flex items-center justify-between border-b border-border bg-background px-6 py-4">
-      {isStudent ? (
-        <Link
-          to="/student/notifications"
-          aria-label="Bildirishnomalar"
-          className="relative flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-primary/10"
+    <header className="flex items-center justify-between border-b border-border bg-background px-4 py-4 sm:px-6">
+      <div className="flex items-center gap-1">
+        {/* Sprint 89 — opens the Sidebar's mobile drawer (see
+            Sidebar.tsx/uiStore.ts). Hidden at `lg` and above, where the
+            sidebar is always visible and there is nothing to toggle. */}
+        <button
+          type="button"
+          onClick={toggleMobileNav}
+          aria-label="Navigatsiyani ochish"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-primary/10 lg:hidden"
         >
-          <span aria-hidden="true">🔔</span>
-          {unreadCount && unreadCount > 0 ? (
-            <span
-              aria-label={`${unreadCount} ta o'qilmagan bildirishnoma`}
-              className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          ) : null}
-        </Link>
-      ) : (
-        <div />
-      )}
+          <span aria-hidden="true">☰</span>
+        </button>
+        {isStudent ? (
+          <Link
+            to="/student/notifications"
+            aria-label="Bildirishnomalar"
+            className="relative flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 hover:bg-primary/10"
+          >
+            <span aria-hidden="true">🔔</span>
+            {unreadCount && unreadCount > 0 ? (
+              <span
+                aria-label={`${unreadCount} ta o'qilmagan bildirishnoma`}
+                className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            ) : null}
+          </Link>
+        ) : null}
+      </div>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -103,7 +116,12 @@ export function Header() {
             {user.first_name[0]}
             {user.last_name[0]}
           </span>
-          <span>{user.first_name} {user.last_name}</span>
+          {/* Sprint 89 — the full name is hidden below `sm` (avatar
+              initials + role badge alone are enough to identify the
+              account on a narrow screen); showing all three together
+              at 320–375px widths was crowding this button against the
+              hamburger/bell/theme buttons on the same row. */}
+          <span className="hidden sm:inline">{user.first_name} {user.last_name}</span>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{user.role}</span>
         </button>
 

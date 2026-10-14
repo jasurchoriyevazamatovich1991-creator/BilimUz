@@ -5,7 +5,16 @@
  * existing shadcn/ui Button rather than a separate Dialog primitive
  * (none exists yet in components/ui/ — adding one is out of this
  * sprint's approved scope, which only asked for ConfirmDialog itself).
+ *
+ * Sprint 89 fix — audit finding: this dialog had no Escape-to-close and
+ * moved focus nowhere on open, inconsistent with the Header dropdown's
+ * own already-existing Escape-key handling (Header.tsx). A keyboard-only
+ * user previously had no way to dismiss it except blindly Tab-cycling.
+ * Fixed the same way Header.tsx already does it (keydown listener while
+ * open), plus autofocusing the Cancel button — the safer of the two
+ * actions — on mount.
  */
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
 interface ConfirmDialogProps {
@@ -29,6 +38,20 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    cancelButtonRef.current?.focus();
+
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -48,7 +71,7 @@ export function ConfirmDialog({
         </h2>
         <p className="mt-2 text-sm text-foreground/60">{description}</p>
         <div className="mt-6 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isConfirming}>
+          <Button ref={cancelButtonRef} type="button" variant="outline" onClick={onCancel} disabled={isConfirming}>
             {cancelLabel}
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm} disabled={isConfirming}>

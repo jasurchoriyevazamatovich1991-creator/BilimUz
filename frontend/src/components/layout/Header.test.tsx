@@ -6,6 +6,7 @@ import { Header } from "./Header";
 import { useAuthStore } from "@/store/authStore";
 import { notificationsApi } from "@/api/notifications";
 import { useThemeStore } from "@/store/themeStore";
+import { useUiStore } from "@/store/uiStore";
 
 vi.mock("@/api/notifications");
 
@@ -80,6 +81,22 @@ describe("Header", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
+
+describe("Header — Sprint 89 mobile nav toggle", () => {
+  beforeEach(() => {
+    useAuthStore.getState().logout();
+    useAuthStore.getState().setUser({ id: "1", first_name: "Aziz", last_name: "Karimov", phone: null, email: null, role: "Teacher" });
+    useUiStore.setState({ isMobileNavOpen: false });
+  });
+
+  it("toggles the shared mobile-nav store when clicked", () => {
+    renderHeader();
+    fireEvent.click(screen.getByLabelText("Navigatsiyani ochish"));
+    expect(useUiStore.getState().isMobileNavOpen).toBe(true);
+    fireEvent.click(screen.getByLabelText("Navigatsiyani ochish"));
+    expect(useUiStore.getState().isMobileNavOpen).toBe(false);
   });
 });
 

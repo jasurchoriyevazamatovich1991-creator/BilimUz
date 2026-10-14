@@ -24,7 +24,7 @@ import { paymentsApi } from "@/api/payments";
 import { useToastStore } from "@/store/toastStore";
 import { ApiError } from "@/api/client";
 
-function useToastOnQueryError(query: UseQueryResult<unknown, unknown>) {
+export function useToastOnQueryError(query: UseQueryResult<unknown, unknown>) {
   const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {

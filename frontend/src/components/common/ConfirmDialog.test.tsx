@@ -47,4 +47,24 @@ describe("ConfirmDialog", () => {
     render(<ConfirmDialog open title="T" description="D" isConfirming onConfirm={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByText("Bekor qilish")).toBeDisabled();
   });
+
+  // Sprint 89 — keyboard-accessibility fix.
+  it("calls onCancel on Escape", () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open title="T" description="D" onConfirm={vi.fn()} onCancel={onCancel} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("does not react to Escape when closed", () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open={false} title="T" description="D" onConfirm={vi.fn()} onCancel={onCancel} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("moves focus to the Cancel button on open", () => {
+    render(<ConfirmDialog open title="T" description="D" onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByText("Bekor qilish")).toHaveFocus();
+  });
 });
