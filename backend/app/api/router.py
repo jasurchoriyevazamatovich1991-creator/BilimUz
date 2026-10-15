@@ -16,6 +16,8 @@ from app.modules.analytics.router import router as analytics_router
 from app.modules.attempts.router import router as attempts_router
 from app.modules.audit_logs.router import router as audit_logs_router
 from app.modules.auth.router import router as auth_router
+from app.modules.catalog.router import router as catalog_products_router
+from app.modules.entitlements.router import router as entitlements_router
 from app.modules.certificates.router import router as certificates_router
 from app.modules.certificates.router import template_router as certificate_templates_router
 from app.modules.grades.router import router as grades_router
@@ -71,5 +73,13 @@ api_router.include_router(profiles_router)
 api_router.include_router(progress_router)
 api_router.include_router(audit_logs_router)
 api_router.include_router(system_logs_router)
+
+# Sprint 91 Phase 1 — Unified Learning Catalog / Grade Subscriptions:
+# catalog product admin CRUD.
+api_router.include_router(catalog_products_router)
+
+# Admin Management of Mock Test Entitlements (Task D) — grant/extend/
+# revoke/admin-list + the student-facing /entitlements/me self-view.
+api_router.include_router(entitlements_router)
 
 # Sprint 12 complete. As modules are implemented, register them here.

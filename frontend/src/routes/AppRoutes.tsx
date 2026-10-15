@@ -54,6 +54,7 @@ import { CertificatesListPage } from "@/pages/student/CertificatesListPage";
 import { NotificationsPage } from "@/pages/student/NotificationsPage";
 import { AiCenterPage } from "@/pages/student/AiCenterPage";
 import { CertificateDetailPage } from "@/pages/student/CertificateDetailPage";
+import { MockTestEntitlementsPage } from "@/pages/student/MockTestEntitlementsPage";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { ADMIN_ITEMS, TEACHER_ITEMS, APPLICANT_STUDENT_ITEMS } from "@/utils/sidebarConfig";
@@ -197,6 +198,9 @@ export function AppRoutes() {
               (Applicant/Student roles); /admin/ai remains an untouched
               PlaceholderPage since no admin-facing AI feature exists. */}
           <Route path="/student/ai" element={<AiCenterPage />} />
+          {/* Admin Management of Mock Test Entitlements, Task D — the
+              student-facing self-view (spec §5), read-only. */}
+          <Route path="/student/mock-test-entitlements" element={<MockTestEntitlementsPage />} />
           {placeholderRoutesFor(APPLICANT_STUDENT_ITEMS, "/student", [
             "/student/tests",
             "/student/certificates",
@@ -205,6 +209,7 @@ export function AppRoutes() {
             "/student/lessons",
             "/student/results",
             "/student/ai",
+            "/student/mock-test-entitlements",
           ])}
         </Route>
       </Route>

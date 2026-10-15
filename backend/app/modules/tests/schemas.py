@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.modules.questions.validators import sanitize_rich_text
 from app.modules.tests.validators import validate_duration, validate_passing_score, validate_test_title
@@ -15,7 +15,12 @@ class TestCreateRequest(BaseModel):
     title: str
     description: str | None = None
     difficulty: str = "medium"
-    duration: int = 60
+    # Mock-test entitlements spec §3 — "the teacher/admin must specify
+    # its duration before publishing it." No default anymore (was 60):
+    # every caller must now pass an explicit value. The frontend form
+    # already always sends one (TestFormPage.tsx's own useState(60)),
+    # so this is a pure server-side tightening, not a breaking UI change.
+    duration: int
     passing_score: float | None = None
     shuffle_questions: bool = True
     shuffle_answers: bool = True
@@ -24,6 +29,13 @@ class TestCreateRequest(BaseModel):
     max_attempts: int | None = None
     # Sprint 47 — optional, generic. No IELTS-specific enum.
     exam_variant: str | None = None
+    # Mock-test entitlements spec §1/§2 — False for every test unless
+    # explicitly opted in. True requires subject_id to also be set
+    # (enforced below AND by ck_tests_mock_test_requires_subject) —
+    # subject_id is the "direction" (a school subject OR an exam like
+    # IELTS/SAT/GRE, both just rows in the existing, generic Subject
+    # table) the entitlements module checks access against.
+    is_mock_test: bool = False
 
     @field_validator("title")
     @classmethod
@@ -54,6 +66,16 @@ class TestCreateRequest(BaseModel):
             raise ValueError("difficulty quyidagilardan biri bo'lishi kerak: easy, medium, hard")
         return v
 
+    @model_validator(mode="after")
+    def _mock_test_requires_subject(self) -> "TestCreateRequest":
+        """Fast, fail-at-the-door copy of ck_tests_mock_test_requires_subject
+        — a full create request always has both fields in scope, unlike
+        a partial update (see TestService._validate_mock_test_consistency
+        for why that case is handled in the service layer instead)."""
+        if self.is_mock_test and self.subject_id is None:
+            raise ValueError("is_mock_test=true uchun subject_id (fan/yo'nalish) ko'rsatilishi shart")
+        return self
+
 
 class TestUpdateRequest(BaseModel):
     subject_id: uuid.UUID | None = None
@@ -68,6 +90,7 @@ class TestUpdateRequest(BaseModel):
     shuffle_answers: bool | None = None
     max_attempts: int | None = None
     exam_variant: str | None = None
+    is_mock_test: bool | None = None
 
     @field_validator("title")
     @classmethod
@@ -116,6 +139,7 @@ class TestOut(BaseModel):
     status: str
     max_attempts: int | None
     exam_variant: str | None
+    is_mock_test: bool
     created_at: datetime
     updated_at: datetime
 

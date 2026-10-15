@@ -6,6 +6,11 @@ from app.db.session import get_db
 from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
 from app.modules.attempts.service import AttemptService
+from app.modules.catalog.dependencies import get_catalog_product_repository
+from app.modules.catalog.repository import CatalogProductRepository
+from app.modules.entitlements.dependencies import get_entitlement_repository
+from app.modules.entitlements.repository import EntitlementRepository
+from app.modules.entitlements.service import EntitlementService
 from app.modules.questions.repository import OptionRepository, QuestionRepository
 from app.modules.tests.repository import (
     ExamModuleRepository,
@@ -63,6 +68,13 @@ def get_module_execution_service(
     )
 
 
+def get_entitlement_service_for_attempts(
+    entitlement_repo: EntitlementRepository = Depends(get_entitlement_repository),
+    product_repo: CatalogProductRepository = Depends(get_catalog_product_repository),
+) -> EntitlementService:
+    return EntitlementService(entitlement_repo, product_repo)
+
+
 def get_attempt_service(
     repo: AttemptRepository = Depends(get_attempt_repository),
     answer_repo: AnswerRepository = Depends(get_answer_repository),
@@ -70,6 +82,7 @@ def get_attempt_service(
     module_repo: ExamModuleRepository = Depends(get_exam_module_repository),
     section_repo: ExamSectionRepository = Depends(get_exam_section_repository),
     group_repo: QuestionGroupRepository = Depends(get_question_group_repository),
+    entitlement_service: EntitlementService = Depends(get_entitlement_service_for_attempts),
     db: Session = Depends(get_db),
 ) -> AttemptService:
     # Sprint 50 — module_execution/module_repo are now always wired for
@@ -82,7 +95,10 @@ def get_attempt_service(
     # AttemptService.get_module_for_attempt()'s section-name lookup.
     # Sprint 77 — group_repo wired the same way, for
     # get_attempt_detail()'s batched QuestionGroup/stimulus_text lookup.
+    # Mock Test Entitlements feature — entitlement_service wired the
+    # same way, for start_attempt()'s is_mock_test gate. A non-mock
+    # test's start_attempt() call never reads it at all.
     return AttemptService(
         repo, answer_repo, TestRepository(db), QuestionRepository(db), OptionRepository(db),
-        module_execution, module_repo, section_repo, group_repo,
+        module_execution, module_repo, section_repo, group_repo, entitlement_service,
     )

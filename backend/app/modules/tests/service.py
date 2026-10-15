@@ -18,6 +18,7 @@ from app.modules.tests.exceptions import (
     ExamSectionNotFoundException,
     InvalidStatusTransitionException,
     InvalidTestReferenceException,
+    MockTestRequiresSubjectException,
     QuestionGroupNotFoundException,
     RoutingThresholdRuleNotFoundException,
     TestNotFoundException,
@@ -71,6 +72,11 @@ class TestService:
 
     def create_test(self, data: TestCreateRequest, actor_id: uuid.UUID) -> Test:
         self._validate_references(data.subject_id, data.grade_id, data.topic_id)
+        # Schema-level model_validator already rejects this for a full
+        # create request — kept here too (cheap, same check) so the
+        # same guarantee holds even if a caller builds a TestCreateRequest
+        # programmatically and skips Pydantic validation somehow.
+        self._validate_mock_test_consistency(data.is_mock_test, data.subject_id)
 
         test = Test(
             subject_id=data.subject_id,
@@ -85,6 +91,7 @@ class TestService:
             shuffle_answers=data.shuffle_answers,
             max_attempts=data.max_attempts,
             exam_variant=data.exam_variant,
+            is_mock_test=data.is_mock_test,
             created_by=actor_id,
         )
         self.repo.create(test)
@@ -100,6 +107,15 @@ class TestService:
             updates.get("subject_id", test.subject_id),
             updates.get("grade_id", test.grade_id),
             updates.get("topic_id", test.topic_id),
+        )
+        # Partial update — merge onto the EXISTING row before checking,
+        # not just the submitted fields. Covers both directions: turning
+        # is_mock_test on without ever submitting a subject_id (falls
+        # back to the test's current one, which may itself be None), and
+        # clearing subject_id on a test that is already a mock test.
+        self._validate_mock_test_consistency(
+            updates.get("is_mock_test", test.is_mock_test),
+            updates.get("subject_id", test.subject_id),
         )
 
         updates["updated_by"] = actor_id
@@ -138,6 +154,15 @@ class TestService:
             raise InvalidTestReferenceException("Ko'rsatilgan sinf/daraja (grade_id) mavjud emas")
         if topic_id is not None and self.topic_repo.get_by_id(topic_id) is None:
             raise InvalidTestReferenceException("Ko'rsatilgan mavzu (topic_id) mavjud emas")
+
+    def _validate_mock_test_consistency(self, is_mock_test: bool, subject_id: uuid.UUID | None) -> None:
+        """Mirrors ck_tests_mock_test_requires_subject (migration 0021)
+        — a mock test is exactly what EntitlementService.has_mock_test_access
+        keys on via subject_id, so one can never exist without the other."""
+        if is_mock_test and subject_id is None:
+            raise MockTestRequiresSubjectException(
+                "is_mock_test=true uchun subject_id (fan/yo'nalish) ko'rsatilishi shart"
+            )
 
 
 class ExamSectionService:

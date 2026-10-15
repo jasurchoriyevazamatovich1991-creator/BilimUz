@@ -20,6 +20,7 @@ from app.modules.attempts.exceptions import (
     InvalidOptionReferenceException,
     InvalidQuestionReferenceException,
     MaxAttemptsExceededException,
+    MockTestAccessDeniedException,
     ModuleNotFoundForAttemptException,
     ResultNotAvailableException,
     TestNotPublishedException,
@@ -55,6 +56,7 @@ class AttemptService:
         module_repository: "ExamModuleRepository | None" = None,
         section_repository: "ExamSectionRepository | None" = None,
         question_group_repository: "QuestionGroupRepository | None" = None,
+        entitlement_service: "EntitlementService | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
@@ -80,6 +82,15 @@ class AttemptService:
         # that omits it simply gets group_id/group_title/stimulus_text
         # left None on every question (the exact pre-Sprint-77 shape).
         self.group_repo = question_group_repository
+        # Mock Test Entitlements feature — optional, default None,
+        # same established pattern as every other optional dependency
+        # above. None means this check is skipped entirely (the exact
+        # pre-feature behavior) — only the real FastAPI dependency path
+        # (attempts/dependencies.py's get_attempt_service) always wires
+        # a real EntitlementService, so production requests are always
+        # checked; existing unit tests that construct AttemptService
+        # with only the original 5 arguments are unaffected.
+        self.entitlement_service = entitlement_service
 
     # --- Start ---------------------------------------------------------
 
@@ -89,6 +100,23 @@ class AttemptService:
             raise TestNotPublishedException("Test topilmadi yoki e'lon qilinmagan")
         if test.status != "published":
             raise TestNotPublishedException("Faqat e'lon qilingan testlarga urinish boshlash mumkin")
+
+        # Mock Test Entitlements feature (spec §1/§6/§10) — a test with
+        # is_mock_test=True requires an active entitlement for its own
+        # subject_id (guaranteed non-NULL by
+        # ck_tests_mock_test_requires_subject, migration 0021) before a
+        # NEW attempt may start. This is a hard 403, not a frontend-only
+        # filter — "Direct backend API requests cannot bypass
+        # entitlement restrictions." Does not affect any non-mock test
+        # (is_mock_test defaults False for every existing row) and does
+        # not affect an attempt already in progress — only starting a
+        # new one (see entitlements/README.md for why that scope was
+        # chosen).
+        if test.is_mock_test and self.entitlement_service is not None:
+            if not self.entitlement_service.has_mock_test_access(user_id, test.subject_id):
+                raise MockTestAccessDeniedException(
+                    "Bu mock test uchun faol ruxsat (entitlement) yo'q — avval mos fan/yo'nalish bo'yicha sotib olish kerak"
+                )
 
         # Sprint 45 — test.max_attempts (nullable) overrides the
         # platform default when a Test opts in; every existing test has

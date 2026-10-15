@@ -17,12 +17,20 @@ import { StatusBadge } from "@/components/users/StatusBadge";
 import { useUser, useUpdateUser, useChangeUserRole } from "@/hooks/useUsers";
 import { useRoles } from "@/hooks/useRoles";
 import { useAuthStore } from "@/store/authStore";
+import { UserEntitlementsPanel } from "@/components/entitlements/UserEntitlementsPanel";
 
 export function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === "Super Admin";
+  // Mock Test entitlement management is Admin/Super Admin only on the
+  // backend (require_roles("Admin", "Super Admin") — see
+  // entitlements/router.py) — gated here too so a Moderator (who can
+  // open this page at all, per AppRoutes.tsx) never sees controls that
+  // would just 403, matching this page's existing isSuperAdmin gate for
+  // the role-change card below.
+  const canManageEntitlements = currentUser?.role === "Admin" || currentUser?.role === "Super Admin";
 
   const { data: user, isLoading, isError } = useUser(userId);
   const { data: roles } = useRoles();
@@ -108,6 +116,8 @@ export function UserDetailPage() {
           </form>
         </CardContent>
       </Card>
+
+      {canManageEntitlements ? <UserEntitlementsPanel userId={user.id} /> : null}
 
       {isSuperAdmin ? (
         <Card>

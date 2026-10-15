@@ -28,6 +28,13 @@ export interface TestOut {
   shuffle_questions: boolean;
   shuffle_answers: boolean;
   status: string;
+  // Mock Test Entitlements feature. Optional here (not `boolean`) so
+  // the many existing TestOut literals across this codebase's test
+  // files don't all need updating — a real API response always
+  // includes it (backend TestOut.is_mock_test is non-optional), this
+  // is purely a frontend-type convenience. Falsy/undefined reads the
+  // same as `false` everywhere this is checked.
+  is_mock_test?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +62,7 @@ export interface TestCreateRequest {
   passing_score?: number;
   shuffle_questions?: boolean;
   shuffle_answers?: boolean;
+  is_mock_test?: boolean;
 }
 
 export interface TestUpdateRequest {
@@ -68,6 +76,7 @@ export interface TestUpdateRequest {
   passing_score?: number;
   shuffle_questions?: boolean;
   shuffle_answers?: boolean;
+  is_mock_test?: boolean;
 }
 
 export const testsApi = {

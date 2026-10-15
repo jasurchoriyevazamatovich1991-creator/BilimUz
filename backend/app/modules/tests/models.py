@@ -4,7 +4,7 @@ module, which reads this model read-only."""
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +26,21 @@ class TestStatus(StrEnum):
 
 class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     __tablename__ = "tests"
+    __table_args__ = (
+        # Migration 0021 — "Mock Test" entitlement feature. A test
+        # flagged as a mock test MUST carry a subject_id, because
+        # subject_id is what the entitlements module keys the
+        # subject/exam-direction access check on (see
+        # entitlements/repository.py's has_active_mock_test_entitlement).
+        # Every pre-existing row defaults is_mock_test=False, so no
+        # existing test is retroactively (and possibly wrongly)
+        # categorized as a mock test by this migration — see
+        # migration 0021's own docstring and tests/README.md.
+        CheckConstraint(
+            "is_mock_test = false OR subject_id IS NOT NULL",
+            name="ck_tests_mock_test_requires_subject",
+        ),
+    )
 
     subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=True)
     grade_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("grades.id"), nullable=True)
@@ -53,6 +68,14 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     # hardcoded anywhere in production code; this field only carries
     # whatever value a caller assigns it.
     exam_variant: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Migration 0021 — "Mock Test" entitlement feature (subject/exam-
+    # direction access, not a single-test unlock). False for every
+    # existing test (the DB default) — a pre-existing test is never
+    # silently reinterpreted as a mock test by this migration; an
+    # admin must explicitly opt a test into this category, and doing
+    # so requires subject_id to already be set (see the CHECK
+    # constraint above and TestService._validate_mock_test_consistency()).
+    is_mock_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):

@@ -26,6 +26,15 @@ class CannotPublishEmptyTestException(AppException):
     error_code = "CANNOT_PUBLISH_EMPTY_TEST"
 
 
+class MockTestRequiresSubjectException(AppException):
+    """A test cannot be flagged is_mock_test=True without a subject_id
+    — subject_id IS the subject/exam-direction the entitlements module
+    keys access on. Mirrors ck_tests_mock_test_requires_subject (the DB
+    backstop for this same rule, migration 0021)."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "MOCK_TEST_REQUIRES_SUBJECT"
+
+
 class ExamSectionNotFoundException(AppException):
     status_code = status.HTTP_404_NOT_FOUND
     error_code = "EXAM_SECTION_NOT_FOUND"

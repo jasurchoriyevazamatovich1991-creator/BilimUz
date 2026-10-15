@@ -12,6 +12,7 @@ from app.modules.attempts.exceptions import (
     InvalidOptionReferenceException,
     InvalidQuestionReferenceException,
     MaxAttemptsExceededException,
+    MockTestAccessDeniedException,
     ResultNotAvailableException,
     TestNotPublishedException,
 )
@@ -100,6 +101,120 @@ def test_start_succeeds_and_snapshots_question_order(service, mock_test_repo, mo
     assert attempt.status == AttemptStatus.IN_PROGRESS
     mock_repo.create.assert_called_once()
     mock_repo.commit.assert_called_once()
+
+
+# --- start_attempt: Mock Test Entitlements gating -------------------------
+# Covers spec §4 test items #1, #6, #10. entitlement_service is wired
+# explicitly here (not via the `service` fixture, which omits it —
+# matching the module's own established optional-dependency pattern,
+# see AttemptService.__init__) so these are the only tests in this file
+# that exercise the gate at all; every other start_attempt test above
+# proves the gate is a complete no-op when entitlement_service is None,
+# which is what every pre-feature caller/test still gets.
+
+@pytest.fixture
+def mock_entitlement_service():
+    return MagicMock()
+
+
+@pytest.fixture
+def service_with_entitlements(mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo, mock_entitlement_service):
+    return AttemptService(
+        mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo,
+        entitlement_service=mock_entitlement_service,
+    )
+
+
+def test_start_mock_test_denied_without_entitlement(service_with_entitlements, mock_test_repo, mock_entitlement_service):
+    subject_id = uuid.uuid4()
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", is_mock_test=True, subject_id=subject_id, max_attempts=None)
+    mock_entitlement_service.has_mock_test_access.return_value = False
+
+    with pytest.raises(MockTestAccessDeniedException):
+        service_with_entitlements.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
+
+
+def test_start_mock_test_succeeds_with_entitlement(
+    service_with_entitlements, mock_test_repo, mock_repo, mock_question_repo, mock_entitlement_service,
+):
+    """Spec test #1 — a valid entitlement for the test's subject lets
+    start_attempt() proceed exactly as for a non-mock test."""
+    subject_id = uuid.uuid4()
+    mock_test_repo.get_by_id.return_value = MagicMock(
+        status="published", is_mock_test=True, subject_id=subject_id, duration=60, shuffle_questions=False, max_attempts=None,
+    )
+    mock_repo.count_for_user_and_test.return_value = 0
+    mock_question_repo.list_all_for_test.return_value = []
+    mock_entitlement_service.has_mock_test_access.return_value = True
+
+    user_id = uuid.uuid4()
+    attempt = service_with_entitlements.start_attempt(uuid.uuid4(), user_id=user_id)
+
+    mock_entitlement_service.has_mock_test_access.assert_called_once_with(user_id, subject_id)
+    assert attempt.status == AttemptStatus.IN_PROGRESS
+
+
+def test_start_mock_test_checks_the_tests_own_subject_not_a_different_one(
+    service_with_entitlements, mock_test_repo, mock_entitlement_service,
+):
+    """Spec test #2/#3 — the gate must pass the TEST's own subject_id,
+    never a hardcoded or caller-supplied one, so a Physics entitlement
+    can never accidentally be checked against (or satisfy) a Chemistry
+    test. Modeled here by having the fake entitlement store only
+    recognize one specific subject."""
+    physics_id, chemistry_id = uuid.uuid4(), uuid.uuid4()
+    mock_entitlement_service.has_mock_test_access.side_effect = lambda uid, sid: sid == physics_id
+
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", is_mock_test=True, subject_id=chemistry_id, max_attempts=None)
+    with pytest.raises(MockTestAccessDeniedException):
+        service_with_entitlements.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
+
+
+def test_start_non_mock_test_never_calls_entitlement_service(
+    service_with_entitlements, mock_test_repo, mock_repo, mock_question_repo, mock_entitlement_service,
+):
+    """A regular (non-mock) test must be completely unaffected by this
+    feature — is_mock_test=False skips the check entirely, even though
+    a real EntitlementService is configured."""
+    mock_test_repo.get_by_id.return_value = MagicMock(
+        status="published", is_mock_test=False, subject_id=None, duration=60, shuffle_questions=False, max_attempts=None,
+    )
+    mock_repo.count_for_user_and_test.return_value = 0
+    mock_question_repo.list_all_for_test.return_value = []
+
+    service_with_entitlements.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
+
+    mock_entitlement_service.has_mock_test_access.assert_not_called()
+
+
+def test_start_mock_test_denied_for_expired_or_revoked_entitlement(service_with_entitlements, mock_test_repo, mock_entitlement_service):
+    """Spec test #10 — expired or revoked entitlements cannot start new
+    attempts. has_mock_test_access() is a live check (see
+    EntitlementRepository.has_active_mock_test_entitlement — status
+    and end_date are re-evaluated on every call, nothing is cached) —
+    modeled here simply as the service reporting no access."""
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", is_mock_test=True, subject_id=uuid.uuid4(), max_attempts=None)
+    mock_entitlement_service.has_mock_test_access.return_value = False
+
+    with pytest.raises(MockTestAccessDeniedException):
+        service_with_entitlements.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
+
+
+def test_legacy_construction_without_entitlement_service_skips_gate_entirely(mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo):
+    """Backward-compatibility guard — every caller/test that still
+    constructs AttemptService with only the original 5 arguments (the
+    `service` fixture above, and anything built before this feature)
+    must keep working unchanged, even for a test row that happens to
+    have is_mock_test=True (e.g. a MagicMock with no explicit
+    is_mock_test, which is truthy by default)."""
+    legacy_service = AttemptService(mock_repo, mock_answer_repo, mock_test_repo, mock_question_repo, mock_option_repo)
+    mock_test_repo.get_by_id.return_value = MagicMock(status="published", duration=60, shuffle_questions=False, max_attempts=None)
+    mock_repo.count_for_user_and_test.return_value = 0
+    mock_question_repo.list_all_for_test.return_value = []
+
+    # Must NOT raise MockTestAccessDeniedException — entitlement_service is None.
+    attempt = legacy_service.start_attempt(uuid.uuid4(), user_id=uuid.uuid4())
+    assert attempt.status == AttemptStatus.IN_PROGRESS
 
 
 # --- ownership / not-found ------------------------------------------------

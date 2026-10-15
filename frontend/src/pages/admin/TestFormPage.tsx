@@ -46,6 +46,11 @@ export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
   const [difficulty, setDifficulty] = useState("medium");
   const [duration, setDuration] = useState(60);
   const [passingScore, setPassingScore] = useState("");
+  // Mock Test Entitlements feature — a mock test grants access via a
+  // subject/exam-direction entitlement rather than role-based rules
+  // alone, and backend requires subject_id whenever this is true (see
+  // app/modules/tests/exceptions.py's MockTestRequiresSubjectException).
+  const [isMockTest, setIsMockTest] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -58,6 +63,7 @@ export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
       setDifficulty(test.difficulty);
       setDuration(test.duration);
       setPassingScore(test.passing_score != null ? String(test.passing_score) : "");
+      setIsMockTest(test.is_mock_test ?? false);
     }
   }, [test]);
 
@@ -73,6 +79,7 @@ export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (isMockTest && !subjectId) return; // mirrors the backend's MockTestRequiresSubjectException
     const payload = {
       subject_id: subjectId || undefined,
       grade_id: gradeId || undefined,
@@ -82,6 +89,7 @@ export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
       difficulty,
       duration,
       passing_score: passingScore ? Number(passingScore) : undefined,
+      is_mock_test: isMockTest,
     };
     if (isEditMode) {
       updateTest.mutate(payload, { onSuccess: () => navigate(`${basePath}/tests/${testId}`) });
@@ -158,6 +166,22 @@ export function TestFormPage({ basePath = "/admin" }: { basePath?: string }) {
                 <label htmlFor="passingScore" className="mb-1 block text-sm font-medium text-foreground">O'tish bali (%)</label>
                 <Input id="passingScore" type="number" min={0} max={100} value={passingScore} onChange={(e) => setPassingScore(e.target.value)} disabled={!canWrite} />
               </div>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={isMockTest}
+                  onChange={(e) => setIsMockTest(e.target.checked)}
+                  disabled={!canWrite}
+                />
+                Mock test (fan/yo'nalish bo'yicha ruxsat talab qilinadi)
+              </label>
+              {isMockTest && !subjectId ? (
+                <p className="mt-1 text-sm text-destructive">
+                  Mock test uchun "Fan" (yo'nalish) tanlanishi shart — yuqoridan tanlang.
+                </p>
+              ) : null}
             </div>
 
             {canWrite ? (

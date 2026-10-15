@@ -79,6 +79,10 @@ export const APPLICANT_ITEMS: SidebarItem[] = [
   { label: "Natijalar", path: "/student/results" },
   { label: "Reyting", path: "/student/ranking" },
   { label: "AI Ustoz", path: "/student/ai" },
+  // Admin Management of Mock Test Entitlements, Task D — self-view of
+  // which subjects/exam directions this user currently has Mock Test
+  // access to (read-only).
+  { label: "Mock Test ruxsatlarim", path: "/student/mock-test-entitlements" },
   { label: "Profil", path: "/student/profile" },
   // Sprint 14 addition — see TEACHER_ITEMS's identical note.
   { label: "Sozlamalar", path: "/student/settings" },
@@ -96,6 +100,9 @@ export const STUDENT_ITEMS: SidebarItem[] = [
   // Sprint 23 addition: needed so NotificationsPage is reachable from
   // the sidebar too, not only via the Header bell.
   { label: "Bildirishnomalar", path: "/student/notifications" },
+  // Admin Management of Mock Test Entitlements, Task D — see
+  // APPLICANT_ITEMS's identical addition above.
+  { label: "Mock Test ruxsatlarim", path: "/student/mock-test-entitlements" },
   { label: "Yutuqlar", path: "/student/achievements" },
   { label: "Profil", path: "/student/profile" },
   // Sprint 14 addition — see TEACHER_ITEMS's identical note.

@@ -18,6 +18,18 @@ class TestNotPublishedException(AppException):
     error_code = "TEST_NOT_PUBLISHED"
 
 
+class MockTestAccessDeniedException(AppException):
+    """Mock Test Entitlements feature. Raised by start_attempt() when
+    the test is flagged is_mock_test=True and the caller has no active
+    entitlement for that test's subject/exam direction (see
+    EntitlementService.has_mock_test_access()). 403, not 404 — the test
+    exists and is published (that check already passed), the caller
+    just isn't entitled to take it; this distinction matters for the
+    frontend to show a paywall rather than a generic 'not found'."""
+    status_code = status.HTTP_403_FORBIDDEN
+    error_code = "MOCK_TEST_ACCESS_DENIED"
+
+
 class MaxAttemptsExceededException(AppException):
     status_code = status.HTTP_409_CONFLICT
     error_code = "MAX_ATTEMPTS_EXCEEDED"
