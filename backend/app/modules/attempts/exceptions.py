@@ -113,3 +113,12 @@ class AttemptMediaUnavailableException(AppException):
     presigned-download support — see uploads/storage.py)."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "ATTEMPT_MEDIA_UNAVAILABLE"
+
+
+class InvalidNumericAnswerException(AppException):
+    """Task 2 — the student's answer to a numeric short_answer question
+    isn't a number the grader accepts (e.g. "1,5", "1e3", "abc", "3/0").
+    Rejected so the student can correct it; never stored as a wrong
+    answer."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "INVALID_NUMERIC_ANSWER"

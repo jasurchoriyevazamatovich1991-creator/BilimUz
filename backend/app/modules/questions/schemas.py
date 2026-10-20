@@ -2,8 +2,9 @@
 (Question, QuestionOption, QuestionMedia)."""
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from app.modules.questions.constants import ALLOWED_DIFFICULTY_LEVELS, ALLOWED_MEDIA_TYPES, ALLOWED_QUESTION_TYPES
 from app.modules.questions.validators import (
@@ -102,6 +103,14 @@ class QuestionCreateRequest(BaseModel):
     score: float = 1
     explanation: str | None = None
     options: list[OptionCreateRequest] = Field(default_factory=list)
+    # Task 2 — optional automatic-grading configuration (short_answer
+    # only). Validated as a whole in QuestionService via
+    # answer_matching.validate_grading_config(); omitted = not
+    # auto-graded, the pre-Task-2 behavior.
+    answer_format: str | None = None
+    accepted_answers: list[str] | None = Field(default=None, max_length=50)
+    case_sensitive: bool = False
+    numeric_tolerance: Decimal | None = None
 
     @field_validator("question_text")
     @classmethod
@@ -159,6 +168,13 @@ class QuestionUpdateRequest(BaseModel):
     section_id: uuid.UUID | None = None
     module_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None
+    # Task 2 — same exclude_unset semantics as above: an omitted field
+    # keeps its stored value; the merged result is validated as a whole
+    # in QuestionService.update_question().
+    answer_format: str | None = None
+    accepted_answers: list[str] | None = Field(default=None, max_length=50)
+    case_sensitive: bool | None = None
+    numeric_tolerance: Decimal | None = None
 
     @field_validator("question_text")
     @classmethod
@@ -197,10 +213,27 @@ class QuestionOut(BaseModel):
     group_id: uuid.UUID | None = None
     options: list[OptionOut] = []
     media: list[MediaOut] = []
+    # Task 2 — grading configuration. QuestionOut is only returned by
+    # the Admin/Super Admin/Teacher question endpoints; the student
+    # attempt view (attempts/schemas.QuestionForAttemptOut) never
+    # includes these.
+    answer_format: str | None = None
+    accepted_answers: list[str] | None = None
+    case_sensitive: bool = False
+    numeric_tolerance: Decimal | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("numeric_tolerance")
+    def _tolerance_out(self, v: Decimal | None) -> str | None:
+        # NUMERIC(20,10) comes back as e.g. Decimal('0.0010000000');
+        # send the plain, trailing-zero-free form ("0.001").
+        if v is None:
+            return None
+        text = format(v.normalize(), "f")
+        return text
 
 
 class QuestionOutNoAnswers(BaseModel):

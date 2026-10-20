@@ -19,6 +19,7 @@ from app.modules.attempts.exceptions import (
     AttemptNotActiveException,
     AttemptNotFoundException,
     ExamNotCompleteException,
+    InvalidNumericAnswerException,
     InvalidOptionReferenceException,
     InvalidQuestionReferenceException,
     MaxAttemptsExceededException,
@@ -30,7 +31,7 @@ from app.modules.attempts.exceptions import (
 from app.modules.attempts.constants import ACTIVE_STATUSES, DEFAULT_MAX_ATTEMPTS
 from app.modules.attempts.models import AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
-from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
 from app.modules.attempts.schemas import (
     AnsweredQuestionState,
     AttemptDetailOut,
@@ -44,6 +45,7 @@ from app.modules.attempts.schemas import (
     SubmitResultOut,
 )
 from app.modules.attempts.validators import build_question_order, compute_expiry, is_expired
+from app.modules.questions.answer_matching import InvalidNumericAnswer, grade_short_answer
 from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
 from app.modules.uploads.constants import PRESIGNED_DOWNLOAD_TTL_SECONDS, UPLOAD_STATUS_READY
 from app.modules.uploads.repository import UploadRepository
@@ -331,7 +333,27 @@ class AttemptService:
         # type, leave is_correct NULL (not False — NULL means "awaiting
         # grading", not "wrong"), and return before the choice-scoring
         # branches below, which don't apply to this question type.
-        if question is not None and question.question_type not in AUTO_GRADABLE_QUESTION_TYPES:
+        # Task 2 — a short_answer question with a configured answer key
+        # is graded here, at save time, exactly like the choice types
+        # below grade theirs. An empty answer is "unanswered" (NULL), and
+        # a non-numeric answer to a numeric question is REJECTED (422,
+        # nothing written — the previously saved answer stays) instead of
+        # being stored as wrong: a formatting slip must never cost points
+        # silently. The answer key is read from the DB row only; nothing
+        # the client sends can influence it.
+        if question is not None and question.question_type == "short_answer" and is_auto_gradable(question):
+            try:
+                is_correct = grade_short_answer(
+                    text_answer, question.answer_format, question.accepted_answers,
+                    question.case_sensitive, question.numeric_tolerance,
+                )
+            except InvalidNumericAnswer as exc:
+                raise InvalidNumericAnswerException(str(exc))
+            self.answer_repo.upsert(attempt_id, question_id, {"text_answer": text_answer, "is_correct": is_correct})
+            self.repo.commit()
+            return
+
+        if question is not None and not is_auto_gradable(question):
             self.answer_repo.upsert(attempt_id, question_id, {"text_answer": text_answer, "is_correct": None})
             self.repo.commit()
             return
@@ -764,7 +786,7 @@ class AttemptService:
         # been resolved, so this does not touch or duplicate Sprint
         # 61/63's effective-question-set algorithm, only narrows its
         # output by question_type.
-        auto_scored_questions = [q for q in questions if q.question_type in AUTO_GRADABLE_QUESTION_TYPES]
+        auto_scored_questions = [q for q in questions if is_auto_gradable(q)]
 
         # Sprint 45 — delegates to the Scoring Strategy foundation
         # (scoring.py). DEFAULT_SCORING_STRATEGY.calculate() is the

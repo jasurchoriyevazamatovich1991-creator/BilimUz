@@ -65,6 +65,13 @@ export interface QuestionOut {
   group_id: string | null;
   options: OptionOut[];
   media: MediaOut[];
+  // Task 2 — automatic grading for short_answer (admin/teacher view
+  // only; never present in the student attempt payload). Optional so
+  // pre-Task-2 fixtures stay valid.
+  answer_format?: ShortAnswerFormat | null;
+  accepted_answers?: string[] | null;
+  case_sensitive?: boolean;
+  numeric_tolerance?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,7 +85,17 @@ export interface QuestionListParams {
   sort?: string;
 }
 
-export interface QuestionCreateRequest {
+export type ShortAnswerFormat = "text" | "numeric";
+
+/** Task 2 — grading fields shared by create and update requests. */
+export interface ShortAnswerGradingPayload {
+  answer_format?: ShortAnswerFormat | null;
+  accepted_answers?: string[] | null;
+  case_sensitive?: boolean;
+  numeric_tolerance?: string | null;
+}
+
+export interface QuestionCreateRequest extends ShortAnswerGradingPayload {
   test_id: string;
   question_text: string;
   question_type: string;
@@ -88,7 +105,7 @@ export interface QuestionCreateRequest {
   options?: OptionCreateRequest[];
 }
 
-export interface QuestionUpdateRequest {
+export interface QuestionUpdateRequest extends ShortAnswerGradingPayload {
   question_text?: string;
   difficulty?: string;
   score?: number;

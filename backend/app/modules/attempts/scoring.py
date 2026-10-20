@@ -45,6 +45,29 @@ from app.modules.questions.models import Question
 AUTO_GRADABLE_QUESTION_TYPES = frozenset({"single_choice", "multiple_choice", "true_false"})
 
 
+def is_auto_gradable(question) -> bool:
+    """Task 2 — the single source of truth for "is this question part of
+    the automatic score". The three choice types always are (unchanged).
+    A short_answer question is too, but ONLY once an admin has configured
+    answer_format + at least one accepted answer (migration 0023); every
+    other short_answer and every essay stays out of the automatic score
+    and awaits manual review, exactly as before Task 2.
+
+    Every place that used to test `question_type in
+    AUTO_GRADABLE_QUESTION_TYPES` (attempt score, module routing
+    performance, per-section raw score, save_answer branching) calls this
+    instead, so the four can never disagree."""
+    if question.question_type in AUTO_GRADABLE_QUESTION_TYPES:
+        return True
+    accepted = getattr(question, "accepted_answers", None)
+    return (
+        question.question_type == "short_answer"
+        and getattr(question, "answer_format", None) in ("text", "numeric")
+        and isinstance(accepted, (list, tuple))
+        and len(accepted) > 0
+    )
+
+
 @dataclass(frozen=True)
 class ScoringResult:
     score: float

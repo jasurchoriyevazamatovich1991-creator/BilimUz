@@ -30,6 +30,14 @@ import { RichTextEditor } from "@/components/questions/RichTextEditor";
 import { QuestionPreview } from "@/components/questions/QuestionPreview";
 import { FileUploader } from "@/components/uploads/FileUploader";
 import { mediaTypeForUpload } from "@/lib/questionMedia";
+import { ShortAnswerGradingFields } from "@/components/questions/ShortAnswerGradingFields";
+import {
+  EMPTY_GRADING,
+  gradingPayload,
+  gradingStateFromQuestion,
+  validateGradingState,
+  type ShortAnswerGradingState,
+} from "@/lib/shortAnswerGrading";
 import {
   useQuestion,
   useCreateQuestion,
@@ -111,6 +119,8 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
   const [options, setOptions] = useState<LocalOption[]>([]);
   const [originalOptions, setOriginalOptions] = useState<OptionOut[]>([]);
   const [media, setMedia] = useState<LocalMedia[]>([]);
+  // Task 2 — short_answer automatic-grading configuration.
+  const [grading, setGrading] = useState<ShortAnswerGradingState>(EMPTY_GRADING);
   const [originalMedia, setOriginalMedia] = useState<MediaOut[]>([]);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -130,6 +140,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
       setGroupId(question.group_id ?? "");
       setOriginalOptions(question.options);
       setOptions(question.options.map((o) => ({ localId: newLocalId(), id: o.id, option_text: o.option_text, is_correct: o.is_correct })));
+      setGrading(gradingStateFromQuestion(question));
       setOriginalMedia(question.media);
       setMedia(
         question.media.map((m) => ({
@@ -272,7 +283,16 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
       setOptionsError(validationMessage);
       return;
     }
+    // Task 2 — grading config only exists for short_answer; the backend
+    // re-validates it (422) regardless of this client-side check.
+    const isShortAnswer = questionType === "short_answer";
+    const gradingMessage = isShortAnswer ? validateGradingState(grading) : null;
+    if (gradingMessage) {
+      setOptionsError(gradingMessage);
+      return;
+    }
     setOptionsError(null);
+    const gradingFields = isShortAnswer ? gradingPayload(grading) : {};
 
     if (isEditMode) {
       updateQuestion.mutate(
@@ -289,6 +309,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
           ...(assignmentEnabled
             ? { section_id: sectionId || null, module_id: moduleId || null, group_id: groupId || null }
             : {}),
+          ...gradingFields,
         },
         {
           onSuccess: () => {
@@ -309,6 +330,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
           score,
           explanation: explanation || undefined,
           options: showOptions ? options.map((o) => ({ option_text: o.option_text, is_correct: o.is_correct })) : undefined,
+          ...gradingFields,
         },
         {
           onSuccess: async (createdQuestion) => {
@@ -481,6 +503,10 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
                   Bu uchala maydon ham mustaqil va ixtiyoriy. "— tanlanmagan —" tanlash mavjud biriktirishni olib tashlaydi.
                 </p>
               </div>
+            ) : null}
+
+            {questionType === "short_answer" ? (
+              <ShortAnswerGradingFields value={grading} onChange={setGrading} disabled={!canWrite} />
             ) : null}
 
             {showOptions ? (

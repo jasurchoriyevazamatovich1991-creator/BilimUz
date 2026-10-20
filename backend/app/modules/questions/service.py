@@ -9,7 +9,9 @@ topics → subjects/grades).
 import uuid
 
 from app.core.audit import log_action
+from app.modules.questions.answer_matching import InvalidGradingConfiguration, validate_grading_config
 from app.modules.questions.exceptions import (
+    InvalidGradingConfigurationException,
     InvalidOptionConfigurationException,
     InvalidTestReferenceException,
     MediaNotFoundException,
@@ -116,6 +118,9 @@ class QuestionService:
         if self.test_repo.get_by_id(data.test_id) is None:
             raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
 
+        grading = _validated_grading(
+            data.question_type, data.answer_format, data.accepted_answers, data.case_sensitive, data.numeric_tolerance,
+        )
         question = Question(
             test_id=data.test_id,
             question_text=data.question_text,
@@ -124,6 +129,7 @@ class QuestionService:
             score=data.score,
             explanation=data.explanation,
             created_by=actor_id,
+            **grading,
         )
         for opt_data in data.options:
             question.options.append(
@@ -140,6 +146,17 @@ class QuestionService:
         question = self.get_question(question_id)
         updates = data.model_dump(exclude_unset=True)
         self._validate_assignment_fields(question, updates)
+        if GRADING_FIELDS & updates.keys():
+            # Task 2 — validate the MERGED configuration (stored values
+            # overridden by whatever this request sets), so a partial
+            # update can never leave an incoherent combination behind.
+            if updates.get("case_sensitive", False) is None:
+                updates["case_sensitive"] = False
+            merged = {f: updates.get(f, getattr(question, f)) for f in GRADING_FIELDS}
+            updates.update(_validated_grading(
+                question.question_type, merged["answer_format"], merged["accepted_answers"],
+                merged["case_sensitive"], merged["numeric_tolerance"],
+            ))
         updates["updated_by"] = actor_id
         self.repo.update(question, updates)
         log_action(
@@ -155,6 +172,16 @@ class QuestionService:
         self.test_repo.increment_question_count(question.test_id, delta=-1)
         log_action(self.repo.db, action="question.deleted", user_id=actor_id, entity_type="question", entity_id=question_id)
         self.repo.commit()
+
+
+GRADING_FIELDS = frozenset({"answer_format", "accepted_answers", "case_sensitive", "numeric_tolerance"})
+
+
+def _validated_grading(question_type, answer_format, accepted_answers, case_sensitive, numeric_tolerance) -> dict:
+    try:
+        return validate_grading_config(question_type, answer_format, accepted_answers, bool(case_sensitive), numeric_tolerance)
+    except InvalidGradingConfiguration as exc:
+        raise InvalidGradingConfigurationException(str(exc))
 
 
 class OptionService:

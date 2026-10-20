@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.audit import log_action
 from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
-from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
@@ -179,7 +179,7 @@ class ResultService:
 
             questions = [
                 q for q in self.question_repo.list_by_section(section.id)
-                if q.id in effective_ids and q.question_type in AUTO_GRADABLE_QUESTION_TYPES
+                if q.id in effective_ids and is_auto_gradable(q)
             ]
             section_answers = [answers_by_question[q.id] for q in questions if q.id in answers_by_question]
 

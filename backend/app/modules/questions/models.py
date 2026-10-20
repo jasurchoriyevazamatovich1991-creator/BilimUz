@@ -7,8 +7,8 @@ role_permissions) since none of the three makes sense without Question.
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.mixins import AuditMixin, StatusMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -25,6 +25,20 @@ class QuestionType(StrEnum):
 
 class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixin):
     __tablename__ = "questions"
+    __table_args__ = (
+        CheckConstraint(
+            "answer_format IS NULL OR answer_format IN ('text', 'numeric')",
+            name="ck_questions_answer_format_allowed",
+        ),
+        CheckConstraint(
+            "answer_format IS NULL OR question_type = 'short_answer'",
+            name="ck_questions_answer_format_short_answer_only",
+        ),
+        CheckConstraint(
+            "numeric_tolerance IS NULL OR (answer_format = 'numeric' AND numeric_tolerance >= 0)",
+            name="ck_questions_numeric_tolerance_numeric_only",
+        ),
+    )
 
     test_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tests.id", ondelete="CASCADE"), nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -48,6 +62,17 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin, StatusMixi
     # link to a shared QuestionGroup (e.g. an IELTS Reading passage's
     # set of questions) — SET NULL on group delete.
     group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("question_groups.id", ondelete="SET NULL"), nullable=True)
+
+    # Task 2 (migration 0023) — automatic grading for short_answer.
+    # answer_format NULL = not auto-graded (manual review; the exact
+    # pre-0023 behavior for every existing row). See
+    # questions/answer_matching.py for the grading rules. NEVER exposed
+    # to students: attempts/schemas.QuestionForAttemptOut is built field
+    # by field and does not carry any of these.
+    answer_format: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    accepted_answers: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    case_sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    numeric_tolerance: Mapped[float | None] = mapped_column(Numeric(20, 10), nullable=True)
 
     options: Mapped[list["QuestionOption"]] = relationship(back_populates="question", cascade="all, delete-orphan")
     media: Mapped[list["QuestionMedia"]] = relationship(back_populates="question", cascade="all, delete-orphan")

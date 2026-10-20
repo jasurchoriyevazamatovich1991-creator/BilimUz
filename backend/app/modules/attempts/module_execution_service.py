@@ -33,7 +33,7 @@ from app.modules.attempts.exceptions import (
 )
 from app.modules.attempts.models import AttemptModuleProgress, AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptModuleProgressRepository, AttemptRepository
-from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_SCORING_STRATEGY
+from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
 from app.modules.attempts.validators import build_question_order
 from app.modules.questions.repository import QuestionRepository
 from app.modules.tests.repository import ExamModuleRepository, RoutingThresholdRuleRepository
@@ -221,7 +221,7 @@ class ModuleExecutionService:
         # same, single, explicit eligible set, matching
         # AttemptService._build_result()'s own
         # effective_id_set-scoped correct_count pattern).
-        eligible_questions = [q for q in questions if q.question_type in AUTO_GRADABLE_QUESTION_TYPES]
+        eligible_questions = [q for q in questions if is_auto_gradable(q)]
         eligible_ids = {q.id for q in eligible_questions}
         correct_count = sum(1 for a in answers if a.is_correct is True and a.question_id in eligible_ids)
 

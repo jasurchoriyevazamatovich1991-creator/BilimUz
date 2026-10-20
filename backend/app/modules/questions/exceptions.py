@@ -46,3 +46,10 @@ class QuestionInUseException(AppException):
     corrupt historical attempts."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "QUESTION_IN_USE"
+
+
+class InvalidGradingConfigurationException(AppException):
+    """Task 2 — accepted answers / answer_format / tolerance / case
+    sensitivity don't form a valid configuration for this question."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "INVALID_GRADING_CONFIGURATION"
