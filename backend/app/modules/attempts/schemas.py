@@ -50,6 +50,26 @@ class OptionForAttemptOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AttemptMediaOut(BaseModel):
+    """Task 1 (exam media delivery) — the student-facing view of one
+    QuestionMedia row. Deliberately carries NO URL, object key,
+    upload_id or created_by: the stored `file_url` of an upload-backed
+    row is a private storage object key (see questions/service.py
+    add_media), so the browser obtains a short-lived URL only through
+    GET /attempts/{attempt_id}/media/{media_id}/view-url, which
+    re-checks ownership, attempt activity and delivery scope."""
+    id: uuid.UUID
+    media_type: str
+    # None = media belongs to the question as a whole; set = it belongs
+    # to that specific (non-deleted, delivered) option.
+    option_id: uuid.UUID | None = None
+
+
+class AttemptMediaViewUrlOut(BaseModel):
+    view_url: str
+    media_type: str
+
+
 class QuestionForAttemptOut(BaseModel):
     """Deliberately excludes is_correct (on options) and explanation —
     the student-facing, answer-hidden view. Never reuse
@@ -80,6 +100,9 @@ class QuestionForAttemptOut(BaseModel):
     group_id: uuid.UUID | None = None
     group_title: str | None = None
     stimulus_text: str | None = None
+    # Task 1 — additive, defaults to [] (the exact pre-existing payload
+    # shape for every caller that doesn't wire a media repository).
+    media: list[AttemptMediaOut] = []
 
     model_config = {"from_attributes": True}
 

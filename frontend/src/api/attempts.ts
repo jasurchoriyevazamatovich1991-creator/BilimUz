@@ -27,6 +27,20 @@ export interface OptionForAttemptOut {
   option_text: string;
 }
 
+/** Task 1 — student-facing media descriptor. Carries no URL: the
+ * browser asks GET /attempts/{id}/media/{media_id}/view-url for a
+ * short-lived one, which re-checks ownership and delivery scope. */
+export interface AttemptMediaOut {
+  id: string;
+  media_type: string;
+  option_id: string | null;
+}
+
+export interface AttemptMediaViewUrlOut {
+  view_url: string;
+  media_type: string;
+}
+
 export interface QuestionForAttemptOut {
   id: string;
   question_text: string;
@@ -44,6 +58,10 @@ export interface QuestionForAttemptOut {
   group_id?: string | null;
   group_title?: string | null;
   stimulus_text?: string | null;
+  // Task 1 — additive and optional for the same fixture-compatibility
+  // reason as the group fields above. Question-level media has
+  // option_id null; option-level media names its option.
+  media?: AttemptMediaOut[];
 }
 
 export interface AnsweredQuestionState {
@@ -176,4 +194,8 @@ export const attemptsApi = {
   // endpoint; no new backend endpoint was created for this.
   submitModule: (attemptId: string, moduleId: string) =>
     unwrap<SubmitModuleResultOut>(httpClient.post(`/attempts/${attemptId}/modules/${moduleId}/submit`)),
+
+  // Task 1 — short-lived view URL for one media item of an active attempt.
+  getMediaViewUrl: (attemptId: string, mediaId: string) =>
+    unwrap<AttemptMediaViewUrlOut>(httpClient.get(`/attempts/${attemptId}/media/${mediaId}/view-url`)),
 };

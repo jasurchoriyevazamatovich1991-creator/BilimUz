@@ -46,7 +46,10 @@ const STAGE_LABEL: Record<Stage, string> = {
 
 interface FileUploaderProps {
   lessonId?: string;
-  onSuccess?: (uploadId: string) => void;
+  /** Task 1 — the second argument (the finalized upload's backend
+   * `file_type`: image/audio/video/document) is additive; existing
+   * single-argument callers are unaffected. */
+  onSuccess?: (uploadId: string, fileType: string) => void;
   disabled?: boolean;
 }
 
@@ -103,7 +106,7 @@ export function FileUploader({ lessonId, onSuccess, disabled }: FileUploaderProp
           setSelectedFile(null);
           setProgress(0);
           setStage("idle");
-          onSuccess?.(result.id);
+          onSuccess?.(result.id, result.file_type);
         },
         onError: () => {
           setStage(wasCancelledRef.current ? "cancelled" : "failed");

@@ -16,6 +16,7 @@ from app.core.schemas import success_response
 from app.modules.attempts.dependencies import get_attempt_service
 from app.modules.attempts.schemas import (
     AttemptDetailOut,
+    AttemptMediaViewUrlOut,
     AttemptListParams,
     AttemptOut,
     ModuleForAttemptOut,
@@ -166,6 +167,26 @@ def get_module_for_attempt(
 ):
     module: ModuleForAttemptOut = service.get_module_for_attempt(attempt_id, module_id, user_id=user.id)
     return success_response(module, "Modul ma'lumoti.")
+
+
+@router.get(
+    "/{attempt_id}/media/{media_id}/view-url",
+    summary="Get a short-lived URL for one question/option media item during an attempt",
+    description="Task 1 (exam media delivery). Owner-only; the attempt must still be active (409 "
+                "ATTEMPT_NOT_ACTIVE otherwise). 404 ATTEMPT_MEDIA_NOT_FOUND if the media doesn't exist, is "
+                "deleted, or isn't attached to a question the attempt is currently delivering (another test, "
+                "a not-yet-routed module, a deleted option). Upload-backed media returns the same short-lived "
+                "presigned URL lesson media uses; 409 ATTEMPT_MEDIA_UNAVAILABLE if the upload isn't finalized "
+                "or the storage backend can't issue view URLs. The storage object key is never returned.",
+)
+def get_attempt_media_view_url(
+    attempt_id: uuid.UUID,
+    media_id: uuid.UUID,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    result: AttemptMediaViewUrlOut = service.get_media_view_url(attempt_id, media_id, user_id=user.id)
+    return success_response(result, "Media havolasi yaratildi.")
 
 
 @router.post(

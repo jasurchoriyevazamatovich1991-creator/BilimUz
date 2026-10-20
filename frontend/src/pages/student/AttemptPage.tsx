@@ -37,6 +37,7 @@ import { ErrorState } from "@/components/layout/ErrorState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Timer } from "@/components/attempts/Timer";
 import { QuestionNavigator } from "@/components/attempts/QuestionNavigator";
+import { AttemptMediaList } from "@/components/attempts/AttemptMedia";
 import { FormulaText } from "@/components/questions/FormulaText";
 import { useAttempt, useModuleForAttempt, useSaveAnswer, useSubmitAndCreateResult, useSubmitModule } from "@/hooks/useAttempt";
 import { useCreateResultForFinishedAttempt } from "@/hooks/useResults";
@@ -372,6 +373,16 @@ export function AttemptPage() {
               reusable renderer (admin QuestionPreview.tsx) for exactly
               this contract; reused here unchanged. */}
           <FormulaText html={currentQuestion.question_text} className="mb-4 block text-foreground" />
+          {/* Task 1 — question-level images/audio/video. Keyed by the
+              question id so moving to another question unmounts any
+              playing audio instead of carrying it over. Renders nothing
+              when the question has no media. */}
+          <AttemptMediaList
+            key={currentQuestion.id}
+            attemptId={attemptId ?? ""}
+            media={(currentQuestion.media ?? []).filter((m) => !m.option_id)}
+            owner="Savol"
+          />
           {currentQuestion.question_type === "short_answer" || currentQuestion.question_type === "essay" ? (
             // Sprint 68 — short_answer gets a single-line text input,
             // essay gets a multi-line textarea. Neither question type
@@ -410,9 +421,13 @@ export function AttemptPage() {
                   const isChecked = isMultiple
                     ? Array.isArray(currentValue) && currentValue.includes(option.id)
                     : currentValue === option.id;
+                  // Task 1 — option-level media is rendered BELOW the
+                  // <label>, not inside it: a click on audio/video
+                  // controls inside a label would also toggle the answer.
+                  const optionMedia = (currentQuestion.media ?? []).filter((m) => m.option_id === option.id);
                   return (
+                    <div key={option.id}>
                     <label
-                      key={option.id}
                       className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-primary/5"
                     >
                       <input
@@ -429,6 +444,12 @@ export function AttemptPage() {
                           as question_text above. */}
                       <FormulaText html={option.option_text} className="text-sm text-foreground" />
                     </label>
+                    {optionMedia.length > 0 ? (
+                      <div className="mt-2 pl-7">
+                        <AttemptMediaList attemptId={attemptId ?? ""} media={optionMedia} owner="Variant" />
+                      </div>
+                    ) : null}
+                    </div>
                   );
                 });
               })()}

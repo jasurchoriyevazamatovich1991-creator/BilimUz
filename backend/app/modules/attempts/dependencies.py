@@ -11,7 +11,10 @@ from app.modules.catalog.repository import CatalogProductRepository
 from app.modules.entitlements.dependencies import get_entitlement_repository
 from app.modules.entitlements.repository import EntitlementRepository
 from app.modules.entitlements.service import EntitlementService
-from app.modules.questions.repository import OptionRepository, QuestionRepository
+from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
+from app.modules.uploads.dependencies import get_storage_backend
+from app.modules.uploads.repository import UploadRepository
+from app.modules.uploads.storage import StorageBackend
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
@@ -83,6 +86,7 @@ def get_attempt_service(
     section_repo: ExamSectionRepository = Depends(get_exam_section_repository),
     group_repo: QuestionGroupRepository = Depends(get_question_group_repository),
     entitlement_service: EntitlementService = Depends(get_entitlement_service_for_attempts),
+    storage: StorageBackend = Depends(get_storage_backend),
     db: Session = Depends(get_db),
 ) -> AttemptService:
     # Sprint 50 — module_execution/module_repo are now always wired for
@@ -101,4 +105,8 @@ def get_attempt_service(
     return AttemptService(
         repo, answer_repo, TestRepository(db), QuestionRepository(db), OptionRepository(db),
         module_execution, module_repo, section_repo, group_repo, entitlement_service,
+        # Task 1 (exam media delivery) — read-only media/upload lookups
+        # plus the SAME StorageBackend dependency uploads/router.py uses,
+        # so attempt media is signed exactly like lesson media.
+        MediaRepository(db), UploadRepository(db), storage,
     )

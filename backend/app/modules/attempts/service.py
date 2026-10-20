@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 
 from app.core.audit import log_action
 from app.modules.attempts.exceptions import (
+    AttemptMediaNotFoundException,
+    AttemptMediaUnavailableException,
     AttemptNotActiveException,
     AttemptNotFoundException,
     ExamNotCompleteException,
@@ -32,6 +34,8 @@ from app.modules.attempts.scoring import AUTO_GRADABLE_QUESTION_TYPES, DEFAULT_S
 from app.modules.attempts.schemas import (
     AnsweredQuestionState,
     AttemptDetailOut,
+    AttemptMediaOut,
+    AttemptMediaViewUrlOut,
     AttemptListParams,
     AttemptOut,
     ModuleForAttemptOut,
@@ -40,7 +44,10 @@ from app.modules.attempts.schemas import (
     SubmitResultOut,
 )
 from app.modules.attempts.validators import build_question_order, compute_expiry, is_expired
-from app.modules.questions.repository import OptionRepository, QuestionRepository
+from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
+from app.modules.uploads.constants import PRESIGNED_DOWNLOAD_TTL_SECONDS, UPLOAD_STATUS_READY
+from app.modules.uploads.repository import UploadRepository
+from app.modules.uploads.storage import StorageBackend
 from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
 
 
@@ -57,6 +64,9 @@ class AttemptService:
         section_repository: "ExamSectionRepository | None" = None,
         question_group_repository: "QuestionGroupRepository | None" = None,
         entitlement_service: "EntitlementService | None" = None,
+        media_repository: "MediaRepository | None" = None,
+        upload_repository: "UploadRepository | None" = None,
+        storage: "StorageBackend | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
@@ -91,6 +101,15 @@ class AttemptService:
         # checked; existing unit tests that construct AttemptService
         # with only the original 5 arguments are unaffected.
         self.entitlement_service = entitlement_service
+        # Task 1 (exam media delivery) — optional, same backward-compatible
+        # constructor pattern as every dependency above. With
+        # media_repository None, every question is delivered with
+        # media=[] (the exact pre-Task-1 payload) and the media view-url
+        # method reports not-found. Only the real FastAPI wiring
+        # (attempts/dependencies.py) supplies all three.
+        self.media_repo = media_repository
+        self.upload_repo = upload_repository
+        self.storage = storage
 
     # --- Start ---------------------------------------------------------
 
@@ -198,24 +217,7 @@ class AttemptService:
         # (module execution configured but no active AttemptModuleProgress
         # row right now) are completely unaffected — both fall through to
         # the original attempt.question_order behavior, unchanged.
-        effective_question_order = attempt.question_order or []
-        # Sprint A (post-75) — additive. Captured alongside the existing
-        # active_progress lookup above (no new query) so AttemptDetailOut
-        # can tell the student frontend which module is currently being
-        # delivered, without it having to guess from question content.
-        # Stays None for every case this didn't change: non-modular
-        # attempts, or a modular attempt with no active progress row
-        # right now (e.g. already finished).
-        active_module_id: uuid.UUID | None = None
-        # Sprint 76 — additive, same None-by-default reasoning as
-        # active_module_id above. See AttemptDetailOut.module_expires_at.
-        active_module_expires_at: datetime | None = None
-        if self.module_execution is not None:
-            active_progress = self.module_execution.get_active_module_progress(attempt_id)
-            if active_progress is not None:
-                effective_question_order = active_progress.question_order or []
-                active_module_id = active_progress.module_id
-                active_module_expires_at = active_progress.expires_at
+        effective_question_order, active_module_id, active_module_expires_at = self._resolve_delivery(attempt)
 
         # ATT-N1 (Sprint 72) — a single batched fetch instead of one
         # get_by_id() round trip per question (each of which itself
@@ -248,7 +250,8 @@ class AttemptService:
         group_ids = {q.group_id for q in questions if q.group_id is not None}
         groups_by_id = {g.id: g for g in self.group_repo.list_active_by_ids(list(group_ids))} if self.group_repo is not None and group_ids else {}
 
-        question_views = [self._to_question_view(q, groups_by_id) for q in questions if q is not None]
+        media_by_question = self._delivered_media_by_question(questions)
+        question_views = [self._to_question_view(q, groups_by_id, media_by_question) for q in questions if q is not None]
         answered_states = [
             AnsweredQuestionState(
                 question_id=qid, is_answered=qid in answers,
@@ -509,7 +512,95 @@ class AttemptService:
             section_id=section.id, section_name=section.name, section_order_number=section.order_number,
         )
 
+    def get_media_view_url(self, attempt_id: uuid.UUID, media_id: uuid.UUID, user_id: uuid.UUID) -> AttemptMediaViewUrlOut:
+        """Task 1 — a short-lived URL for one question/option media item
+        of an attempt this student is actively taking.
+
+        Authorization, in order:
+        1. The attempt must be the caller's own (404 otherwise — the
+           same not-found-or-not-yours shape as every attempt endpoint).
+        2. Lazy expiry runs first (get_attempt), then the attempt must
+           still be active (409 ATTEMPT_NOT_ACTIVE otherwise). Media is
+           an exam-time resource; result review is out of scope.
+        3. The media must be non-deleted and belong to a question in the
+           attempt's CURRENT delivery scope (_resolve_delivery — the
+           active module for a modular attempt), and an option-level
+           media's option must not be deleted. Anything else is 404, so
+           another test's, a future module's, or a deleted item's media
+           cannot be fetched by guessing ids.
+        4. Upload-backed media: the upload must exist and be finalized,
+           then the configured StorageBackend issues the same short-lived
+           presigned GET URL used for lesson media (uploads/constants.py
+           PRESIGNED_DOWNLOAD_TTL_SECONDS). The storage object key itself
+           is never returned. Legacy rows (no upload_id) return their
+           stored http(s) URL, already validated at creation time."""
+        attempt = self.get_attempt(attempt_id, user_id)
+        if attempt.status not in ACTIVE_STATUSES:
+            raise AttemptNotActiveException("Urinish faol emas — media faqat test davomida mavjud")
+
+        if self.media_repo is None:
+            raise AttemptMediaNotFoundException("Media topilmadi")
+        media = self.media_repo.get_by_id(media_id)
+        if media is None:
+            raise AttemptMediaNotFoundException("Media topilmadi")
+
+        delivered_ids, _, _ = self._resolve_delivery(attempt)
+        if media.question_id not in set(delivered_ids):
+            raise AttemptMediaNotFoundException("Media topilmadi")
+        if media.option_id is not None:
+            option = self.option_repo.get_by_id(media.option_id)
+            if option is None or option.deleted_at is not None or option.question_id != media.question_id:
+                raise AttemptMediaNotFoundException("Media topilmadi")
+
+        if media.upload_id is None:
+            return AttemptMediaViewUrlOut(view_url=media.file_url, media_type=media.media_type)
+
+        if self.upload_repo is None or self.storage is None:
+            raise AttemptMediaUnavailableException("Media hozircha mavjud emas")
+        upload = self.upload_repo.get_by_id(media.upload_id)
+        if upload is None:
+            raise AttemptMediaNotFoundException("Media topilmadi")
+        if upload.status != UPLOAD_STATUS_READY:
+            raise AttemptMediaUnavailableException("Media fayli hali tayyor emas")
+        try:
+            view_url = self.storage.create_presigned_download(upload.file_url, PRESIGNED_DOWNLOAD_TTL_SECONDS)
+        except NotImplementedError:
+            raise AttemptMediaUnavailableException(
+                "Joriy fayl saqlash tizimi vaqtinchalik havolalarni qo'llab-quvvatlamaydi"
+            )
+        return AttemptMediaViewUrlOut(view_url=view_url, media_type=media.media_type)
+
     # --- Internal helpers --------------------------------------------------
+
+    def _resolve_delivery(self, attempt: TestAttempt) -> tuple[list[uuid.UUID], uuid.UUID | None, datetime | None]:
+        """The single place that decides which questions an attempt is
+        delivering RIGHT NOW (Sprint 57's active-module boundary) —
+        extracted unchanged from get_attempt_detail() so the Task 1
+        media view-url check uses exactly the same scope as question
+        delivery and the two can never drift apart.
+
+        Returns (effective_question_order, active_module_id,
+        active_module_expires_at)."""
+        effective_question_order = attempt.question_order or []
+        # Sprint A (post-75) — additive. Captured alongside the existing
+        # active_progress lookup above (no new query) so AttemptDetailOut
+        # can tell the student frontend which module is currently being
+        # delivered, without it having to guess from question content.
+        # Stays None for every case this didn't change: non-modular
+        # attempts, or a modular attempt with no active progress row
+        # right now (e.g. already finished).
+        active_module_id: uuid.UUID | None = None
+        # Sprint 76 — additive, same None-by-default reasoning as
+        # active_module_id above. See AttemptDetailOut.module_expires_at.
+        active_module_expires_at: datetime | None = None
+        if self.module_execution is not None:
+            active_progress = self.module_execution.get_active_module_progress(attempt.id)
+            if active_progress is not None:
+                effective_question_order = active_progress.question_order or []
+                active_module_id = active_progress.module_id
+                active_module_expires_at = active_progress.expires_at
+        return effective_question_order, active_module_id, active_module_expires_at
+
 
     def _get_owned_attempt(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> TestAttempt:
         attempt = self.repo.get_by_id(attempt_id)
@@ -731,7 +822,24 @@ class AttemptService:
             correct_count=correct_count, status=attempt.status,
         )
 
-    def _to_question_view(self, question, groups_by_id: dict | None = None) -> QuestionForAttemptOut:
+    def _delivered_media_by_question(self, questions: list) -> dict:
+        """Task 1 — one batched media fetch for questions that are
+        already scoped to the attempt's current delivery. Media attached
+        to a soft-deleted option is dropped, because that option is never
+        delivered either. Returns {} when no media repository is wired."""
+        if self.media_repo is None or not questions:
+            return {}
+        delivered_option_ids = {o.id for q in questions for o in q.options if o.deleted_at is None}
+        by_question: dict = {}
+        for m in self.media_repo.list_active_for_questions([q.id for q in questions]):
+            if m.option_id is not None and m.option_id not in delivered_option_ids:
+                continue
+            by_question.setdefault(m.question_id, []).append(
+                AttemptMediaOut(id=m.id, media_type=m.media_type, option_id=m.option_id)
+            )
+        return by_question
+
+    def _to_question_view(self, question, groups_by_id: dict | None = None, media_by_question: dict | None = None) -> QuestionForAttemptOut:
         options = [OptionForAttemptOut.model_validate(o) for o in question.options if o.deleted_at is None]
         # Sprint 77 — group_by_id intentionally looked up here rather
         # than passed pre-resolved per question: a missing key (group
@@ -745,4 +853,5 @@ class AttemptService:
             group_id=group.id if group is not None else None,
             group_title=group.title if group is not None else None,
             stimulus_text=group.stimulus_text if group is not None else None,
+            media=(media_by_question or {}).get(question.id, []),
         )

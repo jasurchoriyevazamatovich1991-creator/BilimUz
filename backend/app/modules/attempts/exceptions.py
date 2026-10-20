@@ -94,3 +94,22 @@ class ExamNotCompleteException(AppException):
     existing 409 convention rather than inventing a new status code."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "EXAM_NOT_COMPLETE"
+
+
+class AttemptMediaNotFoundException(AppException):
+    """Task 1 (exam media delivery). Raised for a media_id that doesn't
+    exist, is soft-deleted, belongs to a question outside this attempt's
+    currently delivered question set (another test, a future module, a
+    deleted option), or whose backing upload is gone — one shape for all
+    of them, so the endpoint gives no enumeration signal."""
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "ATTEMPT_MEDIA_NOT_FOUND"
+
+
+class AttemptMediaUnavailableException(AppException):
+    """Task 1. The media is legitimately in scope but cannot be served
+    right now: its upload isn't finalized yet, or the configured storage
+    backend cannot issue short-lived view URLs (LocalDiskStorage has no
+    presigned-download support — see uploads/storage.py)."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "ATTEMPT_MEDIA_UNAVAILABLE"

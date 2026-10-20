@@ -176,6 +176,20 @@ class MediaRepository:
         stmt = select(QuestionMedia).where(QuestionMedia.id == media_id, QuestionMedia.deleted_at.is_(None))
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def list_active_for_questions(self, question_ids: list[uuid.UUID]) -> list[QuestionMedia]:
+        """Task 1 (exam media delivery) — one batched, read-only fetch of
+        the non-deleted media for a set of questions, so the student
+        attempt view never issues one query per question. Ordered by
+        created_at so media appear in the order an author attached them."""
+        if not question_ids:
+            return []
+        stmt = (
+            select(QuestionMedia)
+            .where(QuestionMedia.question_id.in_(question_ids), QuestionMedia.deleted_at.is_(None))
+            .order_by(QuestionMedia.created_at, QuestionMedia.id)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def create(self, media: QuestionMedia) -> QuestionMedia:
         self.db.add(media)
         self.db.flush()

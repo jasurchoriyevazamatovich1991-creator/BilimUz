@@ -29,6 +29,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { RichTextEditor } from "@/components/questions/RichTextEditor";
 import { QuestionPreview } from "@/components/questions/QuestionPreview";
 import { FileUploader } from "@/components/uploads/FileUploader";
+import { mediaTypeForUpload } from "@/lib/questionMedia";
 import {
   useQuestion,
   useCreateQuestion,
@@ -536,7 +537,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
                         ) : null}
                         {canWrite && option.id ? (
                           <div className="mt-2 pl-7">
-                            <FileUploader onSuccess={(uploadId) => handleMediaUploaded(uploadId, "image", option.id)} />
+                            <FileUploader onSuccess={(uploadId, fileType) => handleMediaUploaded(uploadId, mediaTypeForUpload(fileType), option.id)} />
                           </div>
                         ) : canWrite ? (
                           <p className="mt-2 pl-7 text-xs text-foreground/50">
@@ -562,7 +563,7 @@ export function QuestionFormPage({ basePath = "/admin" }: { basePath?: string })
                 ))}
               </div>
               {canWrite ? (
-                <FileUploader onSuccess={(uploadId) => handleMediaUploaded(uploadId, "image")} />
+                <FileUploader onSuccess={(uploadId, fileType) => handleMediaUploaded(uploadId, mediaTypeForUpload(fileType))} />
               ) : null}
             </div>
 
