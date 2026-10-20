@@ -1,308 +1,82 @@
 # BilimUz
 
-## 1. BilimUz haqida
+Sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi — o'qituvchilar, abituriyentlar, o'quvchilar uchun.
 
-BilimUz — sun'iy intellekt yordamida ishlovchi onlayn ta'lim va test platformasi: o'qituvchilar, abituriyentlar va o'quvchilar uchun mo'ljallangan. Loyiha dastlab fizika fani uchun yaratilgan test tizimi sifatida boshlangan va ko'p sprintlar davomida generic (universal) imtihon dvigateliga aylantirilgan. Loyihaning to'liq, sprint-by-sprint rivojlanish tarixi [`docs/SPRINT_HISTORY.md`](docs/SPRINT_HISTORY.md) faylida saqlangan (bu fayl ilgari repository ildizidagi `README.md` bo'lgan).
+## Arxitektura
+- **Backend**: FastAPI, feature-based modullar (`backend/app/modules/`) + Layered Architecture (Router → Service → Repository → Database), Clean Architecture tamoyillari bilan
+- **Frontend**: React + TypeScript (Pages → Components → Services → API → Backend) — hali qurilmagan
+- **Database**: PostgreSQL, 54 jadval, 25 modul, Alembic migratsiyalari bilan boshqariladi
+- **Xavfsizlik**: Argon2 (parol xeshlash), JWT (`nbf` claim bilan) — `backend/app/core/security/`da markazlashgan yagona amalga oshirish (Sprint 4 Auth Cutover)
 
-## 2. Loyihaning maqsadi va asosiy imkoniyatlari
+Batafsil: [`docs/00_Folder_Architecture.md`](docs/00_Folder_Architecture.md)
 
-Quyidagilar faqat haqiqiy backend kodi (`backend/app/modules/`, 27 modul) va frontend sahifalari asosida, tasdiqlangan holda sanab o'tilgan:
+## Hujjatlar
+| Bo'lim | Papka |
+|---|---|
+| Talablar (SRS) | `docs/SRS/` |
+| Database | `docs/Database/` |
+| API | `docs/API/` |
+| UI/UX | `docs/UI-UX/` |
+| Xavfsizlik | `docs/Security/` |
+| Deploy | `docs/Deployment/` |
+| Roadmap | `docs/Roadmap/` |
+| Arxitektura qarorlari (ADR) | `docs/ADR/` |
+| Jamoa qoidalari | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
+| O'zgarishlar tarixi | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
 
-- **Autentifikatsiya va RBAC**: ro'yxatdan o'tish, login, token-refresh, Argon2 parol xeshlash, JWT (`backend/app/core/security/`), 8 real rol (Super Admin, Admin, Moderator, Teacher, Applicant, Student, Parent, Guest).
-- **Ta'lim tuzilmasi**: Fanlar (Subjects), Sinflar (Grades), Mavzular (Topics), Darslar (Lessons) — to'liq CRUD, cross-module bog'lanish tekshiruvi bilan.
-- **Test/imtihon dvigateli**: testlar va savollar (`single_choice`, `multiple_choice`, `true_false`, `short_answer`, `essay`), variantlar, media, timer, savol/variantlarni aralashtirish, scoring, modul-darajasidagi adaptiv yo'naltirish (routing), modul-timer bilan avtomatik yakunlash.
-- **Natijalar va sertifikatlar**: natijalarni hisoblash, bo'lim bo'yicha natija tahlili, PDF sertifikat generatsiyasi (QR-kod bilan tasdiqlash), reyting (ranking) hisoblash.
-- **Media saqlash**: Cloudflare R2 orqali private, presigned upload/download, 2GB'gacha multipart yuklash (dars videosi, savol media, sertifikat PDF uchun) — yoki mahalliy disk (`STORAGE_BACKEND=local`, standart rejim).
-- **Qo'shimcha modullar**: bildirishnomalar (notifications), sozlamalar (Fernet shifrlash bilan maxfiy maydonlar), audit/system loglar, AI Ustoz — haqiqiy AI provayder integratsiyasi (Sprint 88: Anthropic, `AI_PROVIDER` orqali sozlanadi; konfiguratsiya bo'lmasa halol `501` qaytaradi, hech qachon soxta javob bermaydi — tafsilotlar: [`backend/README.md`](backend/README.md#ai-provayder-sprint-88)), to'lovlar (payments, vendor-agnostik, idempotent), maktablar/o'quv markazlari katalogi, foydalanuvchi profillari, student progress (dars tugatish holati).
-- **Admin panel**: barcha modullar uchun to'liq CRUD UI, imtihon tuzilmasini (bo'lim/modul/guruh) va adaptiv yo'naltirish qoidalarini sozlash UI.
-- **Teacher panel**: kontent yaratish (fayl boshqaruvi UI'siz).
-- **Student panel**: darslarni ko'rish, testlarni topshirish (shu jumladan modulli/adaptiv testlar), natijalar tarixi, sertifikatlar, progress.
+`.cursor/` papkasi — AI yordamchilar (Cursor va h.k.) uchun rollar, qoidalar va joriy loyiha konteksti (`.cursor/prompts/`, `.cursor/rules/`, `.cursor/context/`).
 
-Hali to'liq amalga oshirilmagan imkoniyatlar (haqiqiy holatni yashirmaslik uchun aniq ko'rsatilgan): xalqaro standartlashtirilgan imtihonlar (IELTS/SAT/GRE) uchun maxsus javob turlari va band/scaled-score konversiyasi, frontend code splitting. To'liq, joriy holat tafsilotlari uchun [`docs/SPRINT_HISTORY.md`](docs/SPRINT_HISTORY.md)ga qarang.
+## Holat
 
-## 3. Texnologiyalar
+Kod yozish boshlangan va faol davom etmoqda.
 
-**Backend** (`backend/`, haqiqiy `requirements.txt`dan tasdiqlangan):
-- Python 3.13 (production Docker image — `backend/Dockerfile`'da `python:3.13-slim`; local dasturchi muhitida boshqa 3.x versiyasi ham ishlaydi, agar barcha paketlar mos bo'lsa)
-- FastAPI `0.115.0`, Uvicorn `0.32.0`
-- SQLAlchemy `2.0.35`, Alembic `1.13.3`, psycopg2-binary `2.9.9` (PostgreSQL)
-- Pydantic `2.9.2`, pydantic-settings `2.5.2`
-- Argon2 (`argon2-cffi` `23.1.0`, `passlib` `1.7.4`), PyJWT `2.9.0`, `cryptography` `43.0.3`
-- Redis `5.1.1` (cache / rate-limiting)
-- `boto3` `1.35.36` (Cloudflare R2 — faqat `STORAGE_BACKEND=r2` bo'lsa lazy-import qilinadi)
-- `bleach` `6.1.0` (rich-text/XSS sanitizatsiya), `email-validator` `2.2.0`
-- `reportlab` `4.2.5` (sertifikat PDF), `qrcode[pil]` `7.4.2` (sertifikat QR kodi)
-- Testlar: `pytest` `8.3.3`, `httpx` `0.27.2`
-
-**Frontend** (`frontend/package.json`dan tasdiqlangan):
-- React `19.x` + TypeScript, Vite `6.x`
-- TanStack Query (server state), Zustand (client state), Axios (HTTP)
-- React Router `7.x`
-- Tailwind CSS + shadcn/ui primitivlari, KaTeX (formula render)
-- Testlar: Vitest `2.x` + Testing Library, ESLint
-
-**Infratuzilma**: PostgreSQL 16 (Docker: `postgres:16-alpine`), Redis 7 (Docker: `redis:7-alpine`), Docker Compose (`docker-compose.yml`).
-
-## 4. Loyiha papkalari tuzilmasi
-
-Haqiqiy repository tuzilmasi (tasdiqlangan):
-
-```
-BilimUz/
-├── backend/                 — FastAPI backend
-│   ├── app/
-│   │   ├── core/             — config, security, logging, middleware, exceptions
-│   │   ├── api/               — API router, versiyalash, v1 prefiks
-│   │   ├── db/                  — SQLAlchemy Base, session
-│   │   └── modules/              — 27 feature-based modul (har birida router/service/
-│   │                                repository/schemas/models) — masalan: auth, users,
-│   │                                roles, permissions, subjects, grades, topics,
-│   │                                lessons, tests, questions, attempts, results,
-│   │                                certificates, analytics, notifications, settings,
-│   │                                uploads, ai, payments, schools, learning_centers,
-│   │                                profiles, progress, audit_logs, system_logs
-│   ├── alembic/                     — migratsiyalar (`versions/`, 19 fayl: 0001–0019)
-│   ├── alembic.ini
-│   ├── conftest.py                    — pytest fixture'lar (DB, test client)
-│   ├── scripts/                        — `seed_admin.py` (birinchi Super Admin yaratish)
-│   ├── storage/                          — mahalliy fayl saqlash (STORAGE_BACKEND=local)
-│   ├── tests/integration/                 — real PostgreSQL talab qiluvchi testlar
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   ├── .env.example
-│   └── README.md
-├── frontend/                 — React + TypeScript frontend
-│   ├── src/
-│   │   ├── api/                — Axios client + har-modul API funksiyalari
-│   │   ├── components/           — qayta ishlatiladigan UI komponentlari
-│   │   ├── hooks/                  — TanStack Query hook'lari
-│   │   ├── layouts/                  — Public/Admin/Teacher/Student layout'lari
-│   │   ├── pages/                      — admin/teacher/student/public sahifalar
-│   │   ├── routes/                      — marshrutlash, RBAC guard
-│   │   ├── store/                        — Zustand (auth, toast)
-│   │   └── types/                         — `npm run generate:types` orqali generatsiya
-│   ├── package.json
-│   ├── .env.example
-│   └── README.md
-├── database/                 — `schema/schema_v2.sql` (ma'lumotlar bazasi sxemasi
-│                                hujjatlashtiruvi), `migrations/`/`backups/`/`seeds/`
-│                                (bo'sh — haqiqiy migratsiyalar `backend/alembic/`da)
-├── docs/                      — SRS, Database, API, UI-UX, Security, Deployment,
-│                                Roadmap, ADR, CONTRIBUTING, CHANGELOG (alohida,
-│                                eski narrativ changelog), sprint arxitektura
-│                                hujjatlari, va `SPRINT_HISTORY.md` (sprint-by-sprint
-│                                to'liq holat arxivi — ilgari root README bo'lgan)
-├── .github/workflows/         — `openapi-schema-validation.yml` (Sprint 84), `backend-ci.yml`
-│                                va `frontend-ci.yml` (Sprint 87) — 3 ta GitHub Actions
-│                                workflow, `main`ga push va PR'da avtomatik ishga tushadi;
-│                                `.gitkeep` ham saqlanib qolgan, batafsil 11-bo'limga qarang
-├── docker-compose.yml          — Postgres + Redis + backend uchun local dev stack
-├── nginx/, docker/, scripts/    — hozircha bo'sh (`.gitkeep`)
-├── .gitignore
-├── LICENSE                       — bo'sh (hech qanday litsenziya belgilanmagan, pastga qarang)
-├── CHANGELOG.md                   — bo'sh
-└── README.md                       — shu fayl
-```
-
-## 5. Talablar va o'rnatish
-
-Minimal talablar:
-- Python 3.11+ (production image 3.13 ishlatadi; mahalliy dasturchi muhitida yangi 3.x versiyalar ham ishlaydi)
-- Node.js 20+ va npm (frontend uchun; `package.json`'dagi React 19/Vite 6 talabiga mos)
-- PostgreSQL 16 (local o'rnatilgan yoki Docker orqali)
-- Redis 7 (local o'rnatilgan yoki Docker orqali)
-- (Ixtiyoriy) Docker va Docker Compose — `docker-compose.yml` orqali Postgres+Redis+backend'ni bitta buyruq bilan ko'tarish uchun
-
-Repository'ni clone/ZIP orqali oldingizdan so'ng, backend va frontend bo'limlarini quyida tasvirlangan tartibda alohida sozlang.
-
-## 6. Backendni ishga tushirish
-
-**A. Docker Compose orqali (Postgres + Redis + backend birga):**
-
-```bash
-docker-compose up -d
-```
-
-Bu `postgres` (port 5432), `redis` (port 6379) va `backend` (port 8000, `--reload` bilan) konteynerlarini ishga tushiradi. `docker-compose.yml` backend konteyneri uchun `ENVIRONMENT=development`ni aniq belgilaydi va `backend/.env` faylini (agar mavjud bo'lsa) o'qiydi.
-
-**B. Mahalliy (venv) orqali:**
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env               # keyingi bo'limga qarang — ENVIRONMENT va boshqa qiymatlarni sozlang
-alembic upgrade head                # migratsiyalarni qo'llash — 9-bo'limga qarang
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Ishga tushgandan so'ng: Swagger UI — `http://localhost:8000/docs`, OpenAPI sxema — `http://localhost:8000/api/v1/openapi.json`.
-
-**Muhim**: `ENVIRONMENT` endi **majburiy** — agar u hech qayerda (muhit o'zgaruvchisi, `.env` fayli) belgilanmagan bo'lsa, backend ishga tushmaydi (8-bo'limga qarang).
-
-Birinchi Super Admin foydalanuvchisini yaratish uchun (migratsiyalar qo'llanilgandan keyin):
-
-```bash
-cd backend
-SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD=YOUR_STRONG_PASSWORD python scripts/seed_admin.py
-```
-
-## 7. Frontendni ishga tushirish
-
-```bash
-cd frontend
-npm install
-cp .env.example .env               # VITE_API_BASE_URL — standart: http://localhost:8000/api/v1
-npm run dev
-```
-
-Vite dev-server odatda `http://localhost:5173`da ishga tushadi. Backend ishlab turgan bo'lishi kerak (yuqoridagi 6-bo'lim).
-
-**API tiplarini generatsiya qilish** (backend `/openapi.json`ni xizmat qilayotganda, ixtiyoriy, lekin `src/types/api.d.ts` fayli shu buyruq orqali yaratiladi):
-
-```bash
-npm run generate:types
-```
-
-**Production build**:
-
-```bash
-npm run build      # tsc -b && vite build — natija: frontend/dist/
-npm run preview     # yig'ilgan build'ni mahalliy ko'rish uchun
-```
-
-## 8. Environment variables sozlash
-
-Backend o'zining barcha sozlamalarini `backend/app/core/config.py`'dagi `Settings` klassidan oladi (`backend/.env` fayli orqali, `pydantic-settings`). Haqiqiy namuna fayl: [`backend/.env.example`](backend/.env.example) — undan nusxa ko'chiring (`cp backend/.env.example backend/.env`) va qiymatlarni to'g'rilang. **Hech qachon haqiqiy maxfiy qiymatlarni ushbu hujjatga yoki boshqa versiyalanadigan faylga yozmang.**
-
-| O'zgaruvchi | Majburiy? | Tasvir |
+| Bosqich | Qamrov | Holat |
 |---|---|---|
-| `ENVIRONMENT` | **Ha — majburiy, standart qiymat yo'q** | `development`, `staging` yoki `production`'dan biri bo'lishi shart. Bo'sh, bo'sh joy-only yoki ro'yxatda yo'q qiymat — backend ishga tushmaydi (fail-closed, Sprint 81 Package 1 Follow-up). `staging` va `production`'da quyidagi maxfiy kalitlar standart (placeholder) qiymatda qolsa, backend ishga tushishni rad etadi. |
-| `APP_NAME` | Yo'q (standart: `BilimUz`) | Ilova nomi |
-| `DEBUG` | Yo'q (standart: `false`) | Debug rejimi |
-| `DATABASE_URL` | Yo'q (standart: local Postgres) | PostgreSQL ulanish satri (`postgresql+psycopg2://...`) |
-| `REDIS_URL` | Yo'q (standart: local Redis) | Redis ulanish satri |
-| `JWT_SECRET_KEY` | **production/staging'da ha** | JWT token imzolash kaliti — standart qiymat faqat local dev uchun xavfsiz |
-| `JWT_ALGORITHM` | Yo'q (standart: `HS256`) | — |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | Yo'q | Token amal qilish muddati |
-| `VERIFICATION_CODE_TTL_MINUTES` / `VERIFICATION_CODE_MAX_ATTEMPTS` | Yo'q | Tasdiqlash kodi sozlamalari |
-| `FILE_ENCRYPTION_KEY` | **production/staging'da ha** | Fernet kaliti — `settings` modulidagi maxfiy maydonlarni shifrlash uchun. Generatsiya: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `STORAGE_BACKEND` | Yo'q (standart: `local`) | `local` yoki `r2` |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT` | Faqat `STORAGE_BACKEND=r2` bo'lsa, production/staging'da ha | Cloudflare R2 hisob ma'lumotlari |
-| `ALLOWED_ORIGINS` | Yo'q (standart: `["http://localhost:5173"]`) | CORS uchun ruxsat etilgan origin'lar ro'yxati (JSON massiv) |
-| `AI_PROVIDER` | Yo'q (standart: `none`) | `none` yoki `anthropic` — Sprint 88, haqiqiy AI integratsiyasi. `none` bo'lsa, AI Center endpointi halol `501` qaytaradi. |
-| `AI_API_KEY` | Faqat `AI_PROVIDER=anthropic` bo'lganda, production/staging'da ha | Haqiqiy Anthropic API kaliti. Batafsil: [`backend/README.md`](backend/README.md#ai-provayder-sprint-88) |
-| `AI_MODEL` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_SECONDS` | Yo'q | Model tanlash, javob uzunligi va so'rov vaqti chegaralari — xarajat/abuse nazorati uchun |
+| Sprint 1 — Foundation | FastAPI skeleti, `core/`, `db/`, Docker, Alembic, health/version endpointlar | ✅ Yakunlandi |
+| Sprint 2 — Enterprise modul arxitekturasi | `auth`, `users`, `roles`, `permissions`, `subjects` — barchasi `backend/app/modules/` ostida | ✅ Yakunlandi |
+| Sprint 3 — Argon2/JWT (izolyatsiyalangan sinov) | `PasswordService`, `JWTService`, Register/Login/Refresh/Me — alohida `-v2` yo'llarda qurildi va sinaldi | ✅ Yakunlandi, keyin birlashtirildi ↓ |
+| Sprint 4 — Auth Cutover | Sprint 3'dagi Argon2/JWT `core/security/`ga ko'chirildi, `auth` moduli shu asosda qayta yozildi, `-v2` papkalar o'chirildi. **Endi faqat bitta auth tizimi bor.** | ✅ Yakunlandi |
+| Sprint 5 — Education Core | `grades`, `topics`, `lessons` — to'liq CRUD, cross-module bog'lanish tekshiruvi (`topics→subjects/grades`, `lessons→topics`), 23 test | ✅ Yakunlandi |
+| Sprint 6 — Test Engine | `tests`, `questions` (+options+media), `attempts` — to'liq test topshirish dvigateli: timer, randomizatsiya, scoring, lazy auto-finish, 47 test. Migratsiya `0002` | ✅ Yakunlandi |
+| Sprint 7 — Results, Certificates, Analytics | `results` (reyting hisoblash dvigateli, leaderboard endpoint keyingi sprintga qoldirilgan), `certificates` (PDF'siz, idempotent), `analytics` (mustaqil, faqat `results`ni o'qiydi), 36 test | ✅ Yakunlandi |
+| Sprint 8 — Notifications, Settings, Uploads | `settings` (Fernet shifrlash, maxfiy maydonlar strukturaviy yashirin), `uploads` (mahalliy disk, UUID nomlash), `notifications` (navbat/trigger dvigateli, haqiqiy SMTP/SMS yo'q — ataylab), 66 test | ✅ Yakunlandi |
+| Sprint 9 — AI, Payments | `ai` (vendor-agnostik, real AI yo'q — faqat interfeys, 10/daqiqa rate-limit), `payments` (vendor-agnostik, 2 qatlamli idempotentlik: servis+DB, to'liq refund), migratsiya `0003`, 49 test | ✅ Yakunlandi |
+| Sprint 10 — Schools, Learning Centers | Mustaqil kataloglar (`profiles` hali qurilmagani uchun iste'molchisiz, ochiq belgilangan), keng telefon validatsiyasi, 19 test | ✅ Yakunlandi |
+| Sprint 11 — Profiles | `User`ning 1:1 kengaytmasi — dublikatsiz (`ProfileOut` User+Profile'ni birlashtiradi), migratsiyasiz, mavjud rollar bilan, 16 test | ✅ Yakunlandi |
+| Sprint 12 — Audit Logs, System Logs | `audit_logs` (faqat o'qish, mavjud `AuditLog`ni qayta ishlatadi — dublikat model yo'q), `system_logs` (yangi, yozish+o'qish, `core/logging.py`ga hali ulanmagan — ochiq belgilangan), 28 test | ✅ Yakunlandi |
+| Sprint 13 — Frontend Foundation | Birinchi frontend sprinti: auth oqimi (Login/Register/Verify), token-refresh, RBAC routing (8 haqiqiy rol), sidebar/layout skeleti, 20 test. Backendga 1 ta kichik, tasdiqlangan o'zgarish (`UserPublic.role`) | ✅ Yakunlandi |
+| Sprint 14 — Header, ErrorBoundary, Dashboard | Header dropdown (Profil/Sozlamalar/Chiqish), global ErrorBoundary, dashboard rol bo'yicha to'liq vidjet ro'yxati bilan haqiqiy backend ma'lumotlariga ulandi (2 ta real API bo'shlig'i topilib, soxta ma'lumotsiz halol hal qilindi), 16 yangi test (jami 33) | ✅ Yakunlandi |
+| Sprint 15 — Users Management UI | Haqiqiy topilma: backendda `POST /users`/`DELETE /users` umuman yo'q — faqat List/View/Edit/Search/Filter/Pagination qurildi, Create/Delete UI ataylab qo'shilmadi. 14 yangi test (jami 47) | ✅ Yakunlandi |
+| Sprint 16 — Schools & Learning Centers UI | Farqli topilma: bu ikkalasida to'liq CRUD bor — Create/Edit/Delete qurildi. Yangi qayta ishlatiladigan `ConfirmDialog`, Moderator uchun yozish tugmalari yashirilgan (lekin o'qish ochiq qoldirilgan — jarayonda tuzatilgan), 13 yangi test (jami 60) | ✅ Yakunlandi |
+| Sprint 17 — Subjects, Grades & Topics UI | Muhim topilma: Topics'ning yozish huquqi kengroq (Teacher ham kiradi), Subjects/Grades'da esa yo'q. Grades'da nom o'zgarmaydi (oddiy matn). Topics — birinchi modullararo CRUD sahifasi (Subjects/Grades'dan faqat o'qish). 9 yangi test (jami 69) | ✅ Yakunlandi |
+| Sprint 18 — Lessons UI | Muhim topilma: backend "video/pdf/matndan kamida bittasi" qoidasini talab qiladi — frontend submit-vaqtida tekshiradi, tugma bloklanmaydi. RBAC Topics bilan bir xil (Teacher yozadi). `type="url"`, yangi `ContentBadges` komponenti. 11 yangi test (jami 80) | ✅ Yakunlandi |
+| Sprint 19 — Tests & Questions UI | Ikki taxmin tuzatildi: Test↔Lesson yo'q (faqat Subject/Grade/Topic), Archive tugmasi yo'q (faqat Publish). Questions Test ichida joylashgan. Options — lokal holatda yig'iladi, faqat Saqlashda yuboriladi. Shartli validatsiya (single/multiple choice). 15 yangi test (jami 95) | ✅ Yakunlandi |
+| Sprint 20 — Student Test Taking / Attempt UI | Birinchi Student-yo'naltirilgan sprint. Haqiqiy backend kamchiligi topildi: `selected_option` — bitta UUID, ro'yxat emas (multiple_choice uchun ham). Timer — faqat vizual, localStorage ishlatmaydi. Submit→CreateResult zanjiri, faol urinishni aniqlash, refresh-xavfsizligi. 15 yangi test (jami 110) | ✅ Yakunlandi |
+| Sprint 21 — Certificates UI | Student Certificates UI, Certificate detail, public certificate verification. Backend `verification_code` qo'shildi, Certificate API bilan real integratsiya. PDF hali mavjud emas. 133 frontend test, Certificate backend testlari 18/18 | ✅ Yakunlandi |
+| Sprint 22 — Roles & Permissions UI | Roles CRUD UI, Permissions CRUD UI, role-permission assign/revoke. RBAC: o'qish Admin+Super Admin, yozish faqat Super Admin. Tizim rollari himoyalangan. 170 frontend test | ✅ Yakunlandi |
+| Sprint 23 — Notifications UI | Student notifications ro'yxati, pagination, Read/Read All, notification bell — real backend endpointlar bilan. 186 frontend test | ✅ Yakunlandi |
+| Sprint 24 — UI/UX & Design System | Indigo + Violet + Cyan dizayn tizimi, Light+Dark tema asosi, shadcn/Tailwind token yangilanishi, qayta ishlatiladigan status/error/toast komponentlari, responsive/accessibility yaxshilanishlari. 194 frontend test | ✅ Yakunlandi |
+| Sprint 25 — Full System Audit | Faqat audit — kod funksiyalari o'zgartirilmadi. Student/Teacher/Admin journey, backend, frontend, DB, xavfsizlik, R2, testlar, performance va production readiness tekshirildi. Umumiy audit balli: 68/100, kritik/yuqori darajali bo'shliqlar aniqlandi | ✅ Yakunlandi (audit) |
+| Sprint 26 — Teacher Panel | Teacher dashboard, Teacher Subjects/Grades (faqat o'qish), Teacher Topics/Lessons/Tests/Questions (to'liq yozish UI) — Admin sahifalarining qayta ishlatiladigan komponentlari `basePath` orqali Teacher panelida ishlatilgan. 203 frontend test, build/TypeScript PASS | ✅ Yakunlandi |
+| Sprint 27 — Cloudflare R2 Media Storage | Private R2 arxitekturasi, presigned upload, xavfsiz signed view URL, fayl metadata PostgreSQL'da, Admin file manager asosi, Lesson↔media integratsiyasi, Teacher/Admin/Super Admin upload RBAC, 2GB videogacha multipart upload, browser→R2 to'g'ridan-to'g'ri yuklash, haqiqiy progress, retry/cancel. 71 backend upload testi, 252 frontend testi, build/TypeScript PASS | ✅ Yakunlandi |
+| Sprint 28 — Full System Audit | Faqat audit. Backend: 384 passed, 6 eski (oldindan mavjud) xato, 3 modul collection muammosi. Frontend: 252/252 PASS, TypeScript/build PASS. Umumiy ball: 68/100. Kritik topilma **G-01**: eski `POST /uploads` orqali katta videoning RAM'ga to'liq o'qilish xavfi. Shuningdek qayd etilgan: **G-03** — `multiple_choice` bir nechta javobni qo'llamaydi; Progress tizimi yo'q; Results history yo'q; real PostgreSQL/R2 E2E test muhiti yo'q; README eskirganligi | ✅ Yakunlandi (audit) |
+| Sprint 29 — Legacy Upload Security Fix | Sprint 28'da aniqlangan **G-01** tuzatildi: eski `POST /uploads` uchun video limiti 20 MB qilib belgilandi, haqiqiy stream hajmi bounded/chunked read orqali tekshiriladi (mijoz e'lon qilgan hajmga ko'r-ko'rona ishonilmaydi). R2/presigned/multipart videoning 2 GB limiti **o'zgarishsiz** qoldi. 9 yangi test, `uploads` moduli 80/80 PASS, to'liq backend 393 passed (6 eski xato/3 collection muammosi o'zgarishsiz), frontend 252/252 PASS, TypeScript/build/`py_compile` PASS. Migratsiya talab qilinmadi | ✅ Yakunlandi |
 
-Frontend uchun: [`frontend/.env.example`](frontend/.env.example) — yagona o'zgaruvchi `VITE_API_BASE_URL` (standart: `http://localhost:8000/api/v1`).
+To'liq qaror tarixi: [`docs/ADR/ADR-009-Auth-Cutover.md`](docs/ADR/ADR-009-Auth-Cutover.md).
 
-## 9. Ma'lumotlar bazasini sozlash va migratsiyalar
+**Ochiq eslatma (Sprint 28/29 auditlarida tasdiqlangan, hali bajarilmagan ishlar)**:
 
-Ma'lumotlar bazasi — PostgreSQL 16, **58 jadval** (`__tablename__` e'lonlari bo'yicha tasdiqlangan — Sprint 85 auditida avvalgi "62" raqami noto'g'ri ekanligi aniqlangan edi, shu bilan tuzatilgan). Haqiqiy migratsiyalar `backend/alembic/versions/`da joylashgan (19 fayl, `0001`'dan `0019`'gacha) — **`database/migrations/` papkasi bo'sh**, haqiqiy migratsiya mexanizmi emas; `database/schema/schema_v2.sql` esa sxemaning hujjatlashtiruvchi (ma'lumot) nusxasi, migratsiyalarni almashtirmaydi.
+- Test to'plami (390+ unit test) hali **haqiqiy PostgreSQL muhitida ishga tushirilmagan** — barcha backend testlar `repository`/`storage` qatlamlarini mock qiladi.
+- Real Cloudflare R2 bilan **end-to-end sinov o'tkazilmagan** (bu muhitda real hisob ma'lumotlari yo'q).
+- `multiple_choice` savol turi — backend `SaveAnswerRequest.selected_option` hali ham bitta UUID, bir nechta javobni qo'llamaydi (Sprint 19'dan beri).
+- **Student Progress** tizimi — umuman mavjud emas (model, endpoint, UI — yo'q).
+- **Results History** (natijalar tarixi ro'yxati) — Student uchun sahifa yo'q, faqat bitta natija ko'rish mavjud.
+- **Student Video Player** — mavjud emas, `Lesson.video` faqat xavfsiz tashqi havola sifatida ko'rsatiladi.
+- **Teacher Media/File UI** — `FileUploader` komponenti tayyor, lekin Teacher paneliga ulanmagan.
+- **Certificate PDF** — hech qachon generatsiya qilinmaydi (`pdf_url` doim `null`).
+- **Rate limiting** — faqat `auth` endpointlarida, boshqa modullarda kengaytirilmagan.
+- **Performance/code splitting** — frontend bitta ~540KB chunk, `React.lazy` qo'llanilmagan.
+- **`Lesson.order_number`** — jadvalda yo'q, darslar tartiblanmaydi.
+- **`Test.max_attempts`** — konfiguratsiya qilinmaydi, backend konstantasi orqali qattiq `1`ga belgilangan.
 
-Migratsiyalarni qo'llash:
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-Alembic `backend/app/core/config.py`'dagi `DATABASE_URL`ni o'qiydi (`backend/alembic/env.py`), shuning uchun `.env` fayl to'g'ri sozlangan bo'lishi kerak. Yangi migratsiya yaratish:
-
-```bash
-alembic revision -m "tasvir"
-```
-
-(Avtogenerate — `--autogenerate` — ehtiyotkorlik bilan ishlatilsin: barcha modul modellari `alembic/env.py`da import qilingan bo'lishi kerak, aks holda mavjud jadvallar noto'g'ri DROP qilinishi mumkin.)
-
-## 10. Testlarni ishga tushirish
-
-**Backend** (venv faollashtirilgan holda, `backend/` papkasidan):
-
-```bash
-# To'liq unit/mock-asoslangan test to'plami (PostgreSQL/Redis talab qilinmaydi):
-python -m pytest app/ scripts/ -q
-
-# Faqat core/ testlari (ENVIRONMENT/secret-safety, rate-limit hujjat
-# muvofiqligi, OpenAPI sxema generatsiyasi, Redis test-izolyatsiya
-# validatsiyasi — Sprint 81/84):
-python -m pytest app/core/tests/ -q
-
-# Real PostgreSQL (va, agar rate-limit/Redis-bog'liq testlar kerak bo'lsa,
-# Redis) integratsiya testlari (backend/tests/integration/) — ALOHIDA,
-# TEST_DATABASE_URL muhit o'zgaruvchisi va ishlab turgan PostgreSQL talab
-# qiladi (ma'lumotlar bazasi nomi "_test" bilan tugashi shart —
-# backend/conftest.py shuni tekshiradi). TEST_REDIS_URL — ixtiyoriy (Sprint
-# 84): berilmasa, Redis-bog'liq testlar odatdagi REDIS_URL'ga ulanadi;
-# berilsa, DB indeksi 0/1 bo'lmasligi shart (xavfsizlik gate) — masalan:
-TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/bilimuz_test \
-TEST_REDIS_URL=redis://localhost:6379/15 \
-    python -m pytest tests/integration/ -q
-```
-
-**Frontend** (`frontend/` papkasidan):
-
-```bash
-npm run test          # vitest run — bir martalik ishga tushirish
-npm run test:watch     # vitest — watch rejimi
-npm run lint            # ESLint
-```
-
-## 11. Production deployment bo'yicha mavjud cheklovlar
-
-- **Production deployment tayyorlandi (Sprint 90)**: `docker-compose.prod.yml`, `backend/Dockerfile.prod`, `frontend/Dockerfile`, `nginx/nginx.conf` (reverse-proxy + statik frontend xizmat ko'rsatish), `scripts/backup_db.sh`/`scripts/restore_db.sh` — barchasi haqiqiy, sinovdan o'tkazilgan (statik validatsiya — `docker compose config`, backend/frontend testlar) tarkib, lekin **haqiqiy serverda hali joylashtirilmagan va tekshirilmagan**. To'liq protsedura, cheklovlar va HTTPS sozlash bo'yicha — [`docs/Deployment/PRODUCTION.md`](docs/Deployment/PRODUCTION.md). `docker/` papkasi hozircha bo'sh qolmoqda (hech narsa kerak bo'lmadi — barcha production tarkib `nginx/`, ikkita Dockerfile va `docker-compose.prod.yml` ichida).
-- **CI (Sprint 84, kengaytirilgan Sprint 87'da)** — `main` branch'ga push va unga qaratilgan PR'larda uchta GitHub Actions workflow avtomatik ishga tushadi (`.github/workflows/`):
-  - `openapi-schema-validation.yml` (Sprint 84, faqat `backend/**`) — `app.openapi()` orqali OpenAPI sxemasi haqiqatan generatsiya qilinishini tekshiradi. PostgreSQL/Redis talab qilinmaydi.
-  - `backend-ci.yml` (Sprint 87, faqat `backend/**`) — ikkita job: `unit-tests` (`pytest app/ scripts/`, PostgreSQL/Redis talab qilinmaydi) va `integration-tests` (izolyatsiya qilingan Postgres 16 + Redis 7 service container'lari, `bilimuz_test` bazasini yaratib `alembic upgrade head` qo'llaydi, keyin `pytest tests/integration/`).
-  - `frontend-ci.yml` (Sprint 87, faqat `frontend/**`) — `npm ci` → `npm run test` → `npx tsc -b --noEmit` → `npm run lint` → `npm run build`.
-
-  Uchalasi ham minimal `permissions: contents: read` bilan ishlaydi, real secret ishlatmaydi (faqat CI konteynerining o'z vaqtinchalik test-only ma'lumotlari), hech qanday auto-deploy/auto-commit qadami yo'q. **Bu hamon to'liq CI/CD emas** — deployment, load testing va production monitoring hamon avtomatlashtirilmagan. Batafsil (lokal ekvivalent buyruqlar, izolyatsiya mexanizmi) — `backend/README.md`ning "CI" bo'limi va `frontend/README.md`ning "CI" bo'limi.
-- `docker-compose.yml` faqat **local development** stacki — production-darajadagi Compose/Kubernetes konfiguratsiyasi (resurs limitlari, health-check'lar, secret boshqaruvi, TLS) alohida tayyorlanishi kerak.
-- `ENVIRONMENT=production` (yoki `staging`) bilan ishga tushirishda, agar `JWT_SECRET_KEY` yoki `FILE_ENCRYPTION_KEY` (va `STORAGE_BACKEND=r2` bo'lsa, `R2_*` qiymatlari) standart (`CHANGE_ME_IN_PRODUCTION...`) qiymatda qolsa — backend ishga tushishni **rad etadi** (fail-closed xavfsizlik tekshiruvi, 8-bo'limga qarang). Bu — real production checklist emas, faqat eng kritik secret-default tekshiruvi.
-- Xalqaro standartlashtirilgan imtihonlar (IELTS/SAT/GRE) uchun maxsus javob turlari va band/scaled-score konversiyasi hali amalga oshirilmagan.
-- Email/SMS orqali haqiqiy xabar yuborish (notifications/verification) ataylab ulanmagan — joriy holatda tasdiqlash kodi API javobida ko'rinadi (`debug_code`), real email/SMS provayder integratsiyasi yo'q.
-- To'liq production-darajadagi monitoring/alerting, log-aggregatsiya, backup/restore protsedurasi hujjatlashtirilmagan.
-
-## 12. Distributable ZIP arxiv tayyorlash
-
-Tarqatiladigan (release) ZIP arxivni repository ildizidan tashqarida tayyorlash tavsiya etiladi — shunda arxiv o'z-o'zini ichiga olmaydi. Minimal, qo'lda buyruq (POSIX `zip`, `.gitignore`dagi qoidalarga mos holda eng muhim istisnolarni qo'llab):
-
-```bash
-cd /path/to  # BilimUz/ ning ota-katalogi
-zip -r BilimUz-release.zip BilimUz \
-  -x "BilimUz/.git/*" \
-  -x "BilimUz/*.zip" \
-  -x "BilimUz/backend/.env" \
-  -x "BilimUz/backend/venv/*" "BilimUz/backend/.venv/*" \
-  -x "BilimUz/backend/__pycache__/*" "BilimUz/backend/**/__pycache__/*" \
-  -x "BilimUz/backend/.pytest_cache/*" \
-  -x "BilimUz/backend/storage/uploads/*" \
-  -x "BilimUz/frontend/node_modules/*" \
-  -x "BilimUz/frontend/dist/*" \
-  -x "BilimUz/database/backups/*" \
-  -x "*.log"
-```
-
-Batafsil, tasdiqlangan istisnolar ro'yxati va arxivni tekshirish (integrity + secret-skan) bo'yicha — agar mavjud bo'lsa — [`docs/RELEASE_PACKAGING.md`](docs/RELEASE_PACKAGING.md)ga qarang. Arxiv hech qachon haqiqiy `.env` qiymatlarini, `.git/` tarixini yoki `node_modules/`/`venv/`ni o'z ichiga olmasligi kerak — yuqoridagi 8 va 12 (xavfsizlik) bo'limlariga qarang.
-
-## 13. Xavfsizlik va maxfiy ma'lumotlar
-
-- **Hech qachon** haqiqiy `.env` faylini, maxfiy kalitlarni, parollarni yoki foydalanuvchi ma'lumotlarini ushbu repository'ga commit qilmang. `.gitignore` `.env`, `venv/`/`.venv/`, `node_modules/`, `dist/`, `*.log`, `database/backups/*`, `uploads/*` kabi fayllarni istisno qiladi.
-- `backend/.env.example` va `frontend/.env.example` fayllarida faqat xavfsiz placeholder qiymatlar bor (masalan, `change-me-to-a-random-64-char-string`) — bu reporsitoriyda hech qanday haqiqiy secret saqlanmaydi.
-- Parollar Argon2 bilan xeshlanadi, JWT token'lar `nbf` claim bilan imzolanadi (`backend/app/core/security/`).
-- `settings` moduli maxfiy maydonlarni Fernet (`FILE_ENCRYPTION_KEY`) bilan shifrlangan holda saqlaydi.
-- Production/staging muhitida standart (CHANGE_ME) secret qiymatlari bilan ishga tushirish fail-closed tarzda bloklanadi (11-bo'limga qarang).
-- Rich-text kiritish maydonlari (savol matni, variant matni, izoh, guruh stimulus matni) `bleach` allowlist-sanitizatsiyasidan o'tadi — XSS'ga qarshi.
-- LaTeX formula rendering (`frontend/.../FormulaText.tsx`, KaTeX) — Sprint 83: formula regex'i endi faqat HTML teglar ORASIDAGI matn segmentlariga qo'llaniladi, hech qachon teg/atribut ichiga emas (masalan, `<a href="...$...">` ichidagi `$` endi tegning o'zini buzib yubormaydi).
-- Rate limiting — Redis fixed-window, faqat muayyan auth/certificate/ai endpointlarida (IP yoki foydalanuvchi bo'yicha), global emas; haqiqiy, tekshirilgan qiymatlar va bilingan cheklov uchun [`docs/API/api_blueprint.md`](docs/API/api_blueprint.md)ning 8-bo'limiga qarang (Sprint 84'da hujjat haqiqiy koddan qayta tekshirilib tuzatildi).
-- **Refresh token — HttpOnly cookie (Sprint 86)**: `refresh_token` endi `POST /auth/login`/`POST /auth/refresh`ning JSON javobida umuman yo'q — faqat HttpOnly, `Path`-chegaralangan cookie orqali uzatiladi, frontend JavaScript uni hech qachon o'qiy olmaydi. `/auth/refresh`/`/auth/logout` endi double-submit CSRF tekshiruvi (`X-CSRF-Token` header + `csrf_token` cookie) bilan himoyalangan. Batafsil: [`docs/API/api_blueprint.md`](docs/API/api_blueprint.md)ning 4-bo'limi va `backend/README.md`ning Sprint 86 bo'limi.
-- Repository'da `git ls-files` orqali tasdiqlangan: hech qanday `.env` fayli (root, backend yoki frontend) git tomonidan kuzatilmaydi — bu xavf hozircha yo'q.
-
-## 14. Litsenziya
-
-Repository ildizidagi `LICENSE` fayli **bo'sh** (0 bayt). **Loyiha uchun hech qanday litsenziya aniq belgilanmagan.** GitHub'ga chiqarishdan oldin loyiha egasi litsenziya turini (masalan, MIT, Apache 2.0, yoki "All rights reserved") tanlashi va ushbu faylni to'ldirishi tavsiya etiladi.
-
----
-
-**Qo'shimcha hujjatlar**: [`backend/README.md`](backend/README.md) (backend uchun batafsil), [`frontend/README.md`](frontend/README.md) (frontend uchun batafsil), [`docs/SPRINT_HISTORY.md`](docs/SPRINT_HISTORY.md) (to'liq sprint-by-sprint tarix va joriy holat jadvali), [`docs/RELEASE_PACKAGING.md`](docs/RELEASE_PACKAGING.md) (distributable ZIP — istisnolar sababi va tekshirish bosqichlari), [`docs/`](docs/) (SRS, Database, API, UI-UX, Security, Deployment, Roadmap, ADR, CONTRIBUTING).
+Reja: [`docs/Roadmap/roadmap_v1_to_v5.md`](docs/Roadmap/roadmap_v1_to_v5.md)
