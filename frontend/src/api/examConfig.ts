@@ -76,6 +76,15 @@ export interface ExamModuleUpdateRequest {
   routing_variant?: string | null;
 }
 
+/** Task 3 — media attached to a question group (e.g. IELTS Listening audio). */
+export interface QuestionGroupMediaOut {
+  id: string;
+  group_id: string;
+  upload_id: string;
+  media_type: string;
+  created_at: string;
+}
+
 export interface QuestionGroupOut {
   id: string;
   test_id: string;
@@ -83,6 +92,8 @@ export interface QuestionGroupOut {
   title: string;
   stimulus_text: string | null;
   order_number: number;
+  // Task 3 — optional so pre-Task-3 fixtures stay valid.
+  media?: QuestionGroupMediaOut[];
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +150,12 @@ export const questionGroupsApi = {
     unwrap<QuestionGroupOut>(httpClient.patch(`/tests/question-groups/${groupId}`, data)),
 
   remove: (groupId: string) => httpClient.delete(`/tests/question-groups/${groupId}`),
+
+  // Task 3 — media_type is decided by the backend from the upload itself.
+  addMedia: (groupId: string, uploadId: string) =>
+    unwrap<QuestionGroupMediaOut>(httpClient.post(`/tests/question-groups/${groupId}/media`, { upload_id: uploadId })),
+
+  removeMedia: (groupId: string, mediaId: string) => httpClient.delete(`/tests/question-groups/${groupId}/media/${mediaId}`),
 };
 
 /**

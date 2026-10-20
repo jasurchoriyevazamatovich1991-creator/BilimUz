@@ -65,6 +65,15 @@ class AttemptMediaOut(BaseModel):
     option_id: uuid.UUID | None = None
 
 
+class AttemptGroupMediaOut(BaseModel):
+    """Task 3 — student view of one media item attached to the question's
+    QuestionGroup (e.g. IELTS Listening section audio). Same no-URL rule
+    as AttemptMediaOut: the browser gets a short-lived URL only from
+    GET /attempts/{attempt_id}/group-media/{media_id}/view-url."""
+    id: uuid.UUID
+    media_type: str
+
+
 class AttemptMediaViewUrlOut(BaseModel):
     view_url: str
     media_type: str
@@ -103,6 +112,10 @@ class QuestionForAttemptOut(BaseModel):
     # Task 1 — additive, defaults to [] (the exact pre-existing payload
     # shape for every caller that doesn't wire a media repository).
     media: list[AttemptMediaOut] = []
+    # Task 3 — media of this question's (active) group; [] when the
+    # question is ungrouped or its group has none. Identical for every
+    # question of the same group, so the UI can key one player per group.
+    group_media: list[AttemptGroupMediaOut] = []
 
     model_config = {"from_attributes": True}
 

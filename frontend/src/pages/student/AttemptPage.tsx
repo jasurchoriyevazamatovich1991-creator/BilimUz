@@ -338,7 +338,9 @@ export function AttemptPage() {
               question (group_id null/undefined) or when the group has
               no stimulus_text (e.g. a diagram-only group) — nothing
               invented to fill the space. */}
-          {currentQuestion.group_id && currentQuestion.stimulus_text ? (
+          {/* Task 3 — the panel is also shown for a group that has media
+              (e.g. IELTS Listening audio) but no stimulus_text. */}
+          {currentQuestion.group_id && (currentQuestion.stimulus_text || (currentQuestion.group_media ?? []).length > 0) ? (
             <div className="mb-4 rounded-md bg-foreground/5 p-4" data-testid="group-stimulus">
               {currentQuestion.group_title ? (
                 // Sprint 80 — group_title is left as plain, auto-escaping
@@ -352,6 +354,19 @@ export function AttemptPage() {
                 // its pre-existing, already-safe plain-text rendering.
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/50">{currentQuestion.group_title}</p>
               ) : null}
+              {/* Task 3 — group audio/images. Keyed by the GROUP id (not
+                  the question id): paging between questions of the same
+                  group keeps the same player mounted, so a Listening
+                  recording is not restarted or re-requested; moving to a
+                  different group unmounts it. */}
+              <AttemptMediaList
+                key={currentQuestion.group_id}
+                attemptId={attemptId ?? ""}
+                media={currentQuestion.group_media ?? []}
+                owner="Bo'lim"
+                source="group"
+                testId="group-media"
+              />
               {/* Sprint 80 — stimulus_text is now backend-sanitized
                   (see backend/app/modules/tests/schemas.py's
                   QuestionGroupCreateRequest/UpdateRequest._stimulus_text,
@@ -359,10 +374,12 @@ export function AttemptPage() {
                   so it renders through the same reusable FormulaText
                   component already used for question/option text below
                   — one renderer, not a second copy of the formula logic. */}
-              <FormulaText
-                html={currentQuestion.stimulus_text}
-                className="whitespace-pre-wrap text-sm text-foreground/80"
-              />
+              {currentQuestion.stimulus_text ? (
+                <FormulaText
+                  html={currentQuestion.stimulus_text}
+                  className="whitespace-pre-wrap text-sm text-foreground/80"
+                />
+              ) : null}
             </div>
           ) : null}
           {/* Sprint 80 — question_text is backend-sanitized HTML

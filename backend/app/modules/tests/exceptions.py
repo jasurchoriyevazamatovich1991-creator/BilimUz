@@ -73,3 +73,33 @@ class DuplicateRoutingThresholdRuleException(AppException):
     IntegrityError from a race that slips past this same check."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "DUPLICATE_ROUTING_THRESHOLD_RULE"
+
+
+class QuestionGroupMediaNotFoundException(AppException):
+    """Task 3 — no active media with this id on this group."""
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "QUESTION_GROUP_MEDIA_NOT_FOUND"
+
+
+class UploadNotFoundForGroupMediaException(AppException):
+    """Task 3 — upload_id doesn't exist (or was deleted)."""
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "UPLOAD_NOT_FOUND_FOR_GROUP_MEDIA"
+
+
+class UnsupportedGroupMediaTypeException(AppException):
+    """Task 3 — only audio and image uploads can be attached to a group."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "UNSUPPORTED_GROUP_MEDIA_TYPE"
+
+
+class GroupMediaUploadNotReadyException(AppException):
+    """Task 3 — the upload session hasn't been finalized yet."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "GROUP_MEDIA_UPLOAD_NOT_READY"
+
+
+class DuplicateGroupMediaException(AppException):
+    """Task 3 — this upload is already attached to this group."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "DUPLICATE_GROUP_MEDIA"

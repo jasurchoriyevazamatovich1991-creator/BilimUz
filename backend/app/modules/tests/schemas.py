@@ -260,6 +260,23 @@ class QuestionGroupUpdateRequest(BaseModel):
         return sanitize_rich_text(v) if v else v
 
 
+class QuestionGroupMediaCreateRequest(BaseModel):
+    """Task 3 — attach an existing, finalized Upload to a group. The
+    media_type is NOT accepted from the client: it is taken from the
+    Upload's own file_type on the server."""
+    upload_id: uuid.UUID
+
+
+class QuestionGroupMediaOut(BaseModel):
+    id: uuid.UUID
+    group_id: uuid.UUID
+    upload_id: uuid.UUID
+    media_type: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class QuestionGroupOut(BaseModel):
     id: uuid.UUID
     test_id: uuid.UUID
@@ -267,6 +284,8 @@ class QuestionGroupOut(BaseModel):
     title: str
     stimulus_text: str | None
     order_number: int
+    # Task 3 — the group's active media (Admin/Super Admin endpoints only).
+    media: list[QuestionGroupMediaOut] = []
     created_at: datetime
     updated_at: datetime
 

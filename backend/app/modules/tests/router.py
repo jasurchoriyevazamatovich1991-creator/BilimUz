@@ -13,6 +13,7 @@ from app.modules.tests.exceptions import InvalidTestReferenceException
 from app.modules.tests.dependencies import (
     get_exam_module_service,
     get_exam_section_service,
+    get_question_group_media_service,
     get_question_group_service,
     get_routing_threshold_rule_service,
     get_test_service,
@@ -25,6 +26,8 @@ from app.modules.tests.schemas import (
     ExamSectionOut,
     ExamSectionUpdateRequest,
     QuestionGroupCreateRequest,
+    QuestionGroupMediaCreateRequest,
+    QuestionGroupMediaOut,
     QuestionGroupOut,
     QuestionGroupUpdateRequest,
     RoutingThresholdRuleCreateRequest,
@@ -39,6 +42,7 @@ from app.modules.tests.schemas import (
 from app.modules.tests.service import (
     ExamModuleService,
     ExamSectionService,
+    QuestionGroupMediaService,
     QuestionGroupService,
     RoutingThresholdRuleService,
     TestService,
@@ -294,6 +298,40 @@ def delete_question_group(
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
     service.delete_group(group_id, actor_id=user.id)
+
+
+@router.post(
+    "/question-groups/{group_id}/media",
+    status_code=status.HTTP_201_CREATED,
+    summary="Attach an audio/image upload to a question group",
+    description="Task 3 — e.g. the audio of an IELTS Listening section shared by all of the group's "
+                "questions. media_type is taken from the Upload's own file_type (audio or image only, "
+                "422 otherwise). 404 if the group or upload doesn't exist; 409 if the upload isn't "
+                "finalized or is already attached to this group.",
+)
+def add_question_group_media(
+    group_id: uuid.UUID,
+    data: QuestionGroupMediaCreateRequest,
+    service: QuestionGroupMediaService = Depends(get_question_group_media_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    media = service.add_media(group_id, data, actor_id=user.id)
+    return success_response(QuestionGroupMediaOut.model_validate(media), "Guruhga media biriktirildi.")
+
+
+@router.delete(
+    "/question-groups/{group_id}/media/{media_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a media item from a question group",
+    description="Task 3 — soft delete; the Upload itself is untouched. 404 if not found on this group.",
+)
+def remove_question_group_media(
+    group_id: uuid.UUID,
+    media_id: uuid.UUID,
+    service: QuestionGroupMediaService = Depends(get_question_group_media_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    service.remove_media(group_id, media_id, actor_id=user.id)
 
 
 # --- Sprint 75 completion: RoutingThresholdRule Admin CRUD ---

@@ -189,6 +189,25 @@ def get_attempt_media_view_url(
     return success_response(result, "Media havolasi yaratildi.")
 
 
+@router.get(
+    "/{attempt_id}/group-media/{media_id}/view-url",
+    summary="Get a short-lived URL for one question-group media item during an attempt",
+    description="Task 3 — e.g. IELTS Listening section audio shared by a group's questions. Same rules "
+                "as the question media endpoint: owner-only, active attempt only (409 ATTEMPT_NOT_ACTIVE), "
+                "404 ATTEMPT_MEDIA_NOT_FOUND unless the media belongs to an active group used by a question "
+                "the attempt is currently delivering, 409 ATTEMPT_MEDIA_UNAVAILABLE if the upload isn't "
+                "finalized or storage can't sign. The storage object key is never returned.",
+)
+def get_attempt_group_media_view_url(
+    attempt_id: uuid.UUID,
+    media_id: uuid.UUID,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    result: AttemptMediaViewUrlOut = service.get_group_media_view_url(attempt_id, media_id, user_id=user.id)
+    return success_response(result, "Media havolasi yaratildi.")
+
+
 @router.post(
     "/{attempt_id}/modules/{module_id}/submit",
     summary="Submit the active module of a modular attempt",

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, RoutingThresholdRule
+from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule
 from app.modules.tests.schemas import TestListParams
 
 
@@ -303,6 +303,37 @@ class RoutingThresholdRuleRepository:
 
     def soft_delete(self, rule: RoutingThresholdRule) -> None:
         rule.deleted_at = datetime.now(timezone.utc)
+        self.db.flush()
+
+    def commit(self) -> None:
+        self.db.commit()
+
+
+class QuestionGroupMediaRepository:
+    """Task 3 — data access for media attached to a QuestionGroup."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_active_by_id(self, media_id: uuid.UUID) -> QuestionGroupMedia | None:
+        stmt = select(QuestionGroupMedia).where(QuestionGroupMedia.id == media_id, QuestionGroupMedia.deleted_at.is_(None))
+        return self.db.scalars(stmt).first()
+
+    def find_active(self, group_id: uuid.UUID, upload_id: uuid.UUID) -> QuestionGroupMedia | None:
+        stmt = select(QuestionGroupMedia).where(
+            QuestionGroupMedia.group_id == group_id, QuestionGroupMedia.upload_id == upload_id,
+            QuestionGroupMedia.deleted_at.is_(None),
+        )
+        return self.db.scalars(stmt).first()
+
+    def create(self, media: QuestionGroupMedia) -> QuestionGroupMedia:
+        self.db.add(media)
+        self.db.flush()
+        return media
+
+    def soft_delete(self, media: QuestionGroupMedia, actor_id: uuid.UUID) -> None:
+        media.deleted_at = datetime.now(timezone.utc)
+        media.updated_by = actor_id
         self.db.flush()
 
     def commit(self) -> None:

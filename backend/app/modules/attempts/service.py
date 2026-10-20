@@ -35,6 +35,7 @@ from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_grada
 from app.modules.attempts.schemas import (
     AnsweredQuestionState,
     AttemptDetailOut,
+    AttemptGroupMediaOut,
     AttemptMediaOut,
     AttemptMediaViewUrlOut,
     AttemptListParams,
@@ -50,7 +51,7 @@ from app.modules.questions.repository import MediaRepository, OptionRepository, 
 from app.modules.uploads.constants import PRESIGNED_DOWNLOAD_TTL_SECONDS, UPLOAD_STATUS_READY
 from app.modules.uploads.repository import UploadRepository
 from app.modules.uploads.storage import StorageBackend
-from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
+from app.modules.tests.repository import ExamSectionRepository, QuestionGroupMediaRepository, QuestionGroupRepository, TestRepository
 
 
 class AttemptService:
@@ -69,6 +70,7 @@ class AttemptService:
         media_repository: "MediaRepository | None" = None,
         upload_repository: "UploadRepository | None" = None,
         storage: "StorageBackend | None" = None,
+        group_media_repository: "QuestionGroupMediaRepository | None" = None,
     ):
         self.repo = repository
         self.answer_repo = answer_repository
@@ -112,6 +114,9 @@ class AttemptService:
         self.media_repo = media_repository
         self.upload_repo = upload_repository
         self.storage = storage
+        # Task 3 — optional like the three above; None = group media is
+        # never served (view-url reports not-found).
+        self.group_media_repo = group_media_repository
 
     # --- Start ---------------------------------------------------------
 
@@ -577,20 +582,52 @@ class AttemptService:
         if media.upload_id is None:
             return AttemptMediaViewUrlOut(view_url=media.file_url, media_type=media.media_type)
 
+        return AttemptMediaViewUrlOut(view_url=self._sign_upload(media.upload_id), media_type=media.media_type)
+
+    def get_group_media_view_url(self, attempt_id: uuid.UUID, media_id: uuid.UUID, user_id: uuid.UUID) -> AttemptMediaViewUrlOut:
+        """Task 3 — short-lived URL for one QuestionGroup media item (e.g.
+        IELTS Listening audio). Same rules as get_media_view_url():
+        owner only (404), active attempt only (409), and the media must
+        belong to an ACTIVE group that at least one question in the
+        attempt's CURRENT delivery scope points at (_resolve_delivery —
+        the active module for a modular attempt). Another test's group,
+        a not-yet-routed module's group, a soft-deleted group or media
+        all answer 404. Always upload-backed, signed by the configured
+        StorageBackend; the object key is never returned."""
+        attempt = self.get_attempt(attempt_id, user_id)
+        if attempt.status not in ACTIVE_STATUSES:
+            raise AttemptNotActiveException("Urinish faol emas — media faqat test davomida mavjud")
+        if self.group_media_repo is None or self.group_repo is None:
+            raise AttemptMediaNotFoundException("Media topilmadi")
+
+        media = self.group_media_repo.get_active_by_id(media_id)
+        if media is None:
+            raise AttemptMediaNotFoundException("Media topilmadi")
+
+        delivered_ids, _, _ = self._resolve_delivery(attempt)
+        delivered_group_ids = {q.group_id for q in self.question_repo.list_by_ids(delivered_ids) if q.group_id is not None}
+        if media.group_id not in delivered_group_ids or not self.group_repo.list_active_by_ids([media.group_id]):
+            raise AttemptMediaNotFoundException("Media topilmadi")
+
+        return AttemptMediaViewUrlOut(view_url=self._sign_upload(media.upload_id), media_type=media.media_type)
+
+    def _sign_upload(self, upload_id: uuid.UUID) -> str:
+        """Shared by question and group media: the upload must exist and be
+        finalized, then the configured StorageBackend issues the same
+        short-lived presigned GET URL lesson media uses."""
         if self.upload_repo is None or self.storage is None:
             raise AttemptMediaUnavailableException("Media hozircha mavjud emas")
-        upload = self.upload_repo.get_by_id(media.upload_id)
+        upload = self.upload_repo.get_by_id(upload_id)
         if upload is None:
             raise AttemptMediaNotFoundException("Media topilmadi")
         if upload.status != UPLOAD_STATUS_READY:
             raise AttemptMediaUnavailableException("Media fayli hali tayyor emas")
         try:
-            view_url = self.storage.create_presigned_download(upload.file_url, PRESIGNED_DOWNLOAD_TTL_SECONDS)
+            return self.storage.create_presigned_download(upload.file_url, PRESIGNED_DOWNLOAD_TTL_SECONDS)
         except NotImplementedError:
             raise AttemptMediaUnavailableException(
                 "Joriy fayl saqlash tizimi vaqtinchalik havolalarni qo'llab-quvvatlamaydi"
             )
-        return AttemptMediaViewUrlOut(view_url=view_url, media_type=media.media_type)
 
     # --- Internal helpers --------------------------------------------------
 
@@ -876,4 +913,8 @@ class AttemptService:
             group_title=group.title if group is not None else None,
             stimulus_text=group.stimulus_text if group is not None else None,
             media=(media_by_question or {}).get(question.id, []),
+            # Task 3 — group.media is the relationship's active-only,
+            # attach-ordered view; the group itself is already known to be
+            # active and in this attempt's delivery scope (groups_by_id).
+            group_media=[AttemptGroupMediaOut(id=m.id, media_type=m.media_type) for m in group.media] if group is not None else [],
         )

@@ -169,6 +169,36 @@ export function useDeleteQuestionGroup(testId: string) {
   });
 }
 
+// --- QuestionGroup media (Task 3) ---
+
+export function useAddQuestionGroupMedia(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ groupId, uploadId }: { groupId: string; uploadId: string }) => questionGroupsApi.addMedia(groupId, uploadId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questionGroups", "list", testId] });
+      addToast("Guruhga media biriktirildi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Media biriktirilmadi"),
+  });
+}
+
+export function useRemoveQuestionGroupMedia(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: ({ groupId, mediaId }: { groupId: string; mediaId: string }) => questionGroupsApi.removeMedia(groupId, mediaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questionGroups", "list", testId] });
+      addToast("Guruh mediasi olib tashlandi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "O'chirib bo'lmadi"),
+  });
+}
+
 // --- RoutingThresholdRule (Sprint 75 completion) ---
 
 export function useRoutingThresholdRulesList(testId: string | undefined) {

@@ -17,7 +17,19 @@
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { attemptsApi, type AttemptMediaOut } from "@/api/attempts";
+import { attemptsApi } from "@/api/attempts";
+
+/** Task 3 — which endpoint signs this media: question/option media or
+ * question-group media. Also part of the cache key, so the two id
+ * spaces can never collide. */
+export type AttemptMediaSource = "question" | "group";
+
+/** The fields this component needs; satisfied by both AttemptMediaOut
+ * and AttemptGroupMediaOut. */
+export interface AttemptMediaItemData {
+  id: string;
+  media_type: string;
+}
 
 const VIEW_URL_FRESH_MS = 4 * 60 * 1000;
 
@@ -30,16 +42,18 @@ const TYPE_LABEL: Record<string, string> = {
 
 interface AttemptMediaItemProps {
   attemptId: string;
-  media: AttemptMediaOut;
+  media: AttemptMediaItemData;
+  source: AttemptMediaSource;
   /** Accessible name, e.g. "Savol audiosi 1". */
   label: string;
 }
 
-function AttemptMediaItem({ attemptId, media, label }: AttemptMediaItemProps) {
+function AttemptMediaItem({ attemptId, media, source, label }: AttemptMediaItemProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["attempts", attemptId, "media", media.id, "view-url"],
-    queryFn: () => attemptsApi.getMediaViewUrl(attemptId, media.id),
+    queryKey: ["attempts", attemptId, source === "group" ? "group-media" : "media", media.id, "view-url"],
+    queryFn: () =>
+      source === "group" ? attemptsApi.getGroupMediaViewUrl(attemptId, media.id) : attemptsApi.getMediaViewUrl(attemptId, media.id),
     staleTime: VIEW_URL_FRESH_MS,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -121,22 +135,27 @@ function AttemptMediaItem({ attemptId, media, label }: AttemptMediaItemProps) {
 
 interface AttemptMediaListProps {
   attemptId: string;
-  media: AttemptMediaOut[];
-  /** "Savol" for question-level media, "Variant" for option-level. */
+  media: AttemptMediaItemData[];
+  /** "Savol" for question-level media, "Variant" for option-level,
+   * "Bo'lim" for question-group media. */
   owner: string;
+  /** Defaults to "question" (Task 1 behavior). */
+  source?: AttemptMediaSource;
+  testId?: string;
 }
 
 /** Renders nothing for an empty list, so questions without media look
  * exactly as they did before Task 1. */
-export function AttemptMediaList({ attemptId, media, owner }: AttemptMediaListProps) {
+export function AttemptMediaList({ attemptId, media, owner, source = "question", testId = "attempt-media" }: AttemptMediaListProps) {
   if (media.length === 0) return null;
   return (
-    <div className="mb-4 space-y-3" data-testid="attempt-media">
+    <div className="mb-4 space-y-3" data-testid={testId}>
       {media.map((m, i) => (
         <AttemptMediaItem
           key={m.id}
           attemptId={attemptId}
           media={m}
+          source={source}
           label={`${owner} ${TYPE_LABEL[m.media_type] ?? "media"}${media.length > 1 ? ` ${i + 1}` : ""}`}
         />
       ))}

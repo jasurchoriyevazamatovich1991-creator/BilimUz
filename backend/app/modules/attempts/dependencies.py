@@ -18,6 +18,7 @@ from app.modules.uploads.storage import StorageBackend
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
+    QuestionGroupMediaRepository,
     QuestionGroupRepository,
     RoutingThresholdRuleRepository,
     TestRepository,
@@ -109,4 +110,6 @@ def get_attempt_service(
         # plus the SAME StorageBackend dependency uploads/router.py uses,
         # so attempt media is signed exactly like lesson media.
         MediaRepository(db), UploadRepository(db), storage,
+        # Task 3 — group media (e.g. IELTS Listening audio), read-only here.
+        QuestionGroupMediaRepository(db),
     )

@@ -4,9 +4,9 @@ module, which reads this model read-only."""
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.mixins import AuditMixin, TimestampMixin, UUIDPrimaryKeyMixin
 from app.db.base import Base
@@ -172,6 +172,45 @@ class QuestionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # on module delete, matching Question.module_id/.section_id/
     # .group_id's own established pattern.
     module_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_modules.id", ondelete="SET NULL"), nullable=True)
+
+    # Task 3 — read-only view of this group's NON-deleted media, in attach
+    # order. viewonly: rows are only ever written through
+    # QuestionGroupMediaRepository.
+    media: Mapped[list["QuestionGroupMedia"]] = relationship(
+        "QuestionGroupMedia",
+        primaryjoin="and_(QuestionGroup.id == QuestionGroupMedia.group_id, QuestionGroupMedia.deleted_at.is_(None))",
+        order_by="(QuestionGroupMedia.created_at, QuestionGroupMedia.id)",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+
+class QuestionGroupMedia(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
+    """Task 3 (migration 0024) — media attached to a QuestionGroup as a
+    whole, e.g. the audio of an IELTS Listening section shared by all of
+    its questions.
+
+    Always backed by a real Upload row (upload_id NOT NULL): no file_url
+    copy is stored, so there is no second, possibly stale, location field
+    and no unauthenticated external-URL path. media_type is derived from
+    the Upload's own backend-classified file_type when the row is
+    created (never client-supplied), and is limited to audio/image.
+
+    A soft-deleted row (deleted_at set) is never delivered; the partial
+    unique index stops the same upload being attached to the same group
+    twice while still allowing it to be re-attached after removal."""
+    __tablename__ = "question_group_media"
+    __table_args__ = (
+        CheckConstraint("media_type IN ('audio', 'image')", name="ck_question_group_media_type_allowed"),
+        Index(
+            "uq_question_group_media_active_group_upload", "group_id", "upload_id",
+            unique=True, postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
+
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("question_groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    upload_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(20), nullable=False)
 
 
 class RoutingThresholdRule(Base, UUIDPrimaryKeyMixin, TimestampMixin):

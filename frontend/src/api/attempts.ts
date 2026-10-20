@@ -36,6 +36,14 @@ export interface AttemptMediaOut {
   option_id: string | null;
 }
 
+/** Task 3 — media attached to the question's group (e.g. IELTS
+ * Listening audio). Same no-URL rule; fetched via
+ * GET /attempts/{id}/group-media/{media_id}/view-url. */
+export interface AttemptGroupMediaOut {
+  id: string;
+  media_type: string;
+}
+
 export interface AttemptMediaViewUrlOut {
   view_url: string;
   media_type: string;
@@ -62,6 +70,8 @@ export interface QuestionForAttemptOut {
   // reason as the group fields above. Question-level media has
   // option_id null; option-level media names its option.
   media?: AttemptMediaOut[];
+  // Task 3 — identical for every question of the same group.
+  group_media?: AttemptGroupMediaOut[];
 }
 
 export interface AnsweredQuestionState {
@@ -198,4 +208,8 @@ export const attemptsApi = {
   // Task 1 — short-lived view URL for one media item of an active attempt.
   getMediaViewUrl: (attemptId: string, mediaId: string) =>
     unwrap<AttemptMediaViewUrlOut>(httpClient.get(`/attempts/${attemptId}/media/${mediaId}/view-url`)),
+
+  // Task 3 — same, for question-group media.
+  getGroupMediaViewUrl: (attemptId: string, mediaId: string) =>
+    unwrap<AttemptMediaViewUrlOut>(httpClient.get(`/attempts/${attemptId}/group-media/${mediaId}/view-url`)),
 };

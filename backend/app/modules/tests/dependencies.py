@@ -8,6 +8,7 @@ from app.modules.subjects.repository import SubjectRepository
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
+    QuestionGroupMediaRepository,
     QuestionGroupRepository,
     RoutingThresholdRuleRepository,
     TestRepository,
@@ -15,11 +16,13 @@ from app.modules.tests.repository import (
 from app.modules.tests.service import (
     ExamModuleService,
     ExamSectionService,
+    QuestionGroupMediaService,
     QuestionGroupService,
     RoutingThresholdRuleService,
     TestService,
 )
 from app.modules.topics.repository import TopicRepository
+from app.modules.uploads.repository import UploadRepository
 
 
 def get_test_repository(db: Session = Depends(get_db)) -> TestRepository:
@@ -78,3 +81,8 @@ def get_routing_threshold_rule_service(
     test_repo: TestRepository = Depends(get_test_repository),
 ) -> RoutingThresholdRuleService:
     return RoutingThresholdRuleService(repo, test_repo)
+
+
+def get_question_group_media_service(db: Session = Depends(get_db)) -> QuestionGroupMediaService:
+    """Task 3."""
+    return QuestionGroupMediaService(QuestionGroupMediaRepository(db), QuestionGroupRepository(db), UploadRepository(db))

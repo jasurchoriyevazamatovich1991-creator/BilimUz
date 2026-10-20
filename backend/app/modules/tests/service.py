@@ -11,6 +11,11 @@ from app.core.audit import log_action
 from app.modules.grades.repository import GradeRepository
 from app.modules.subjects.repository import SubjectRepository
 from app.modules.tests.exceptions import (
+    DuplicateGroupMediaException,
+    GroupMediaUploadNotReadyException,
+    QuestionGroupMediaNotFoundException,
+    UnsupportedGroupMediaTypeException,
+    UploadNotFoundForGroupMediaException,
     CannotPublishEmptyTestException,
     DuplicateOrderNumberException,
     DuplicateRoutingThresholdRuleException,
@@ -23,10 +28,11 @@ from app.modules.tests.exceptions import (
     RoutingThresholdRuleNotFoundException,
     TestNotFoundException,
 )
-from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, RoutingThresholdRule, Test, TestStatus
+from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule, Test, TestStatus
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
+    QuestionGroupMediaRepository,
     QuestionGroupRepository,
     RoutingThresholdRuleRepository,
     TestRepository,
@@ -37,6 +43,7 @@ from app.modules.tests.schemas import (
     ExamSectionCreateRequest,
     ExamSectionUpdateRequest,
     QuestionGroupCreateRequest,
+    QuestionGroupMediaCreateRequest,
     QuestionGroupUpdateRequest,
     RoutingThresholdRuleCreateRequest,
     RoutingThresholdRuleUpdateRequest,
@@ -44,6 +51,8 @@ from app.modules.tests.schemas import (
     TestListParams,
     TestUpdateRequest,
 )
+from app.modules.uploads.constants import UPLOAD_STATUS_PENDING
+from app.modules.uploads.repository import UploadRepository
 from app.modules.tests.validators import is_valid_status_transition
 from app.modules.topics.repository import TopicRepository
 
@@ -450,4 +459,52 @@ class RoutingThresholdRuleService:
         rule = self.get_rule(rule_id)
         self.repo.soft_delete(rule)
         log_action(self.repo.db, action="routing_threshold_rule.deleted", user_id=actor_id, entity_type="routing_threshold_rule", entity_id=rule.id)
+        self.repo.commit()
+
+
+GROUP_MEDIA_FILE_TYPES = ("audio", "image")
+
+
+class QuestionGroupMediaService:
+    """Task 3 — attach/remove media on a QuestionGroup (Admin/Super Admin,
+    the same roles as group CRUD). Reads UploadRepository read-only, the
+    same cross-module read questions/service.py already does for
+    question media."""
+
+    def __init__(self, repo: QuestionGroupMediaRepository, group_repo: QuestionGroupRepository, upload_repo: UploadRepository):
+        self.repo = repo
+        self.group_repo = group_repo
+        self.upload_repo = upload_repo
+
+    def _active_group(self, group_id: uuid.UUID) -> QuestionGroup:
+        group = self.group_repo.get_active_by_id(group_id)
+        if group is None:
+            raise QuestionGroupNotFoundException("Savol guruhi topilmadi")
+        return group
+
+    def add_media(self, group_id: uuid.UUID, data: QuestionGroupMediaCreateRequest, actor_id: uuid.UUID) -> QuestionGroupMedia:
+        self._active_group(group_id)
+        upload = self.upload_repo.get_by_id(data.upload_id)
+        if upload is None:
+            raise UploadNotFoundForGroupMediaException("Ko'rsatilgan fayl (upload_id) topilmadi")
+        if upload.file_type not in GROUP_MEDIA_FILE_TYPES:
+            raise UnsupportedGroupMediaTypeException("Guruhga faqat audio yoki rasm fayli biriktirish mumkin")
+        if upload.status == UPLOAD_STATUS_PENDING:
+            raise GroupMediaUploadNotReadyException("Fayl yuklanishi hali yakunlanmagan")
+        if self.repo.find_active(group_id, upload.id) is not None:
+            raise DuplicateGroupMediaException("Bu fayl ushbu guruhga allaqachon biriktirilgan")
+
+        media = QuestionGroupMedia(group_id=group_id, upload_id=upload.id, media_type=upload.file_type, created_by=actor_id)
+        self.repo.create(media)
+        log_action(self.repo.db, action="question_group.media_added", user_id=actor_id, entity_type="question_group", entity_id=group_id)
+        self.repo.commit()
+        return media
+
+    def remove_media(self, group_id: uuid.UUID, media_id: uuid.UUID, actor_id: uuid.UUID) -> None:
+        self._active_group(group_id)
+        media = self.repo.get_active_by_id(media_id)
+        if media is None or media.group_id != group_id:
+            raise QuestionGroupMediaNotFoundException("Guruh mediasi topilmadi")
+        self.repo.soft_delete(media, actor_id)
+        log_action(self.repo.db, action="question_group.media_removed", user_id=actor_id, entity_type="question_group", entity_id=group_id)
         self.repo.commit()

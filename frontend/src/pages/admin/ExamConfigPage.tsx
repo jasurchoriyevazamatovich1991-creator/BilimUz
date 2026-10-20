@@ -59,6 +59,7 @@ import {
   useUpdateRoutingThresholdRule,
 } from "@/hooks/useExamConfig";
 import { useAuthStore } from "@/store/authStore";
+import { GroupMediaManager } from "@/components/examConfig/GroupMediaManager";
 import type { ExamModuleOut, ExamSectionOut, QuestionGroupOut, RoutingThresholdRuleOut } from "@/api/examConfig";
 
 function emptyToUndefined(v: string): string | undefined {
@@ -736,6 +737,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                       Tartib: {group.order_number} · Modul: {moduleName(group.module_id)}
                     </p>
                     {group.stimulus_text ? <p className="mt-1 max-w-md truncate text-xs text-foreground/50">{group.stimulus_text}</p> : null}
+                    {testId ? <GroupMediaManager testId={testId} group={group} /> : null}
                   </div>
                   <div className="flex gap-3">
                     <button type="button" onClick={() => setEditingGroupId(group.id)} className="text-sm text-primary hover:underline">
