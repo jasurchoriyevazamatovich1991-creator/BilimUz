@@ -59,17 +59,43 @@ export interface ConversionTableOut {
   section_id: string;
   routing_variant: string | null;
   version: number;
-  method: "exact" | "linear";
-  entries: { raw: string; scaled: string }[];
+  method: ConversionMethod;
+  /** {raw, scaled} for exact/linear; Task 7 {raw, lower, upper} for range. */
+  entries: ConversionEntry[];
   is_current: boolean;
   created_by: string | null;
   created_at: string;
+  // Task 7 — provenance (optional: older fixtures predate it).
+  conversion_type?: ConversionType;
+  test_form?: string | null;
+  source_url?: string | null;
+  source_title?: string | null;
+  source_version?: string | null;
+  source_verified_at?: string | null;
+}
+
+export type ConversionMethod = "exact" | "linear" | "range";
+/** Task 7 — official_practice_test is accepted by the backend only for SAT
+ * with a registered practice-test form. */
+export type ConversionType = "official_practice_test" | "estimate" | "unverified";
+
+export interface ConversionEntry {
+  raw: string;
+  scaled?: string;
+  lower?: string;
+  upper?: string;
 }
 
 export interface ConversionTableCreateRequest {
   routing_variant?: string;
-  method: "exact" | "linear";
-  entries: { raw: string; scaled: string }[];
+  method: ConversionMethod;
+  entries: ConversionEntry[];
+  conversion_type?: ConversionType;
+  test_form?: string;
+  source_url?: string;
+  source_title?: string;
+  source_version?: string;
+  source_verified_at?: string;
 }
 
 export interface ExamModuleOut {
@@ -152,10 +178,16 @@ export const examSectionsApi = {
     unwrap<ExamSectionOut>(httpClient.patch(`/tests/exam-sections/${sectionId}`, data)),
 };
 
+export type IeltsModule = "academic" | "general_training";
+
 // Task 4 — exam-specific scaled scoring configuration (Admin/Super Admin).
 export const scoringApi = {
-  setProfile: (testId: string, scoringProfile: "ielts" | "sat" | "gre" | null) =>
-    unwrap<TestOut>(httpClient.put(`/tests/${testId}/scoring-profile`, { scoring_profile: scoringProfile })),
+  // Task 7 — ielts_module is sent only when given (omitted = unchanged).
+  setProfile: (testId: string, scoringProfile: "ielts" | "sat" | "gre" | null, ieltsModule?: IeltsModule | null) =>
+    unwrap<TestOut>(httpClient.put(`/tests/${testId}/scoring-profile`, {
+      scoring_profile: scoringProfile,
+      ...(ieltsModule !== undefined ? { ielts_module: ieltsModule } : {}),
+    })),
 
   listTables: (sectionId: string) =>
     unwrap<ConversionTableOut[]>(httpClient.get(`/tests/exam-sections/${sectionId}/conversion-tables`)),

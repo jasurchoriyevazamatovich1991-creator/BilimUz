@@ -11,6 +11,7 @@ import {
   questionGroupsApi,
   scoringApi,
   type ConversionTableCreateRequest,
+  type IeltsModule,
   routingThresholdRulesApi,
   type ExamModuleCreateRequest,
   type ExamModuleUpdateRequest,
@@ -264,7 +265,11 @@ export function useSetScoringProfile(testId: string) {
   const addToast = useToastStore((s) => s.addToast);
 
   return useMutation({
-    mutationFn: (profile: "ielts" | "sat" | "gre" | null) => scoringApi.setProfile(testId, profile),
+    // Task 7 — a plain profile (unchanged call shape) or {profile, ieltsModule}.
+    mutationFn: (arg: "ielts" | "sat" | "gre" | null | { profile: "ielts" | "sat" | "gre" | null; ieltsModule: IeltsModule | null }) =>
+      arg !== null && typeof arg === "object"
+        ? scoringApi.setProfile(testId, arg.profile, arg.ieltsModule)
+        : scoringApi.setProfile(testId, arg),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tests", "detail", testId] });
       addToast("Ballash profili saqlandi", "success");

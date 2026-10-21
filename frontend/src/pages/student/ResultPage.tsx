@@ -15,7 +15,10 @@ import { useTest } from "@/hooks/useTests";
 import { useIssueCertificate } from "@/hooks/useCertificates";
 import type { QuestionReviewOut, ResultSectionOut } from "@/api/results";
 import { FormulaText } from "@/components/questions/FormulaText";
-import { OVERALL_STATUS_LABELS, SCALED_STATUS_LABELS, overallLabel } from "@/lib/scaledScoring";
+import {
+  OVERALL_STATUS_LABELS, SCALED_STATUS_LABELS, SCORE_BASIS_LABELS, formatScoreRange, overallLabel, scoreBasisExplanation,
+  type ScoreBasis,
+} from "@/lib/scaledScoring";
 
 function formatTimeSpent(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -159,7 +162,7 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
  * `raw_score`/`scaled_score` are both nullable (e.g. a section whose
  * questions are all manual-grading types scores null, not 0 — see
  * backend Sprint 72 RS1-D), rendered as "—" rather than "null"/"0". */
-function SectionScoreRow({ section, index }: { section: ResultSectionOut; index: number }) {
+function SectionScoreRow({ section, index, profile }: { section: ResultSectionOut; index: number; profile?: string | null }) {
   const label = section.name ?? `Bo'lim ${index + 1}`;
   const scoreText = section.raw_score === null ? "—" : `${section.raw_score} ball`;
   // Task 4 — exam-specific scaled score. Shown only when the backend
@@ -167,35 +170,74 @@ function SectionScoreRow({ section, index }: { section: ResultSectionOut; index:
   // made-up number). Plain percentage tests have no scaled_status.
   const hasScaledInfo = section.scaled_status != null;
   const scaledNote = section.scaled_status ? SCALED_STATUS_LABELS[section.scaled_status] ?? "" : "";
+  // Task 7 — a single score or a lower–upper range, plus what it rests on.
+  const scaledText = hasScaledInfo ? formatScoreRange(section.scaled_score, section.scaled_score_lower, section.scaled_score_upper) : null;
+  const basis = section.score_basis ?? null;
+  const source = section.source ?? null;
   return (
-    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0" data-testid="section-score-row">
-      <span className="text-foreground">{label}</span>
-      <span className="text-right">
-        {hasScaledInfo && section.scaled_score != null ? (
-          <>
-            <span className="font-semibold text-foreground" data-testid="section-scaled-score">{section.scaled_score}</span>
-            <span className="ml-2 text-xs text-foreground/50">({scoreText})</span>
-          </>
-        ) : (
-          <span className="font-medium text-foreground/80">{scoreText}</span>
-        )}
-        {hasScaledInfo && scaledNote ? <span className="block text-xs text-foreground/50">{scaledNote}</span> : null}
-        {section.is_provisional ? <span className="block text-xs text-amber-700">Provisional (rubrika tasdiqlanmagan)</span> : null}
-      </span>
+    <div className="border-b border-border py-2 text-sm last:border-0" data-testid="section-score-row">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-foreground">{label}</span>
+        <span className="text-right">
+          {scaledText != null ? (
+            <>
+              <span className="font-semibold text-foreground" data-testid="section-scaled-score">{scaledText}</span>
+              <span className="ml-2 text-xs text-foreground/50">({scoreText})</span>
+            </>
+          ) : (
+            <span className="font-medium text-foreground/80">{scoreText}</span>
+          )}
+          {hasScaledInfo && scaledNote ? <span className="block text-xs text-foreground/50">{scaledNote}</span> : null}
+          {section.is_provisional ? <span className="block text-xs text-amber-700">Provisional (rubrika tasdiqlanmagan)</span> : null}
+        </span>
+      </div>
+      {basis && scaledText != null ? (
+        <div className="mt-1 text-xs text-foreground/60" data-testid="section-score-basis">
+          <span className={`mr-1 rounded px-1.5 py-0.5 ${basis === "official_practice_test" || basis === "official_rule" ? "bg-primary/10 text-primary" : "bg-amber-50 text-amber-800"}`}>
+            {SCORE_BASIS_LABELS[basis]}
+          </span>
+          {scoreBasisExplanation(basis, profile)}
+          {source ? (
+            <span className="block">
+              Manba:{" "}
+              {source.url ? (
+                <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  {source.test_form_label ?? source.title ?? source.url}
+                </a>
+              ) : (
+                source.test_form_label ?? source.title
+              )}
+              {source.verified_at ? ` · tekshirilgan: ${source.verified_at}` : ""}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/** Task 4 — overall IELTS band / SAT total, or why it isn't available. */
-function OverallScaledScore({ profile, score, status, provisional }: { profile: string; score: number | null | undefined; status: string | null | undefined; provisional?: boolean }) {
+/** Task 4 — overall IELTS band / SAT total, or why it isn't available.
+ * Task 7 — may be a range, and always says what it rests on. */
+function OverallScaledScore({ profile, score, status, provisional, lower, upper, basis }: {
+  profile: string; score: number | null | undefined; status: string | null | undefined; provisional?: boolean;
+  lower?: number | null; upper?: number | null; basis?: ScoreBasis | null;
+}) {
+  const text = status === "scaled" ? formatScoreRange(score, lower, upper) : null;
   return (
     <div className="mb-3 rounded-md bg-primary/5 p-3 text-center" data-testid="overall-scaled-score">
       <p className="text-xs text-foreground/60">{overallLabel(profile)}</p>
-      {status === "scaled" && score != null ? (
-        <p className="text-2xl font-semibold text-foreground">
-          {score}
-          {provisional ? <span className="ml-2 text-xs font-normal text-amber-700">(provisional)</span> : null}
-        </p>
+      {text != null ? (
+        <>
+          <p className="text-2xl font-semibold text-foreground">
+            {text}
+            {provisional ? <span className="ml-2 text-xs font-normal text-amber-700">(provisional)</span> : null}
+          </p>
+          {basis ? (
+            <p className="mt-1 text-xs text-foreground/60" data-testid="overall-basis">
+              <span className="font-medium">{SCORE_BASIS_LABELS[basis]}.</span> {scoreBasisExplanation(basis, profile)}
+            </p>
+          ) : null}
+        </>
       ) : (
         <p className="text-sm text-foreground/60">{status ? OVERALL_STATUS_LABELS[status] ?? "—" : "—"}</p>
       )}
@@ -295,10 +337,14 @@ export function ResultPage() {
           </CardHeader>
           <CardContent>
             {result.scoring_profile ? (
-              <OverallScaledScore profile={result.scoring_profile} score={result.overall_scaled_score} status={result.overall_status} provisional={result.is_provisional} />
+              <OverallScaledScore
+                profile={result.scoring_profile} score={result.overall_scaled_score} status={result.overall_status}
+                provisional={result.is_provisional} lower={result.overall_score_lower} upper={result.overall_score_upper}
+                basis={result.overall_basis}
+              />
             ) : null}
             {result.sections.map((section, index) => (
-              <SectionScoreRow key={section.id} section={section} index={index} />
+              <SectionScoreRow key={section.id} section={section} index={index} profile={result.scoring_profile} />
             ))}
           </CardContent>
         </Card>

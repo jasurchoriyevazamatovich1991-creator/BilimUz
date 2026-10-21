@@ -98,6 +98,23 @@ export interface ResultSectionOut {
   conversion_table_version?: number | null;
   /** Task 5 — manually graded with an unvalidated rubric. */
   is_provisional?: boolean;
+  // Task 7 — provenance. Optional: older fixtures/results predate it.
+  score_basis?: ScoreBasis | null;
+  scaled_score_lower?: number | null;
+  scaled_score_upper?: number | null;
+  source?: ScoreSourceOut | null;
+}
+
+/** Task 7 — what a scaled score rests on (backend official_scoring BASIS_*). */
+export type ScoreBasis = "official_rule" | "official_practice_test" | "estimate" | "unverified_table" | "rubric";
+
+export interface ScoreSourceOut {
+  title: string | null;
+  url: string | null;
+  version: string | null;
+  verified_at: string | null;
+  test_form: string | null;
+  test_form_label: string | null;
 }
 
 export interface ResultDetailOut extends ResultOut {
@@ -116,6 +133,10 @@ export interface ResultDetailOut extends ResultOut {
   overall_status?: string | null;
   /** Task 5 — overall relies on a provisional manual grade. */
   is_provisional?: boolean;
+  // Task 7 — the overall's basis and range (range when any part is a range).
+  overall_basis?: ScoreBasis | null;
+  overall_score_lower?: number | null;
+  overall_score_upper?: number | null;
 }
 
 export const resultsApi = {

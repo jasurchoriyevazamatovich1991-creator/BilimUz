@@ -1,6 +1,6 @@
 """Pydantic v2 request/response contracts for the tests module."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -143,6 +143,8 @@ class TestOut(BaseModel):
     is_mock_test: bool
     # Task 4 — 'ielts' | 'sat' | 'gre' | None (plain percentage scoring).
     scoring_profile: str | None = None
+    # Task 7 — IELTS 'academic' | 'general_training' | None.
+    ielts_module: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -341,25 +343,41 @@ class RoutingThresholdRuleOut(BaseModel):
 # --- Task 4: exam-specific scaled scoring (Admin/Super Admin only) ---
 
 class ScoringProfileUpdateRequest(BaseModel):
-    """null switches the test back to plain percentage scoring."""
+    """null switches the test back to plain percentage scoring.
+
+    Task 7 — ielts_module ('academic' | 'general_training') applies to the
+    IELTS profile only. Omitted = keep the current value (when the profile
+    stays IELTS); it is cleared automatically for any other profile."""
     scoring_profile: str | None = None
+    ielts_module: str | None = None
 
 
 class ConversionTableEntryIn(BaseModel):
+    """'exact'/'linear': raw + scaled. Task 7 'range': raw + lower + upper."""
     raw: Decimal
-    scaled: Decimal
+    scaled: Decimal | None = None
+    lower: Decimal | None = None
+    upper: Decimal | None = None
 
 
 class ConversionTableCreateRequest(BaseModel):
-    """Publishes a NEW version; existing versions are never modified."""
+    """Publishes a NEW version; existing versions are never modified.
+
+    Task 7 — provenance. conversion_type 'official_practice_test' needs a
+    registered test_form (SAT Practice Test 4–11); its source URL/title come
+    from the registry, not from the request. 'estimate' and 'unverified'
+    may carry a free-form source description."""
     routing_variant: str | None = Field(default=None, min_length=1, max_length=50)
     method: str = "exact"
     entries: list[ConversionTableEntryIn] = Field(min_length=1, max_length=500)
+    conversion_type: str = "unverified"
+    test_form: str | None = Field(default=None, max_length=60)
+    source_url: str | None = Field(default=None, max_length=500)
+    source_title: str | None = Field(default=None, max_length=300)
+    source_version: str | None = Field(default=None, max_length=100)
+    source_verified_at: date | None = None
 
 
-class ConversionTableEntryOut(BaseModel):
-    raw: str
-    scaled: str
 
 
 class ConversionTableOut(BaseModel):
@@ -368,7 +386,16 @@ class ConversionTableOut(BaseModel):
     routing_variant: str | None
     version: int
     method: str
-    entries: list[ConversionTableEntryOut]
+    # As stored: {"raw", "scaled"} for exact/linear, {"raw", "lower",
+    # "upper"} for Task 7 'range' tables (exact decimal strings).
+    entries: list[dict[str, str]]
+    # Task 7 — provenance ('unverified' for every pre-0028 table).
+    conversion_type: str = "unverified"
+    test_form: str | None = None
+    source_url: str | None = None
+    source_title: str | None = None
+    source_version: str | None = None
+    source_verified_at: date | None = None
     # True for the highest version of its (section, routing_variant) —
     # the one new results are scored with.
     is_current: bool = False

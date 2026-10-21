@@ -58,8 +58,18 @@ from app.modules.tests.schemas import (
 from app.modules.results.scaled_scoring import (
     COMPONENTS,
     SCORING_PROFILES,
+    METHOD_RANGE,
+    PROFILE_IELTS,
     InvalidConversionTable,
     validate_conversion_table,
+)
+from app.modules.results.official_scoring import (
+    CONVERSION_TYPES,
+    IELTS_MODULES,
+    OFFICIAL_TABLE_PROFILES,
+    PRACTICE_FORMS,
+    SOURCES,
+    TABLE_OFFICIAL_PRACTICE_TEST,
 )
 from app.modules.uploads.constants import UPLOAD_STATUS_PENDING
 from app.modules.uploads.repository import UploadRepository
@@ -569,7 +579,8 @@ class ExamScoringService:
         self.module_repo = module_repo
         self.table_repo = table_repo
 
-    def set_scoring_profile(self, test_id: uuid.UUID, profile: str | None, actor_id: uuid.UUID) -> Test:
+    def set_scoring_profile(self, test_id: uuid.UUID, profile: str | None, actor_id: uuid.UUID,
+                            ielts_module: str | None = None, ielts_module_given: bool = False) -> Test:
         test = self.test_repo.get_by_id(test_id)
         if test is None or test.deleted_at is not None:
             raise TestNotFoundException("Test topilmadi")
@@ -584,11 +595,23 @@ class ExamScoringService:
                 raise ScoringConfigurationConflictException(
                     "Avval bu bo'limlarning ballash komponentini olib tashlang: " + ", ".join(mismatched)
                 )
+        # Task 7 — Academic vs General Training (IELTS only).
+        if profile != PROFILE_IELTS:
+            if ielts_module_given and ielts_module is not None:
+                raise InvalidScoringConfigurationException("ielts_module faqat IELTS profili uchun")
+            new_module = None
+        elif ielts_module_given:
+            if ielts_module is not None and ielts_module not in IELTS_MODULES:
+                raise InvalidScoringConfigurationException(f"ielts_module quyidagilardan biri bo'lishi kerak: {', '.join(IELTS_MODULES)}")
+            new_module = ielts_module
+        else:
+            new_module = test.ielts_module if test.scoring_profile == PROFILE_IELTS else None
         test.scoring_profile = profile
+        test.ielts_module = new_module
         test.updated_by = actor_id
         self.test_repo.db.flush()
         log_action(self.test_repo.db, action="test.scoring_profile_set", user_id=actor_id, entity_type="test", entity_id=test.id,
-                   metadata={"scoring_profile": profile})
+                   metadata={"scoring_profile": profile, "ielts_module": new_module})
         self.test_repo.db.commit()
         return test
 
@@ -609,6 +632,53 @@ class ExamScoringService:
         current_ids = {t.id for t in current.values()}
         return [(t, t.id in current_ids) for t in tables]
 
+    def _provenance(self, test: Test, section: ExamSection, data: ConversionTableCreateRequest) -> dict:
+        """Task 7 — validates and returns the table's provenance columns.
+
+        'official_practice_test' is only accepted for an exam whose official
+        practice-test conversions are registered (SAT), with a registered
+        test_form of that exam, the 'range' method the guides use, and no
+        routing_variant (the paper-guide table covers the whole section).
+        All official tables of one test must name the same form, so tables
+        of different practice tests are never mixed. Its source URL/title
+        come from the registry, not the request."""
+        ctype = data.conversion_type
+        if ctype not in CONVERSION_TYPES:
+            raise InvalidScoringConfigurationException(f"conversion_type quyidagilardan biri bo'lishi kerak: {', '.join(CONVERSION_TYPES)}")
+        if ctype != TABLE_OFFICIAL_PRACTICE_TEST:
+            if data.test_form is not None:
+                raise InvalidScoringConfigurationException("test_form faqat 'official_practice_test' jadvali uchun")
+            return {
+                "conversion_type": ctype, "test_form": None,
+                "source_url": data.source_url, "source_title": data.source_title,
+                "source_version": data.source_version, "source_verified_at": data.source_verified_at,
+            }
+        if test.scoring_profile not in OFFICIAL_TABLE_PROFILES:
+            raise InvalidScoringConfigurationException(
+                "Bu imtihon uchun rasmiy konversiya jadvali tasdiqlanmagan (IELTS: faqat indikativ, GRE: ETS jadval chop etmaydi) — "
+                "'estimate' turidan foydalaning"
+            )
+        form = PRACTICE_FORMS.get(data.test_form or "")
+        if form is None or form.exam != test.scoring_profile:
+            raise InvalidScoringConfigurationException("test_form ro'yxatdagi rasmiy amaliy test bo'lishi kerak (masalan sat_practice_test_4)")
+        if data.method != METHOD_RANGE:
+            raise InvalidScoringConfigurationException("Rasmiy SAT amaliy test jadvali 'range' (lower/upper) usulida kiritiladi")
+        if data.routing_variant is not None:
+            raise InvalidScoringConfigurationException("Rasmiy amaliy test jadvali butun bo'lim uchun — routing_variant qo'yilmaydi")
+        for other in self.section_repo.list_for_test(test.id):
+            for variant in {None} | {m.routing_variant for m in self.module_repo.list_for_section(other.id) if m.routing_variant}:
+                current = self.table_repo.get_current(other.id, variant)
+                if current is not None and current.conversion_type == TABLE_OFFICIAL_PRACTICE_TEST and current.test_form != form.form_id:
+                    raise ScoringConfigurationConflictException(
+                        f"Bu testda boshqa amaliy test ({current.test_form}) jadvali bor — turli formalar aralashtirilmaydi"
+                    )
+        source = SOURCES[form.source_key]
+        return {
+            "conversion_type": ctype, "test_form": form.form_id,
+            "source_url": form.scoring_guide_url, "source_title": f"Scoring guide — {form.label}",
+            "source_version": data.source_version or source.version, "source_verified_at": data.source_verified_at,
+        }
+
     def publish_table(self, section_id: uuid.UUID, data: ConversionTableCreateRequest, actor_id: uuid.UUID) -> ScoreConversionTable:
         self._active_section(section_id)
         section = self.table_repo.lock_section(section_id)
@@ -625,22 +695,29 @@ class ExamScoringService:
                 raise InvalidScoringConfigurationException(
                     f"routing_variant='{data.routing_variant}' bu bo'limdagi hech bir modulda yo'q"
                 )
+        provenance = self._provenance(test, section, data)
+        if data.method == METHOD_RANGE:
+            raw_entries = [{"raw": e.raw, "lower": e.lower, "upper": e.upper} for e in data.entries]
+            if any(e.lower is None or e.upper is None for e in data.entries):
+                raise InvalidScoringConfigurationException("'range' usulida har bir qatorda raw, lower va upper bo'lishi kerak")
+        else:
+            if any(e.scaled is None for e in data.entries):
+                raise InvalidScoringConfigurationException("Har bir qatorda raw va scaled bo'lishi kerak")
+            raw_entries = [{"raw": e.raw, "scaled": e.scaled} for e in data.entries]
         try:
-            entries = validate_conversion_table(
-                section.score_component, data.method,
-                [{"raw": e.raw, "scaled": e.scaled} for e in data.entries],
-            )
+            entries = validate_conversion_table(section.score_component, data.method, raw_entries)
         except InvalidConversionTable as exc:
             raise InvalidScoringConfigurationException(str(exc))
 
         table = ScoreConversionTable(
             section_id=section.id, routing_variant=data.routing_variant,
             version=self.table_repo.max_version(section.id, data.routing_variant) + 1,
-            method=data.method, entries=entries, created_by=actor_id,
+            method=data.method, entries=entries, created_by=actor_id, **provenance,
         )
         self.table_repo.create(table)
         log_action(self.table_repo.db, action="score_conversion_table.published", user_id=actor_id,
                    entity_type="exam_section", entity_id=section.id,
-                   metadata={"table_id": str(table.id), "version": table.version, "routing_variant": data.routing_variant})
+                   metadata={"table_id": str(table.id), "version": table.version, "routing_variant": data.routing_variant,
+                             "conversion_type": provenance["conversion_type"], "test_form": provenance["test_form"]})
         self.table_repo.commit()
         return table

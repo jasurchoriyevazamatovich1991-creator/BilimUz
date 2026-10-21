@@ -257,6 +257,8 @@ def test_plain_percentage_test_is_unchanged(client, pg_session):
         "id": detail["sections"][0]["id"], "section_id": str(section.id), "name": "Mechanics", "order_number": 0,
         "raw_score": 3.0, "scaled_score": None, "score_component": None, "scaled_status": None, "conversion_table_version": None,
         "is_provisional": False,  # Task 5 — additive
+        # Task 7 — additive provenance fields, all null for a plain test.
+        "score_basis": None, "scaled_score_lower": None, "scaled_score_upper": None, "source": None,
     }]
 
 

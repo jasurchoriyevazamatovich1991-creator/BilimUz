@@ -4,7 +4,9 @@ module, which reads this model read-only."""
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
+from datetime import date
+
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,6 +56,12 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
             "scoring_profile IS NULL OR scoring_profile IN ('ielts', 'sat', 'gre')",
             name="ck_tests_scoring_profile_allowed",
         ),
+        # Task 7 (migration 0028) — IELTS Academic vs General Training
+        # (they use different Reading reference points).
+        CheckConstraint(
+            "ielts_module IS NULL OR ielts_module IN ('academic', 'general_training')",
+            name="ck_tests_ielts_module_allowed",
+        ),
     )
 
     subject_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subjects.id"), nullable=True)
@@ -95,6 +103,8 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     # percentage scoring, unchanged. Set only by Admin/Super Admin via
     # PUT /tests/{id}/scoring-profile; never inferred from the title.
     scoring_profile: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Task 7 — 'academic' | 'general_training' | NULL (only meaningful for IELTS).
+    ielts_module: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -297,7 +307,11 @@ class ScoreConversionTable(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin
     (results/scaled_scoring.validate_conversion_table)."""
     __tablename__ = "score_conversion_tables"
     __table_args__ = (
-        CheckConstraint("method IN ('exact', 'linear')", name="ck_score_conversion_tables_method"),
+        CheckConstraint("method IN ('exact', 'linear', 'range')", name="ck_score_conversion_tables_method"),
+        CheckConstraint(
+            "conversion_type IN ('official_practice_test', 'estimate', 'unverified')",
+            name="ck_score_conversion_tables_conversion_type",
+        ),
         CheckConstraint("version >= 1", name="ck_score_conversion_tables_version_positive"),
         Index(
             "uq_score_conversion_tables_section_variant_version", "section_id",
@@ -310,3 +324,13 @@ class ScoreConversionTable(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     method: Mapped[str] = mapped_column(String(20), nullable=False)
     entries: Mapped[list] = mapped_column(JSONB, nullable=False)
+    # Task 7 (migration 0028) — provenance. Tables created before 0028 are
+    # 'unverified' (no source was recorded). 'official_practice_test'
+    # requires a registered test_form (results/official_scoring.PRACTICE_FORMS)
+    # and is only allowed for exams with published practice-test tables (SAT).
+    conversion_type: Mapped[str] = mapped_column(String(30), nullable=False, default="unverified", server_default="unverified")
+    test_form: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    source_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source_verified_at: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -39,6 +39,12 @@ class Result(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Task 5 (migration 0026) — True when the overall score depends on a
     # manual grade made with a rubric not marked as validated.
     is_provisional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Task 7 (migration 0028) — what the overall score rests on
+    # (results/official_scoring BASIS_*) and, when a component is a range,
+    # the overall range. NULL on results created before 0028.
+    overall_basis: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    overall_score_lower: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
+    overall_score_upper: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
 
 
 class Statistics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -119,3 +125,13 @@ class ResultSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Task 5 (migration 0026) — manual-graded section scored with an
     # unvalidated rubric.
     is_provisional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Task 7 (migration 0028) — provenance of scaled_score: official
+    # practice-test table, estimate, unverified admin table or rubric
+    # (official_scoring BASIS_*); a range when the source gives one
+    # (scaled_score is then set only if lower == upper); and the registry
+    # key of a code-defined source (IELTS indicative points). All NULL on
+    # rows created before 0028 — those rows are never rewritten.
+    score_basis: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    scaled_score_lower: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    scaled_score_upper: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    score_source_key: Mapped[str | None] = mapped_column(String(80), nullable=True)

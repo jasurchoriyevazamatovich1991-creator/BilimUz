@@ -37,6 +37,8 @@ export interface TestOut {
   is_mock_test?: boolean;
   // Task 4 — 'ielts' | 'sat' | 'gre' | null (plain percentage scoring).
   scoring_profile?: "ielts" | "sat" | "gre" | null;
+  // Task 7 — IELTS Academic vs General Training (IELTS only).
+  ielts_module?: "academic" | "general_training" | null;
   created_at: string;
   updated_at: string;
 }

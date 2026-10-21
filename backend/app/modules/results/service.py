@@ -8,6 +8,7 @@ Reads AttemptRepository, AnswerRepository (attempts module) and
 TestRepository (tests module) — all read-only, unmodified.
 """
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from app.core.audit import log_action
@@ -20,6 +21,7 @@ from fractions import Fraction
 
 from app.modules.grading.repository import ReviewRepository, RubricRepository
 from app.modules.grading.rules import compute_section_score
+from app.modules.results import official_scoring as osr
 from app.modules.results import scaled_scoring as ss
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
@@ -31,6 +33,7 @@ from app.modules.results.schemas import (
     ResultDetailOut,
     ResultListParams,
     ResultSectionOut,
+    ScoreSourceOut,
 )
 from app.modules.tests.repository import (
     ExamModuleRepository,
@@ -41,6 +44,38 @@ from app.modules.tests.repository import (
 )
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
+
+
+@dataclass
+class _Scaled:
+    """Task 7 — one section's scaled outcome. A single score is a range with
+    lower == upper; `basis` says what the number rests on (official
+    practice-test table, estimate, unverified table, rubric)."""
+    lower: Fraction | None
+    upper: Fraction | None
+    status: str
+    table: object | None = None
+    provisional: bool = False
+    basis: str | None = None
+    source_key: str | None = None
+
+    @property
+    def scaled(self) -> Fraction | None:
+        return self.lower if self.lower is not None and self.lower == self.upper else None
+
+    @property
+    def range(self) -> tuple[Fraction, Fraction] | None:
+        return (self.lower, self.upper) if self.lower is not None and self.upper is not None else None
+
+
+def _plain(value):
+    """Task 7 columns read defensively: unit tests drive this service with
+    MagicMock rows that predate them (same guard style as elsewhere)."""
+    return value if isinstance(value, (str, int, float, Decimal)) and not isinstance(value, bool) else None
+
+
+def _frac(value) -> Fraction | None:
+    return Fraction(Decimal(str(value))) if value is not None else None
 
 
 class ResultService:
@@ -190,8 +225,11 @@ class ResultService:
             return
         delivered_variants = self._delivered_variants_by_section(attempt, sections) if profile is not None else {}
         finalized_reviews = self._finalized_reviews_by_question(attempt.id) if profile is not None else {}
-        scaled_by_component: dict = {}
+        test = self.test_repo.get_by_id(result.test_id) if profile == ss.PROFILE_IELTS else None
+        ielts_module = getattr(test, "ielts_module", None) if test is not None else None
+        range_by_component: dict = {}
         provisional_by_component: dict = {}
+        basis_by_component: dict = {}
 
         answers = self.answer_repo.list_for_attempt(attempt.id)
         answers_by_question = {a.question_id: a for a in answers}
@@ -238,27 +276,49 @@ class ResultService:
             if profile is not None:
                 manual_questions = [q for q in delivered_section_questions if not is_auto_gradable(q)]
                 has_ungraded = len(questions) != len(delivered_section_questions)
-                scaled, status, table, provisional = self._scale_section(
+                # Task 7 — the marked-out-of scale, for sources defined on a
+                # fixed number of one-mark items (IELTS: out of 40).
+                raw_max = Fraction(len(questions)) if questions and all(Fraction(Decimal(str(q.score))) == 1 for q in questions) else None
+                outcome = self._scale_section(
                     profile, section, scoring_result.score, has_ungraded, delivered_variants.get(section.id, set()),
-                    manual_questions, finalized_reviews,
+                    manual_questions, finalized_reviews, ielts_module=ielts_module, raw_max=raw_max,
                 )
                 row.score_component = section.score_component
-                row.scaled_status = status
-                row.scaled_score = float(scaled) if scaled is not None else None
-                row.conversion_table_id = table.id if table is not None else None
-                row.is_provisional = provisional
+                self._store_outcome(row, outcome)
+                row.conversion_table_id = outcome.table.id if outcome.table is not None else None
                 if section.score_component is not None:
-                    scaled_by_component[section.score_component] = scaled
-                    provisional_by_component[section.score_component] = provisional
+                    range_by_component[section.score_component] = outcome.range
+                    provisional_by_component[section.score_component] = outcome.provisional
+                    basis_by_component[section.score_component] = outcome.basis
             self.result_section_repo.create(row)
 
         if profile is not None:
-            self._apply_overall(result, profile, scaled_by_component, provisional_by_component)
+            self._apply_overall(result, profile, range_by_component, provisional_by_component, basis_by_component)
 
     @staticmethod
-    def _apply_overall(result, profile: str, scaled_by_component: dict, provisional_by_component: dict) -> None:
-        overall, overall_status = ss.compute_overall(profile, scaled_by_component)
-        result.overall_scaled_score = float(overall) if overall is not None else None
+    def _store_outcome(row, outcome: _Scaled) -> None:
+        row.scaled_status = outcome.status
+        row.scaled_score = float(outcome.scaled) if outcome.scaled is not None else None
+        row.scaled_score_lower = float(outcome.lower) if outcome.lower is not None else None
+        row.scaled_score_upper = float(outcome.upper) if outcome.upper is not None else None
+        row.score_basis = outcome.basis if outcome.range is not None else None
+        row.score_source_key = outcome.source_key if outcome.range is not None else None
+        row.is_provisional = outcome.provisional
+
+    @staticmethod
+    def _apply_overall(result, profile: str, range_by_component: dict, provisional_by_component: dict,
+                       basis_by_component: dict | None = None) -> None:
+        """Task 4/5/7 — overall score (or range) and what it rests on. The
+        overall rule (IELTS rounded mean / SAT sum) is applied to the lower
+        and upper ends separately; a single score has lower == upper."""
+        lower, upper, overall_status = ss.compute_overall_range(profile, range_by_component)
+        scored = overall_status == ss.OVERALL_SCALED and lower is not None and upper is not None
+        result.overall_scaled_score = float(lower) if scored and lower == upper else None
+        result.overall_score_lower = float(lower) if scored else None
+        result.overall_score_upper = float(upper) if scored else None
+        result.overall_basis = (
+            osr.overall_basis(profile, [(basis_by_component or {}).get(c) for c in ss.overall_components(profile)]) if scored else None
+        )
         result.overall_status = overall_status
         # Provisional only when an actual overall score relies on a
         # provisional (unvalidated-rubric) section.
@@ -334,18 +394,21 @@ class ResultService:
                 q for q in self.question_repo.list_by_section(section.id) if q.id in effective_ids and not is_auto_gradable(q)
             ]
             scaled, status, provisional = self._manual_section_score(section.score_component, manual_questions, finalized)
-            row.scaled_score = float(scaled) if scaled is not None else None
-            row.scaled_status = status
-            row.is_provisional = provisional
+            self._store_outcome(row, _Scaled(scaled, scaled, status, provisional=provisional,
+                                             basis=osr.BASIS_RUBRIC if scaled is not None else None))
 
-        scaled_by_component, provisional_by_component = {}, {}
+        range_by_component, provisional_by_component, basis_by_component = {}, {}, {}
         for row in rows.values():
             if row.score_component:
-                scaled_by_component[row.score_component] = (
-                    Fraction(Decimal(str(row.scaled_score))) if row.scaled_score is not None else None
-                )
+                # Table-scored rows are read back as stored. Rows created
+                # before Task 7 have no lower/upper: their single scaled_score
+                # is the range, and their basis is unknown (None).
+                lower = _frac(row.scaled_score_lower) if row.scaled_score_lower is not None else _frac(row.scaled_score)
+                upper = _frac(row.scaled_score_upper) if row.scaled_score_upper is not None else _frac(row.scaled_score)
+                range_by_component[row.score_component] = (lower, upper) if lower is not None and upper is not None else None
                 provisional_by_component[row.score_component] = bool(row.is_provisional)
-        self._apply_overall(result, result.scoring_profile, scaled_by_component, provisional_by_component)
+                basis_by_component[row.score_component] = row.score_basis
+        self._apply_overall(result, result.scoring_profile, range_by_component, provisional_by_component, basis_by_component)
         self.repo.db.flush()
 
     def _delivered_variants_by_section(self, attempt, sections) -> dict:
@@ -364,30 +427,44 @@ class ResultService:
         return variants
 
     def _scale_section(self, profile: str, section, raw_score: float, has_ungraded: bool, variants: set,
-                       manual_questions: list | None = None, finalized_reviews: dict | None = None):
-        """Task 4/5 — returns (scaled Fraction | None, status, table | None,
-        is_provisional). Never invents a score: every path that cannot
-        produce one says why."""
+                       manual_questions: list | None = None, finalized_reviews: dict | None = None,
+                       ielts_module: str | None = None, raw_max: Fraction | None = None) -> _Scaled:
+        """Task 4/5/7 — a section's scaled outcome. Never invents a score:
+        every path that cannot produce one says why, and every score says
+        what it rests on (score basis)."""
         component = section.score_component
         spec = ss.COMPONENTS.get(component) if component else None
         if spec is None or spec.profile != profile:
-            return None, ss.STATUS_NO_COMPONENT, None, False
+            return _Scaled(None, None, ss.STATUS_NO_COMPONENT)
         if not spec.table_convertible:
             # Task 5 — Writing/Speaking/AWA: finalized manual reviews only.
             scaled, status, provisional = self._manual_section_score(component, manual_questions or [], finalized_reviews or {})
-            return scaled, status, None, provisional
+            return _Scaled(scaled, scaled, status, provisional=provisional, basis=osr.BASIS_RUBRIC if scaled is not None else None)
         if has_ungraded:
             # The section's raw score is incomplete because some delivered
             # answers are not auto-gradable (e.g. an unconfigured short_answer).
-            return None, ss.STATUS_PENDING_MANUAL, None, False
+            return _Scaled(None, None, ss.STATUS_PENDING_MANUAL)
         if len(variants) > 1:
-            return None, ss.STATUS_AMBIGUOUS_VARIANT, None, False
+            return _Scaled(None, None, ss.STATUS_AMBIGUOUS_VARIANT)
         variant = next(iter(variants)) if variants else None
         table = self.table_repo.get_current(section.id, variant) if self.table_repo is not None else None
-        if table is None:
-            return None, ss.STATUS_NO_TABLE, None, False
-        scaled, status = ss.convert_raw_score(component, table.method, table.entries, round(raw_score, 2))
-        return scaled, status, table, False
+        raw = round(raw_score, 2)
+        if table is not None:
+            basis = osr.TABLE_TYPE_TO_BASIS.get(getattr(table, "conversion_type", None) or osr.TABLE_UNVERIFIED, osr.BASIS_UNVERIFIED)
+            if table.method == ss.METHOD_RANGE:
+                lower, upper, status = ss.convert_raw_range(table.entries, raw)
+            else:
+                lower, status = ss.convert_raw_score(component, table.method, table.entries, raw)
+                upper = lower
+            return _Scaled(lower, upper, status, table=table, basis=basis)
+        if profile == ss.PROFILE_IELTS and component in ("ielts_listening", "ielts_reading"):
+            # Task 7 — no admin table: IELTS.org's published average marks
+            # give an indicative band RANGE only (thresholds vary by version).
+            lower, upper, status = osr.ielts_indicative_band_range(
+                component, ielts_module, _frac(raw), raw_max if raw_max is not None else Fraction(-1),
+            )
+            return _Scaled(lower, upper, status, basis=osr.BASIS_ESTIMATE, source_key=osr.IELTS_SOURCE_KEY)
+        return _Scaled(None, None, ss.STATUS_NO_TABLE)
 
     def get_result(self, result_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         result = self.repo.get_by_id(result_id)
@@ -518,6 +595,9 @@ class ResultService:
             status=result.status, created_at=result.created_at,
             scoring_profile=result.scoring_profile, overall_scaled_score=result.overall_scaled_score,
             overall_status=result.overall_status, is_provisional=bool(result.is_provisional),
+            overall_basis=_plain(getattr(result, "overall_basis", None)),
+            overall_score_lower=_plain(getattr(result, "overall_score_lower", None)),
+            overall_score_upper=_plain(getattr(result, "overall_score_upper", None)),
             total_questions=len(question_ids), correct_answers=correct_count,
             incorrect_answers=incorrect_count, unanswered=unanswered_count,
             time_spent_seconds=time_spent_seconds, questions=question_reviews,
@@ -564,7 +644,8 @@ class ResultService:
             rows = sorted(rows, key=lambda r: r.id)
 
         table_ids = [row.conversion_table_id for row in rows if row.conversion_table_id is not None]
-        versions = {t.id: t.version for t in self.table_repo.list_by_ids(table_ids)} if self.table_repo is not None and table_ids else {}
+        tables = {t.id: t for t in self.table_repo.list_by_ids(table_ids)} if self.table_repo is not None and table_ids else {}
+        versions = {tid: t.version for tid, t in tables.items()}
 
         return [
             ResultSectionOut(
@@ -575,9 +656,33 @@ class ResultService:
                 score_component=row.score_component, scaled_status=row.scaled_status,
                 conversion_table_version=versions.get(row.conversion_table_id),
                 is_provisional=bool(row.is_provisional),
+                score_basis=_plain(getattr(row, "score_basis", None)),
+                scaled_score_lower=_plain(getattr(row, "scaled_score_lower", None)),
+                scaled_score_upper=_plain(getattr(row, "scaled_score_upper", None)),
+                source=self._section_source(row, tables.get(row.conversion_table_id)),
             )
             for row in rows
         ]
+
+    @staticmethod
+    def _section_source(row, table) -> ScoreSourceOut | None:
+        """Task 7 — citation for a Task-7 row: the exact table's recorded
+        source, or the code registry entry it was scored with. Pre-Task-7
+        rows (no score_basis) get none rather than a retro-fitted label."""
+        if _plain(getattr(row, "score_basis", None)) is None:
+            return None
+        if table is not None:
+            form = osr.PRACTICE_FORMS.get(getattr(table, "test_form", None) or "")
+            if not any([table.source_url, table.source_title, form]):
+                return None
+            verified = getattr(table, "source_verified_at", None)
+            return ScoreSourceOut(
+                title=table.source_title, url=table.source_url, version=table.source_version,
+                verified_at=verified.isoformat() if verified else None,
+                test_form=form.form_id if form else None, test_form_label=form.label if form else None,
+            )
+        src = osr.source_dict(_plain(getattr(row, "score_source_key", None)))
+        return ScoreSourceOut(**{k: v for k, v in src.items() if k != "key"}) if src else None
 
     def list_my_results(self, user_id: uuid.UUID, params: ResultListParams) -> tuple[list[Result], int]:
         return self.repo.list_for_user(user_id, params.page, params.per_page, params.test_id, params.sort)

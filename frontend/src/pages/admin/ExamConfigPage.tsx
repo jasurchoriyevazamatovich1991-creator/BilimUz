@@ -619,7 +619,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
       </div>
 
       {/* --- Scoring profile (Task 4) --- */}
-      <ScoringProfileCard testId={testId} current={test.scoring_profile ?? null} />
+      <ScoringProfileCard testId={testId} current={test.scoring_profile ?? null} currentIeltsModule={test.ielts_module ?? null} />
 
       {/* --- Sections --- */}
       <Card>

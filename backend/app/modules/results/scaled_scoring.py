@@ -23,7 +23,10 @@ SCORING_PROFILES = (PROFILE_IELTS, PROFILE_SAT, PROFILE_GRE)
 
 METHOD_EXACT = "exact"
 METHOD_LINEAR = "linear"
-CONVERSION_METHODS = (METHOD_EXACT, METHOD_LINEAR)
+# Task 7 — every raw score maps to a [lower, upper] scaled range, as in the
+# College Board paper practice-test scoring guides. Exact lookup only.
+METHOD_RANGE = "range"
+CONVERSION_METHODS = (METHOD_EXACT, METHOD_LINEAR, METHOD_RANGE)
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,9 @@ def validate_conversion_table(component: str, method: str, entries: list[dict]) 
     if len(entries) > MAX_TABLE_ENTRIES:
         raise InvalidConversionTable(f"Jadvalda ko'pi bilan {MAX_TABLE_ENTRIES} ta qator bo'lishi mumkin")
 
+    if method == METHOD_RANGE:
+        return _validate_range_table(spec, entries)
+
     pairs: list[tuple[Fraction, Fraction]] = []
     for i, entry in enumerate(entries, start=1):
         if not isinstance(entry, dict) or "raw" not in entry or "scaled" not in entry:
@@ -161,6 +167,58 @@ def validate_conversion_table(component: str, method: str, entries: list[dict]) 
         raise InvalidConversionTable("'linear' usulida kamida 2 ta nuqta bo'lishi kerak")
 
     return [{"raw": _decimal_text(raw), "scaled": _decimal_text(scaled)} for raw, scaled in pairs]
+
+
+def _check_scaled(spec: ComponentSpec, value: Fraction, what: str) -> None:
+    if value < spec.scale_min or value > spec.scale_max:
+        raise InvalidConversionTable(f"{what} {_fmt(spec.scale_min)}–{_fmt(spec.scale_max)} oralig'ida bo'lishi kerak")
+    if (value / spec.step).denominator != 1:
+        raise InvalidConversionTable(f"{what} {_fmt(spec.step)} qadamli bo'lishi kerak")
+
+
+def _validate_range_table(spec: ComponentSpec, entries: list[dict]) -> list[dict]:
+    """Task 7 — [{"raw", "lower", "upper"}]: every integer raw score from 0
+    to the maximum, lower <= upper, both non-decreasing in raw."""
+    rows: list[tuple[Fraction, Fraction, Fraction]] = []
+    for i, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict) or not {"raw", "lower", "upper"} <= set(entry):
+            raise InvalidConversionTable(f"{i}-qator: 'raw', 'lower' va 'upper' maydonlari kerak")
+        raw = _to_fraction(entry["raw"], f"{i}-qator raw")
+        lower = _to_fraction(entry["lower"], f"{i}-qator lower")
+        upper = _to_fraction(entry["upper"], f"{i}-qator upper")
+        if raw.denominator != 1 or raw < 0 or raw > MAX_RAW:
+            raise InvalidConversionTable(f"{i}-qator: raw 0 dan {MAX_RAW} gacha butun son bo'lishi kerak")
+        _check_scaled(spec, lower, f"{i}-qator: lower")
+        _check_scaled(spec, upper, f"{i}-qator: upper")
+        if lower > upper:
+            raise InvalidConversionTable(f"{i}-qator: lower upper dan katta bo'lishi mumkin emas")
+        rows.append((raw, lower, upper))
+    rows.sort(key=lambda r: r[0])
+    present = [int(r[0]) for r in rows]
+    if len(set(present)) != len(present):
+        raise InvalidConversionTable("Bir xil raw ikki marta kiritilgan")
+    expected = list(range(0, present[-1] + 1))
+    if present != expected:
+        missing = sorted(set(expected) - set(present))
+        raise InvalidConversionTable(
+            "'range' usulida 0 dan eng katta raw gacha har bir qiymat bo'lishi kerak; yetishmaydi: "
+            + ", ".join(str(m) for m in missing[:20])
+        )
+    for (raw_a, lo_a, up_a), (raw_b, lo_b, up_b) in zip(rows, rows[1:]):
+        if lo_b < lo_a or up_b < up_a:
+            raise InvalidConversionTable(f"Jadval monoton emas: raw {_fmt(raw_a)} va {_fmt(raw_b)}")
+    return [{"raw": _decimal_text(r), "lower": _decimal_text(lo), "upper": _decimal_text(up)} for r, lo, up in rows]
+
+
+def convert_raw_range(entries: list[dict], raw_score) -> tuple[Fraction | None, Fraction | None, str]:
+    """Task 7 — exact lookup in a validated 'range' table. Returns
+    (lower, upper, STATUS_SCALED) or (None, None, STATUS_OUT_OF_RANGE);
+    never extrapolates or interpolates."""
+    raw = _to_fraction(raw_score, "raw")
+    for e in entries:
+        if _to_fraction(e["raw"], "raw") == raw:
+            return _to_fraction(e["lower"], "lower"), _to_fraction(e["upper"], "upper"), STATUS_SCALED
+    return None, None, STATUS_OUT_OF_RANGE
 
 
 def _decimal_text(value: Fraction) -> str:
@@ -217,6 +275,20 @@ def overall_components(profile: str) -> tuple[str, ...]:
     if profile == PROFILE_SAT:
         return SAT_TOTAL_COMPONENTS
     return ()
+
+
+def compute_overall_range(profile: str, range_by_component: dict[str, tuple[Fraction, Fraction] | None]):
+    """Task 7 — overall (lower, upper, status) from per-component ranges
+    (a single score is a range with lower == upper). The overall rule is
+    applied to the lower ends and to the upper ends separately; both rules
+    (IELTS rounded mean, SAT sum) are monotonic, so lower <= upper. For SAT
+    this is exactly the College Board guide's "add the two lower values
+    together and the two upper values together"."""
+    lowers = {c: (r[0] if r is not None else None) for c, r in range_by_component.items()}
+    uppers = {c: (r[1] if r is not None else None) for c, r in range_by_component.items()}
+    lower, status = compute_overall(profile, lowers)
+    upper, _ = compute_overall(profile, uppers)
+    return lower, upper, status
 
 
 def compute_overall(profile: str, scaled_by_component: dict[str, Fraction | None]) -> tuple[Fraction | None, str]:

@@ -94,6 +94,18 @@ class ManualGradeOut(BaseModel):
     finalized_at: datetime
 
 
+class ScoreSourceOut(BaseModel):
+    """Task 7 — where a section's scaled score comes from. No table
+    entries, no admin identity — just the citation a student may see."""
+    title: str | None = None
+    url: str | None = None
+    version: str | None = None
+    verified_at: str | None = None
+    # e.g. 'sat_practice_test_4' and its human label.
+    test_form: str | None = None
+    test_form_label: str | None = None
+
+
 class ResultSectionOut(BaseModel):
     """Sprint 55 — read-only exposure of Sprint 54's ResultSection rows.
     Deliberately exposes only the fields a result consumer needs
@@ -128,6 +140,15 @@ class ResultSectionOut(BaseModel):
     conversion_table_version: int | None = None
     # Task 5 — manual section graded with an unvalidated rubric.
     is_provisional: bool = False
+    # Task 7 — provenance: 'official_practice_test' | 'estimate' |
+    # 'unverified_table' | 'rubric' (results/official_scoring BASIS_*);
+    # a range when the source gives one (scaled_score is then None unless
+    # lower == upper); and the cited source. All None for rows created
+    # before Task 7.
+    score_basis: str | None = None
+    scaled_score_lower: float | None = None
+    scaled_score_upper: float | None = None
+    source: ScoreSourceOut | None = None
 
     model_config = {"from_attributes": True}
 
@@ -142,6 +163,12 @@ class ResultDetailOut(ResultOut):
     overall_status: str | None = None
     # Task 5 — the overall score relies on a provisional manual grade.
     is_provisional: bool = False
+    # Task 7 — what the overall rests on (weakest component basis, or
+    # 'official_rule' / 'official_practice_test' when every input is
+    # rubric/official) and the overall range when a component is a range.
+    overall_basis: str | None = None
+    overall_score_lower: float | None = None
+    overall_score_upper: float | None = None
     total_questions: int
     correct_answers: int
     incorrect_answers: int

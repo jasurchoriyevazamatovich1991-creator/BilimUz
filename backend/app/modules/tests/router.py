@@ -450,7 +450,8 @@ def publish_conversion_table(
     "/{test_id}/scoring-profile",
     summary="Set or clear a test's exam scoring profile",
     description="Task 4. 'ielts', 'sat', 'gre', or null (plain percentage scoring). Admin/Super Admin only. "
-                "409 while sections still carry score components of a different profile.",
+                "409 while sections still carry score components of a different profile. Task 7: optional "
+                "ielts_module ('academic' | 'general_training', IELTS only; omitted = unchanged).",
 )
 def set_scoring_profile(
     test_id: uuid.UUID,
@@ -458,7 +459,10 @@ def set_scoring_profile(
     service: ExamScoringService = Depends(get_exam_scoring_service),
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
-    test = service.set_scoring_profile(test_id, data.scoring_profile, actor_id=user.id)
+    test = service.set_scoring_profile(
+        test_id, data.scoring_profile, actor_id=user.id,
+        ielts_module=data.ielts_module, ielts_module_given="ielts_module" in data.model_fields_set,
+    )
     return success_response(TestOut.model_validate(test), "Ballash profili yangilandi.")
 
 
