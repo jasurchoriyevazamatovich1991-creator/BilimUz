@@ -103,3 +103,17 @@ class DuplicateGroupMediaException(AppException):
     """Task 3 — this upload is already attached to this group."""
     status_code = status.HTTP_409_CONFLICT
     error_code = "DUPLICATE_GROUP_MEDIA"
+
+
+class InvalidScoringConfigurationException(AppException):
+    """Task 4 — scoring profile / score component / conversion table rule
+    violated (wrong profile, duplicate component, invalid table data...)."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "INVALID_SCORING_CONFIGURATION"
+
+
+class ScoringConfigurationConflictException(AppException):
+    """Task 4 — the change would orphan existing scoring data (e.g.
+    changing a section's component after tables were published)."""
+    status_code = status.HTTP_409_CONFLICT
+    error_code = "SCORING_CONFIGURATION_CONFLICT"

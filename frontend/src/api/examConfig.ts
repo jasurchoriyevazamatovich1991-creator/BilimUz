@@ -20,6 +20,7 @@
  * per section).
  */
 import { httpClient, unwrap } from "./client";
+import type { TestOut } from "./tests";
 
 export interface ExamSectionOut {
   id: string;
@@ -27,6 +28,8 @@ export interface ExamSectionOut {
   name: string;
   order_number: number;
   duration: number | null;
+  // Task 4 — e.g. "sat_math"; optional so older fixtures stay valid.
+  score_component?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,12 +39,33 @@ export interface ExamSectionCreateRequest {
   name: string;
   order_number: number;
   duration?: number;
+  score_component?: string;
 }
 
 export interface ExamSectionUpdateRequest {
   name?: string;
   order_number?: number;
   duration?: number | null;
+  score_component?: string | null;
+}
+
+/** Task 4 — an immutable, versioned raw-to-scaled table (Admin only). */
+export interface ConversionTableOut {
+  id: string;
+  section_id: string;
+  routing_variant: string | null;
+  version: number;
+  method: "exact" | "linear";
+  entries: { raw: string; scaled: string }[];
+  is_current: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ConversionTableCreateRequest {
+  routing_variant?: string;
+  method: "exact" | "linear";
+  entries: { raw: string; scaled: string }[];
 }
 
 export interface ExamModuleOut {
@@ -122,6 +146,18 @@ export const examSectionsApi = {
 
   update: (sectionId: string, data: ExamSectionUpdateRequest) =>
     unwrap<ExamSectionOut>(httpClient.patch(`/tests/exam-sections/${sectionId}`, data)),
+};
+
+// Task 4 — exam-specific scaled scoring configuration (Admin/Super Admin).
+export const scoringApi = {
+  setProfile: (testId: string, scoringProfile: "ielts" | "sat" | "gre" | null) =>
+    unwrap<TestOut>(httpClient.put(`/tests/${testId}/scoring-profile`, { scoring_profile: scoringProfile })),
+
+  listTables: (sectionId: string) =>
+    unwrap<ConversionTableOut[]>(httpClient.get(`/tests/exam-sections/${sectionId}/conversion-tables`)),
+
+  publishTable: (sectionId: string, data: ConversionTableCreateRequest) =>
+    unwrap<ConversionTableOut>(httpClient.post(`/tests/exam-sections/${sectionId}/conversion-tables`, data)),
 };
 
 export const examModulesApi = {

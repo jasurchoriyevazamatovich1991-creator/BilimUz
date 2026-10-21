@@ -5,7 +5,7 @@ import uuid
 from enum import StrEnum
 
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.mixins import AuditMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -24,6 +24,16 @@ class TestStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+# Task 4 — mirrors results/scaled_scoring.COMPONENTS (kept literal here so
+# the model module has no dependency on the results module).
+SCORE_COMPONENT_CHECK_SQL = (
+    "score_component IS NULL OR score_component IN ("
+    "'ielts_listening', 'ielts_reading', 'ielts_writing', 'ielts_speaking', "
+    "'sat_reading_writing', 'sat_math', "
+    "'gre_verbal', 'gre_quantitative', 'gre_analytical_writing')"
+)
+
+
 class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     __tablename__ = "tests"
     __table_args__ = (
@@ -39,6 +49,10 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
         CheckConstraint(
             "is_mock_test = false OR subject_id IS NOT NULL",
             name="ck_tests_mock_test_requires_subject",
+        ),
+        CheckConstraint(
+            "scoring_profile IS NULL OR scoring_profile IN ('ielts', 'sat', 'gre')",
+            name="ck_tests_scoring_profile_allowed",
         ),
     )
 
@@ -76,6 +90,11 @@ class Test(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
     # so requires subject_id to already be set (see the CHECK
     # constraint above and TestService._validate_mock_test_consistency()).
     is_mock_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Task 4 (migration 0025) — explicit exam scoring profile: 'ielts',
+    # 'sat', 'gre', or NULL. NULL (every existing test) keeps the plain
+    # percentage scoring, unchanged. Set only by Admin/Super Admin via
+    # PUT /tests/{id}/scoring-profile; never inferred from the title.
+    scoring_profile: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -91,7 +110,14 @@ class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     reasoning: a real DB-level guarantee of deterministic section
     order within one test, not just an advisory sort hint."""
     __tablename__ = "exam_sections"
-    __table_args__ = (UniqueConstraint("test_id", "order_number", name="uq_exam_sections_test_id_order_number"),)
+    __table_args__ = (
+        UniqueConstraint("test_id", "order_number", name="uq_exam_sections_test_id_order_number"),
+        CheckConstraint(SCORE_COMPONENT_CHECK_SQL, name="ck_exam_sections_score_component_allowed"),
+        Index(
+            "uq_exam_sections_active_test_score_component", "test_id", "score_component",
+            unique=True, postgresql_where=text("deleted_at IS NULL AND score_component IS NOT NULL"),
+        ),
+    )
 
     test_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tests.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -102,6 +128,11 @@ class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # own; nothing in this sprint enforces it yet (foundation only,
     # per this sprint's explicit scope).
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Task 4 (migration 0025) — which scored exam component this section
+    # is (e.g. 'sat_math', 'ielts_listening'); see
+    # results/scaled_scoring.COMPONENTS. Must match the test's
+    # scoring_profile; unique among a test's active sections.
+    score_component: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
 
 class ExamModule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -246,3 +277,32 @@ class RoutingThresholdRule(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     routing_group: Mapped[str] = mapped_column(String(50), nullable=False)
     min_ratio: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     variant: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class ScoreConversionTable(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin):
+    """Task 4 (migration 0025) — an admin-managed raw-to-scaled mapping for
+    one ExamSection (= one exam component of one test form), optionally
+    for one adaptive routing_variant of that section.
+
+    Rows are immutable once created: "changing" a table publishes a new
+    version (version + 1 for the same section/variant). The current table
+    is the highest active version. ResultSection.conversion_table_id
+    records exactly which row produced a scaled score, so results stay
+    reproducible after later updates. entries holds the validated,
+    canonical [{"raw": "12", "scaled": "650"}, ...] list
+    (results/scaled_scoring.validate_conversion_table)."""
+    __tablename__ = "score_conversion_tables"
+    __table_args__ = (
+        CheckConstraint("method IN ('exact', 'linear')", name="ck_score_conversion_tables_method"),
+        CheckConstraint("version >= 1", name="ck_score_conversion_tables_version_positive"),
+        Index(
+            "uq_score_conversion_tables_section_variant_version", "section_id",
+            text("COALESCE(routing_variant, '')"), "version", unique=True,
+        ),
+    )
+
+    section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="CASCADE"), nullable=False, index=True)
+    routing_variant: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    method: Mapped[str] = mapped_column(String(20), nullable=False)
+    entries: Mapped[list] = mapped_column(JSONB, nullable=False)

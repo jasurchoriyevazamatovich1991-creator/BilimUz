@@ -35,6 +35,8 @@ export interface TestOut {
   // is purely a frontend-type convenience. Falsy/undefined reads the
   // same as `false` everywhere this is checked.
   is_mock_test?: boolean;
+  // Task 4 — 'ielts' | 'sat' | 'gre' | null (plain percentage scoring).
+  scoring_profile?: "ielts" | "sat" | "gre" | null;
   created_at: string;
   updated_at: string;
 }

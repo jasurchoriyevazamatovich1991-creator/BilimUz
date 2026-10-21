@@ -12,6 +12,7 @@ from app.modules.auth.dependencies import require_roles
 from app.modules.tests.exceptions import InvalidTestReferenceException
 from app.modules.tests.dependencies import (
     get_exam_module_service,
+    get_exam_scoring_service,
     get_exam_section_service,
     get_question_group_media_service,
     get_question_group_service,
@@ -19,6 +20,9 @@ from app.modules.tests.dependencies import (
     get_test_service,
 )
 from app.modules.tests.schemas import (
+    ConversionTableCreateRequest,
+    ConversionTableOut,
+    ScoringProfileUpdateRequest,
     ExamModuleCreateRequest,
     ExamModuleOut,
     ExamModuleUpdateRequest,
@@ -41,6 +45,7 @@ from app.modules.tests.schemas import (
 )
 from app.modules.tests.service import (
     ExamModuleService,
+    ExamScoringService,
     ExamSectionService,
     QuestionGroupMediaService,
     QuestionGroupService,
@@ -401,6 +406,60 @@ def delete_routing_threshold_rule(
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
     service.delete_rule(rule_id, actor_id=user.id)
+
+
+# --- Task 4: exam-specific scaled scoring (Admin/Super Admin only) ---
+
+@router.get(
+    "/exam-sections/{section_id}/conversion-tables",
+    summary="List a section's raw-to-scaled conversion table versions",
+    description="Task 4. All versions, newest first per routing_variant; is_current marks the version new "
+                "results are scored with. Admin/Super Admin only.",
+)
+def list_conversion_tables(
+    section_id: uuid.UUID,
+    service: ExamScoringService = Depends(get_exam_scoring_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    rows = service.list_tables(section_id)
+    out = [ConversionTableOut.model_validate(t).model_copy(update={"is_current": current}) for t, current in rows]
+    return success_response(out, "Konversiya jadvallari.")
+
+
+@router.post(
+    "/exam-sections/{section_id}/conversion-tables",
+    status_code=status.HTTP_201_CREATED,
+    summary="Publish a new raw-to-scaled conversion table version",
+    description="Task 4. Existing versions are never modified; results keep the version they were scored "
+                "with. 422 on invalid data: score range/step for the section's component (IELTS 0-9 by 0.5, "
+                "SAT 200-800 by 10, GRE 130-170 by 1), duplicate or non-increasing raw values, non-monotonic "
+                "scaled values, gaps in an 'exact' table, Writing/Speaking/AWA components, a routing_variant "
+                "no module of the section has, or a test without a scoring profile.",
+)
+def publish_conversion_table(
+    section_id: uuid.UUID,
+    data: ConversionTableCreateRequest,
+    service: ExamScoringService = Depends(get_exam_scoring_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    table = service.publish_table(section_id, data, actor_id=user.id)
+    return success_response(ConversionTableOut.model_validate(table).model_copy(update={"is_current": True}), "Jadval e'lon qilindi.")
+
+
+@router.put(
+    "/{test_id}/scoring-profile",
+    summary="Set or clear a test's exam scoring profile",
+    description="Task 4. 'ielts', 'sat', 'gre', or null (plain percentage scoring). Admin/Super Admin only. "
+                "409 while sections still carry score components of a different profile.",
+)
+def set_scoring_profile(
+    test_id: uuid.UUID,
+    data: ScoringProfileUpdateRequest,
+    service: ExamScoringService = Depends(get_exam_scoring_service),
+    user: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    test = service.set_scoring_profile(test_id, data.scoring_profile, actor_id=user.id)
+    return success_response(TestOut.model_validate(test), "Ballash profili yangilandi.")
 
 
 @router.get(

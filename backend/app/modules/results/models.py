@@ -28,6 +28,14 @@ class Result(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     percentage: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     is_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="final")
+    # Task 4 (migration 0025) — exam-specific scaled scoring. NULL for a
+    # plain percentage-scored test (every existing result). Snapshot of
+    # the test's profile at result creation, so later profile changes do
+    # not reinterpret old results.
+    scoring_profile: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    overall_scaled_score: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
+    # 'scaled' | 'pending' | 'not_reported' (GRE has no combined score).
+    overall_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
 
 class Statistics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -97,3 +105,11 @@ class ResultSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="CASCADE"), nullable=False)
     raw_score: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
     scaled_score: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    # Task 4 (migration 0025) — all NULL for non-profile tests.
+    score_component: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # See results/scaled_scoring STATUS_* — why scaled_score is or isn't set.
+    scaled_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # The exact (immutable) table version used; NULL when none was used.
+    conversion_table_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("score_conversion_tables.id"), nullable=True,
+    )

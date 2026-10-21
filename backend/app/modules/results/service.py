@@ -15,10 +15,17 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
+from app.modules.results import scaled_scoring as ss
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams, ResultSectionOut
-from app.modules.tests.repository import ExamSectionRepository, QuestionGroupRepository, TestRepository
+from app.modules.tests.repository import (
+    ExamModuleRepository,
+    ExamSectionRepository,
+    QuestionGroupRepository,
+    ScoreConversionTableRepository,
+    TestRepository,
+)
 
 _FINISHED_ATTEMPT_STATUSES = ("submitted", "auto_finished")
 
@@ -60,6 +67,11 @@ class ResultService:
         # below degrades to the exact legacy (group_id/group_title/
         # stimulus_text always None) behavior when this is None.
         question_group_repository: QuestionGroupRepository | None = None,
+        # Task 4 — optional; without them a scoring-profile test still gets
+        # its raw section scores, with every scaled score marked
+        # no_conversion_table (never invented).
+        conversion_table_repository: ScoreConversionTableRepository | None = None,
+        exam_module_repository: ExamModuleRepository | None = None,
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
@@ -71,6 +83,8 @@ class ResultService:
         self.result_section_repo = result_section_repository
         self.module_execution = module_execution_service
         self.group_repo = question_group_repository
+        self.table_repo = conversion_table_repository
+        self.module_repo = exam_module_repository
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -113,6 +127,8 @@ class ResultService:
         result = Result(
             attempt_id=attempt_id, user_id=user_id, test_id=attempt.test_id,
             score=float(attempt.score or 0), percentage=float(attempt.percentage or 0), is_passed=is_passed,
+            # Task 4 — snapshot of the profile in force when the result is created.
+            scoring_profile=test.scoring_profile if test is not None else None,
         )
         self.repo.create(result)
         self._create_result_sections(result, attempt)
@@ -143,12 +159,20 @@ class ResultService:
         check below is a defensive, not load-bearing, assertion of
         that invariant (never trust an ID without re-verifying its
         ownership, even one this method itself just fetched)."""
+        profile = result.scoring_profile
+        if profile is not None:
+            # Until a section proves otherwise, an exam-profile result has
+            # no overall score yet (e.g. a test with no sections at all).
+            result.overall_status = ss.OVERALL_NOT_REPORTED if profile == ss.PROFILE_GRE else ss.OVERALL_PENDING
+
         if self.section_repo is None or self.result_section_repo is None:
             return
 
         sections = self.section_repo.list_for_test(attempt.test_id)
         if not sections:
             return
+        delivered_variants = self._delivered_variants_by_section(attempt, sections) if profile is not None else {}
+        scaled_by_component: dict = {}
 
         answers = self.answer_repo.list_for_attempt(attempt.id)
         answers_by_question = {a.question_id: a for a in answers}
@@ -177,10 +201,8 @@ class ResultService:
                 # own test, no matter what.
                 continue
 
-            questions = [
-                q for q in self.question_repo.list_by_section(section.id)
-                if q.id in effective_ids and is_auto_gradable(q)
-            ]
+            delivered_section_questions = [q for q in self.question_repo.list_by_section(section.id) if q.id in effective_ids]
+            questions = [q for q in delivered_section_questions if is_auto_gradable(q)]
             section_answers = [answers_by_question[q.id] for q in questions if q.id in answers_by_question]
 
             # Same generic ScoringStrategy already used for the
@@ -190,10 +212,62 @@ class ResultService:
             # weighting formula, no exam-specific scoring.
             scoring_result = DEFAULT_SCORING_STRATEGY.calculate(questions, section_answers)
 
-            self.result_section_repo.create(ResultSection(
+            row = ResultSection(
                 result_id=result.id, section_id=section.id,
                 raw_score=scoring_result.score, scaled_score=None,
-            ))
+            )
+            if profile is not None:
+                has_ungraded = len(questions) != len(delivered_section_questions)
+                scaled, status, table = self._scale_section(
+                    profile, section, scoring_result.score, has_ungraded, delivered_variants.get(section.id, set()),
+                )
+                row.score_component = section.score_component
+                row.scaled_status = status
+                row.scaled_score = float(scaled) if scaled is not None else None
+                row.conversion_table_id = table.id if table is not None else None
+                if section.score_component is not None:
+                    scaled_by_component[section.score_component] = scaled
+            self.result_section_repo.create(row)
+
+        if profile is not None:
+            overall, overall_status = ss.compute_overall(profile, scaled_by_component)
+            result.overall_scaled_score = float(overall) if overall is not None else None
+            result.overall_status = overall_status
+
+    def _delivered_variants_by_section(self, attempt, sections) -> dict:
+        """Task 4 — for each section, the routing_variant(s) of the modules
+        this attempt was actually routed through (AttemptModuleProgress).
+        Used to pick the variant-specific conversion table for adaptive
+        sections (e.g. SAT's harder/easier second module)."""
+        if self.module_execution is None or self.module_repo is None:
+            return {}
+        routed_module_ids = {p.module_id for p in self.module_execution.progress_repo.list_for_attempt(attempt.id)}
+        variants: dict = {}
+        for section in sections:
+            for module in self.module_repo.list_for_section(section.id):
+                if module.id in routed_module_ids and module.routing_variant:
+                    variants.setdefault(section.id, set()).add(module.routing_variant)
+        return variants
+
+    def _scale_section(self, profile: str, section, raw_score: float, has_ungraded: bool, variants: set):
+        """Task 4 — returns (scaled Fraction | None, status, table | None).
+        Never invents a score: every path that cannot produce one says why."""
+        component = section.score_component
+        spec = ss.COMPONENTS.get(component) if component else None
+        if spec is None or spec.profile != profile:
+            return None, ss.STATUS_NO_COMPONENT, None
+        if not spec.table_convertible or has_ungraded:
+            # Writing/Speaking/AWA, or the section's raw score is incomplete
+            # because some delivered answers await manual grading.
+            return None, ss.STATUS_PENDING_MANUAL, None
+        if len(variants) > 1:
+            return None, ss.STATUS_AMBIGUOUS_VARIANT, None
+        variant = next(iter(variants)) if variants else None
+        table = self.table_repo.get_current(section.id, variant) if self.table_repo is not None else None
+        if table is None:
+            return None, ss.STATUS_NO_TABLE, None
+        scaled, status = ss.convert_raw_score(component, table.method, table.entries, round(raw_score, 2))
+        return scaled, status, table
 
     def get_result(self, result_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         result = self.repo.get_by_id(result_id)
@@ -320,6 +394,8 @@ class ResultService:
             id=result.id, attempt_id=result.attempt_id, user_id=result.user_id, test_id=result.test_id,
             score=result.score, percentage=result.percentage, is_passed=result.is_passed,
             status=result.status, created_at=result.created_at,
+            scoring_profile=result.scoring_profile, overall_scaled_score=result.overall_scaled_score,
+            overall_status=result.overall_status,
             total_questions=len(question_ids), correct_answers=correct_count,
             incorrect_answers=incorrect_count, unanswered=unanswered_count,
             time_spent_seconds=time_spent_seconds, questions=question_reviews,
@@ -365,12 +441,17 @@ class ResultService:
             sections_by_id = {}
             rows = sorted(rows, key=lambda r: r.id)
 
+        table_ids = [row.conversion_table_id for row in rows if row.conversion_table_id is not None]
+        versions = {t.id: t.version for t in self.table_repo.list_by_ids(table_ids)} if self.table_repo is not None and table_ids else {}
+
         return [
             ResultSectionOut(
                 id=row.id, section_id=row.section_id,
                 name=sections_by_id[row.section_id].name if row.section_id in sections_by_id else None,
                 order_number=sections_by_id[row.section_id].order_number if row.section_id in sections_by_id else None,
                 raw_score=row.raw_score, scaled_score=row.scaled_score,
+                score_component=row.score_component, scaled_status=row.scaled_status,
+                conversion_table_version=versions.get(row.conversion_table_id),
             )
             for row in rows
         ]

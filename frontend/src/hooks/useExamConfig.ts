@@ -9,6 +9,8 @@ import {
   examModulesApi,
   examSectionsApi,
   questionGroupsApi,
+  scoringApi,
+  type ConversionTableCreateRequest,
   routingThresholdRulesApi,
   type ExamModuleCreateRequest,
   type ExamModuleUpdateRequest,
@@ -251,5 +253,44 @@ export function useDeleteRoutingThresholdRule(testId: string) {
       addToast("Yo'naltirish qoidasi o'chirildi", "success");
     },
     onError: (error) => addToast(error instanceof ApiError ? error.message : "O'chirib bo'lmadi"),
+  });
+}
+
+
+// --- Exam-specific scaled scoring (Task 4, Admin/Super Admin) ---
+
+export function useSetScoringProfile(testId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (profile: "ielts" | "sat" | "gre" | null) => scoringApi.setProfile(testId, profile),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tests", "detail", testId] });
+      addToast("Ballash profili saqlandi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Saqlab bo'lmadi"),
+  });
+}
+
+export function useConversionTables(sectionId: string | undefined) {
+  return useQuery({
+    queryKey: ["conversionTables", sectionId],
+    queryFn: () => scoringApi.listTables(sectionId as string),
+    enabled: !!sectionId,
+  });
+}
+
+export function usePublishConversionTable(sectionId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+
+  return useMutation({
+    mutationFn: (data: ConversionTableCreateRequest) => scoringApi.publishTable(sectionId, data),
+    onSuccess: (table) => {
+      queryClient.invalidateQueries({ queryKey: ["conversionTables", sectionId] });
+      addToast(`Jadval ${table.version}-versiya sifatida e'lon qilindi`, "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Jadval saqlanmadi"),
   });
 }

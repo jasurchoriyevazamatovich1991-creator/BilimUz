@@ -188,7 +188,7 @@ def test_result_detail_contains_all_analysis_fields(service, mock_repo, mock_att
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=5, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=5, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -208,7 +208,7 @@ def test_correct_incorrect_unanswered_counts(service, mock_repo, mock_attempt_re
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1, q2, q3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=33, is_passed=False, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=33, is_passed=False, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2, q3], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -234,7 +234,7 @@ def test_unanswered_via_null_is_correct_also_counts_as_unanswered(service, mock_
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=False, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=False, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -253,7 +253,7 @@ def test_time_spent_calculated_from_real_timestamps(service, mock_repo, mock_att
     result_id = uuid.uuid4()
     start = datetime(2026, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
     finish = start + timedelta(minutes=12, seconds=34)
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[], start_time=start, finish_time=finish)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -268,7 +268,7 @@ def test_time_spent_is_none_when_finish_time_missing(service, mock_repo, mock_at
     """Historical/edge-case data safety — never fabricate a time value."""
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -286,7 +286,7 @@ def test_multiple_choice_answer_shows_selected_options_array(service, mock_repo,
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     opt_a, opt_b = uuid.uuid4(), uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -310,7 +310,7 @@ def test_question_review_includes_text_options_and_explanation(service, mock_rep
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     opt_a = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -348,7 +348,7 @@ def test_existing_result_fields_remain_present_and_compatible(service, mock_repo
     result_id = uuid.uuid4()
     attempt_id = uuid.uuid4()
     test_id = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=attempt_id, test_id=test_id, score=7.5, percentage=75.0, is_passed=True, status="final", created_at="2026-01-01T00:00:00")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=attempt_id, test_id=test_id, score=7.5, percentage=75.0, is_passed=True, status="final", created_at="2026-01-01T00:00:00", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=attempt_id, question_order=[], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -374,7 +374,7 @@ def test_short_answer_text_answer_appears_in_question_review(service, mock_repo,
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -395,7 +395,7 @@ def test_essay_text_answer_appears_in_question_review(service, mock_repo, mock_a
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     essay_text = "A long-form essay answer discussing the causes of..."
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -416,7 +416,7 @@ def test_question_with_no_answer_has_null_text_answer(service, mock_repo, mock_a
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=0, percentage=0, is_passed=None, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -436,7 +436,7 @@ def test_text_answer_does_not_alter_scoring_counts(service, mock_repo, mock_atte
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1, q2 = uuid.uuid4(), uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=50, is_passed=False, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=50, is_passed=False, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -464,7 +464,7 @@ def test_existing_choice_type_review_unchanged_by_text_answer_field(service, moc
     result_id = uuid.uuid4()
     q1, q2, q3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     opt_a = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=2, percentage=67, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=2, percentage=67, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1, q2, q3], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -499,7 +499,7 @@ def test_grouped_question_includes_group_fields_when_group_repo_wired(
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     group_id = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -522,7 +522,7 @@ def test_ungrouped_question_has_null_group_fields_even_with_group_repo_wired(
     user_id = uuid.uuid4()
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -547,7 +547,7 @@ def test_soft_deleted_group_renders_as_ungrouped(
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     group_id = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt
@@ -573,7 +573,7 @@ def test_grouped_question_has_null_group_fields_when_group_repo_not_wired(
     result_id = uuid.uuid4()
     q1 = uuid.uuid4()
     group_id = uuid.uuid4()
-    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01")
+    result = MagicMock(id=result_id, user_id=user_id, attempt_id=uuid.uuid4(), test_id=uuid.uuid4(), score=1, percentage=100, is_passed=True, status="final", created_at="2026-01-01", scoring_profile=None, overall_scaled_score=None, overall_status=None)
     mock_repo.get_by_id.return_value = result
     attempt = MagicMock(id=result.attempt_id, question_order=[q1], start_time=None, finish_time=None)
     mock_attempt_repo.get_by_id.return_value = attempt

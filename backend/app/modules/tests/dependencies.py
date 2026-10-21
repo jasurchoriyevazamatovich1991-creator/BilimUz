@@ -11,10 +11,12 @@ from app.modules.tests.repository import (
     QuestionGroupMediaRepository,
     QuestionGroupRepository,
     RoutingThresholdRuleRepository,
+    ScoreConversionTableRepository,
     TestRepository,
 )
 from app.modules.tests.service import (
     ExamModuleService,
+    ExamScoringService,
     ExamSectionService,
     QuestionGroupMediaService,
     QuestionGroupService,
@@ -51,8 +53,9 @@ def get_question_group_repository(db: Session = Depends(get_db)) -> QuestionGrou
 def get_exam_section_service(
     repo: ExamSectionRepository = Depends(get_exam_section_repository),
     test_repo: TestRepository = Depends(get_test_repository),
+    db: Session = Depends(get_db),
 ) -> ExamSectionService:
-    return ExamSectionService(repo, test_repo)
+    return ExamSectionService(repo, test_repo, ScoreConversionTableRepository(db))
 
 
 def get_exam_module_service(
@@ -86,3 +89,8 @@ def get_routing_threshold_rule_service(
 def get_question_group_media_service(db: Session = Depends(get_db)) -> QuestionGroupMediaService:
     """Task 3."""
     return QuestionGroupMediaService(QuestionGroupMediaRepository(db), QuestionGroupRepository(db), UploadRepository(db))
+
+
+def get_exam_scoring_service(db: Session = Depends(get_db)) -> ExamScoringService:
+    """Task 4."""
+    return ExamScoringService(TestRepository(db), ExamSectionRepository(db), ExamModuleRepository(db), ScoreConversionTableRepository(db))

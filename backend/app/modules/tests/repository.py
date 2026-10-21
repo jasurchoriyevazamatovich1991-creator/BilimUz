@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule
+from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule, ScoreConversionTable
 from app.modules.tests.schemas import TestListParams
 
 
@@ -335,6 +335,68 @@ class QuestionGroupMediaRepository:
         media.deleted_at = datetime.now(timezone.utc)
         media.updated_by = actor_id
         self.db.flush()
+
+    def commit(self) -> None:
+        self.db.commit()
+
+
+class ScoreConversionTableRepository:
+    """Task 4 — versioned, immutable raw-to-scaled tables. There is no
+    update method on purpose: a change is a new version."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def lock_section(self, section_id: uuid.UUID) -> ExamSection | None:
+        """Row-locks the owning section so two concurrent publishes for
+        it get consecutive version numbers instead of colliding."""
+        stmt = select(ExamSection).where(ExamSection.id == section_id, ExamSection.deleted_at.is_(None)).with_for_update()
+        return self.db.scalars(stmt).first()
+
+    def list_for_section(self, section_id: uuid.UUID) -> list[ScoreConversionTable]:
+        stmt = (
+            select(ScoreConversionTable)
+            .where(ScoreConversionTable.section_id == section_id, ScoreConversionTable.deleted_at.is_(None))
+            .order_by(ScoreConversionTable.routing_variant.nulls_first(), ScoreConversionTable.version.desc())
+        )
+        return list(self.db.scalars(stmt).all())
+
+    def _variant_filter(self, routing_variant: str | None):
+        if routing_variant is None:
+            return ScoreConversionTable.routing_variant.is_(None)
+        return ScoreConversionTable.routing_variant == routing_variant
+
+    def get_current(self, section_id: uuid.UUID, routing_variant: str | None) -> ScoreConversionTable | None:
+        stmt = (
+            select(ScoreConversionTable)
+            .where(ScoreConversionTable.section_id == section_id, ScoreConversionTable.deleted_at.is_(None),
+                   self._variant_filter(routing_variant))
+            .order_by(ScoreConversionTable.version.desc())
+            .limit(1)
+        )
+        return self.db.scalars(stmt).first()
+
+    def max_version(self, section_id: uuid.UUID, routing_variant: str | None) -> int:
+        stmt = select(func.max(ScoreConversionTable.version)).where(
+            ScoreConversionTable.section_id == section_id, self._variant_filter(routing_variant),
+        )
+        return self.db.execute(stmt).scalar() or 0
+
+    def has_any(self, section_id: uuid.UUID) -> bool:
+        stmt = select(func.count()).select_from(ScoreConversionTable).where(
+            ScoreConversionTable.section_id == section_id, ScoreConversionTable.deleted_at.is_(None),
+        )
+        return (self.db.execute(stmt).scalar() or 0) > 0
+
+    def list_by_ids(self, table_ids: list[uuid.UUID]) -> list[ScoreConversionTable]:
+        if not table_ids:
+            return []
+        return list(self.db.scalars(select(ScoreConversionTable).where(ScoreConversionTable.id.in_(table_ids))).all())
+
+    def create(self, table: ScoreConversionTable) -> ScoreConversionTable:
+        self.db.add(table)
+        self.db.flush()
+        return table
 
     def commit(self) -> None:
         self.db.commit()

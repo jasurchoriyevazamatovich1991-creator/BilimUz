@@ -1,6 +1,7 @@
 """Pydantic v2 request/response contracts for the tests module."""
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -140,6 +141,8 @@ class TestOut(BaseModel):
     max_attempts: int | None
     exam_variant: str | None
     is_mock_test: bool
+    # Task 4 — 'ielts' | 'sat' | 'gre' | None (plain percentage scoring).
+    scoring_profile: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -165,12 +168,15 @@ class ExamSectionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     order_number: int = Field(default=0, ge=0)
     duration: int | None = Field(default=None, gt=0)
+    # Task 4 — e.g. 'sat_math'; must belong to the test's scoring_profile.
+    score_component: str | None = None
 
 
 class ExamSectionUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     order_number: int | None = Field(default=None, ge=0)
     duration: int | None = Field(default=None, gt=0)
+    score_component: str | None = None
 
 
 class ExamSectionOut(BaseModel):
@@ -179,6 +185,7 @@ class ExamSectionOut(BaseModel):
     name: str
     order_number: int
     duration: int | None
+    score_component: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -323,5 +330,45 @@ class RoutingThresholdRuleOut(BaseModel):
     variant: str
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Task 4: exam-specific scaled scoring (Admin/Super Admin only) ---
+
+class ScoringProfileUpdateRequest(BaseModel):
+    """null switches the test back to plain percentage scoring."""
+    scoring_profile: str | None = None
+
+
+class ConversionTableEntryIn(BaseModel):
+    raw: Decimal
+    scaled: Decimal
+
+
+class ConversionTableCreateRequest(BaseModel):
+    """Publishes a NEW version; existing versions are never modified."""
+    routing_variant: str | None = Field(default=None, min_length=1, max_length=50)
+    method: str = "exact"
+    entries: list[ConversionTableEntryIn] = Field(min_length=1, max_length=500)
+
+
+class ConversionTableEntryOut(BaseModel):
+    raw: str
+    scaled: str
+
+
+class ConversionTableOut(BaseModel):
+    id: uuid.UUID
+    section_id: uuid.UUID
+    routing_variant: str | None
+    version: int
+    method: str
+    entries: list[ConversionTableEntryOut]
+    # True for the highest version of its (section, routing_variant) —
+    # the one new results are scored with.
+    is_current: bool = False
+    created_by: uuid.UUID | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}

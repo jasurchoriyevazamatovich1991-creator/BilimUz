@@ -97,11 +97,25 @@ class ResultSectionOut(BaseModel):
     order_number: int | None = None
     raw_score: float | None
     scaled_score: float | None
+    # Task 4 — which exam component this section is, why scaled_score is
+    # (not) set (results/scaled_scoring STATUS_*), and which conversion
+    # table version produced it. The table's entries are never exposed
+    # here; they are Admin/Super Admin only.
+    score_component: str | None = None
+    scaled_status: str | None = None
+    conversion_table_version: int | None = None
 
     model_config = {"from_attributes": True}
 
 
 class ResultDetailOut(ResultOut):
+    # Task 4 — exam-specific scaled scoring; all None for a plain
+    # percentage-scored test. overall_status: 'scaled' | 'pending' |
+    # 'not_reported' (GRE reports Verbal/Quant separately). Kept off
+    # ResultOut so the results-history list contract is unchanged.
+    scoring_profile: str | None = None
+    overall_scaled_score: float | None = None
+    overall_status: str | None = None
     total_questions: int
     correct_answers: int
     incorrect_answers: int

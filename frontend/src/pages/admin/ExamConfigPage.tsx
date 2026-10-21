@@ -60,6 +60,9 @@ import {
 } from "@/hooks/useExamConfig";
 import { useAuthStore } from "@/store/authStore";
 import { GroupMediaManager } from "@/components/examConfig/GroupMediaManager";
+import { ScoringProfileCard } from "@/components/examConfig/ScoringProfileCard";
+import { ConversionTablesPanel } from "@/components/examConfig/ConversionTablesPanel";
+import { SCORE_COMPONENTS, componentsForProfile } from "@/lib/scaledScoring";
 import type { ExamModuleOut, ExamSectionOut, QuestionGroupOut, RoutingThresholdRuleOut } from "@/api/examConfig";
 
 function emptyToUndefined(v: string): string | undefined {
@@ -72,6 +75,8 @@ interface SectionFormValues {
   name: string;
   order_number: number;
   duration: string;
+  /** Task 4 — "" = no score component. */
+  score_component: string;
 }
 
 function SectionForm({
@@ -79,11 +84,14 @@ function SectionForm({
   isSaving,
   onSubmit,
   onCancel,
+  componentOptions = [],
 }: {
   initial: SectionFormValues;
   isSaving: boolean;
   onSubmit: (values: SectionFormValues) => void;
   onCancel?: () => void;
+  /** Task 4 — components allowed by the test's scoring profile. */
+  componentOptions?: string[];
 }) {
   const [values, setValues] = useState(initial);
   const id = useId();
@@ -126,6 +134,22 @@ function SectionForm({
           onChange={(e) => setValues((v) => ({ ...v, duration: e.target.value }))}
         />
       </div>
+      {componentOptions.length > 0 ? (
+        <div className="sm:col-span-3">
+          <label htmlFor={`${id}-component`} className="mb-1 block text-xs font-medium text-foreground/70">Ballash komponenti</label>
+          <select
+            id={`${id}-component`}
+            value={values.score_component}
+            onChange={(e) => setValues((v) => ({ ...v, score_component: e.target.value }))}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">— (shkala balli yo'q)</option>
+            {componentOptions.map((c) => (
+              <option key={c} value={c}>{SCORE_COMPONENTS[c]?.label ?? c}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={isSaving}>{isSaving ? "..." : "Saqlash"}</Button>
         {onCancel ? <Button type="button" variant="outline" onClick={onCancel}>Bekor qilish</Button> : null}
@@ -420,6 +444,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
   const [addingSection, setAddingSection] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
+  const [tablesSectionId, setTablesSectionId] = useState<string | null>(null);
   const [addingModuleForSection, setAddingModuleForSection] = useState<string | null>(null);
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -450,10 +475,17 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
     return allModules.filter((m) => m.section_id === sectionId).sort((a, b) => a.order_number - b.order_number);
   }
 
+  // Task 4 — score components allowed by this test's scoring profile.
+  const componentOptions = componentsForProfile(test.scoring_profile);
+
   function handleCreateSection(values: SectionFormValues) {
     if (!testId) return;
     createSection.mutate(
-      { test_id: testId, name: values.name, order_number: values.order_number, duration: values.duration ? Number(values.duration) : undefined },
+      {
+        test_id: testId, name: values.name, order_number: values.order_number,
+        duration: values.duration ? Number(values.duration) : undefined,
+        ...(values.score_component ? { score_component: values.score_component } : {}),
+      },
       { onSuccess: () => setAddingSection(false) },
     );
   }
@@ -462,7 +494,12 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
     updateSection.mutate(
       {
         sectionId: section.id,
-        data: { name: values.name, order_number: values.order_number, duration: values.duration ? Number(values.duration) : null },
+        data: {
+          name: values.name, order_number: values.order_number, duration: values.duration ? Number(values.duration) : null,
+          // Task 4 — only sent when the test has a profile, so editing a
+          // plain test's section never touches the field.
+          ...(componentOptions.length > 0 ? { score_component: values.score_component || null } : {}),
+        },
       },
       { onSuccess: () => setEditingSectionId(null) },
     );
@@ -565,6 +602,9 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
         <p className="text-sm text-foreground/60">{test.title}</p>
       </div>
 
+      {/* --- Scoring profile (Task 4) --- */}
+      <ScoringProfileCard testId={testId} current={test.scoring_profile ?? null} />
+
       {/* --- Sections --- */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -576,7 +616,8 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
         <CardContent className="space-y-4">
           {addingSection ? (
             <SectionForm
-              initial={{ name: "", order_number: sortedSections.length, duration: "" }}
+              initial={{ name: "", order_number: sortedSections.length, duration: "", score_component: "" }}
+              componentOptions={componentOptions}
               isSaving={createSection.isPending}
               onSubmit={handleCreateSection}
               onCancel={() => setAddingSection(false)}
@@ -596,7 +637,12 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                 <div key={section.id} className="rounded-md border border-border p-3">
                   {editingSectionId === section.id ? (
                     <SectionForm
-                      initial={{ name: section.name, order_number: section.order_number, duration: section.duration ? String(section.duration) : "" }}
+                      initial={{
+                        name: section.name, order_number: section.order_number,
+                        duration: section.duration ? String(section.duration) : "",
+                        score_component: section.score_component ?? "",
+                      }}
+                      componentOptions={componentOptions}
                       isSaving={updateSection.isPending}
                       onSubmit={(values) => handleUpdateSection(section, values)}
                       onCancel={() => setEditingSectionId(null)}
@@ -607,9 +653,19 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                         <p className="font-medium text-foreground">{section.name}</p>
                         <p className="text-xs text-foreground/50">
                           Tartib: {section.order_number}{section.duration ? ` · ${section.duration} daq` : ""}
+                          {section.score_component ? ` · ${SCORE_COMPONENTS[section.score_component]?.label ?? section.score_component}` : ""}
                         </p>
                       </div>
                       <div className="flex gap-3">
+                        {section.score_component && SCORE_COMPONENTS[section.score_component]?.tableConvertible ? (
+                          <button
+                            type="button"
+                            onClick={() => setTablesSectionId((id) => (id === section.id ? null : section.id))}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            {tablesSectionId === section.id ? "Jadvallarni yashirish" : "Shkala jadvallari"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => setExpandedSectionId((id) => (id === section.id ? null : section.id))}
@@ -623,6 +679,14 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                       </div>
                     </div>
                   )}
+
+                  {tablesSectionId === section.id && section.score_component ? (
+                    <ConversionTablesPanel
+                      sectionId={section.id}
+                      component={section.score_component}
+                      variants={[...new Set(modulesForSection(section.id).map((m) => m.routing_variant).filter((v): v is string => !!v))]}
+                    />
+                  ) : null}
 
                   {expandedSectionId === section.id ? (
                     <div className="mt-3 space-y-2 border-t border-border pt-3 pl-3">

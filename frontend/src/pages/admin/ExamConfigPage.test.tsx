@@ -281,3 +281,56 @@ describe("ExamConfigPage — Sprint 74", () => {
     });
   });
 });
+
+describe("ExamConfigPage — Task 4 scaled scoring configuration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().setUser({ id: "u1", first_name: "A", last_name: "B", phone: null, email: null, role: "Admin" });
+    vi.mocked(routingThresholdRulesApi.list).mockResolvedValue([]);
+    vi.mocked(examModulesApi.listForTest).mockResolvedValue([]);
+    vi.mocked(questionGroupsApi.list).mockResolvedValue([]);
+  });
+
+  it("without a profile the section form has no component select", async () => {
+    vi.mocked(testsApi.get).mockResolvedValue(TEST_OUT);
+    vi.mocked(examSectionsApi.list).mockResolvedValue([]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("SAT Mock")).toBeInTheDocument());
+    expect(screen.getByLabelText("Profil")).toHaveValue("");
+    await userEvent.setup().click(screen.getByText("+ Bo'lim qo'shish"));
+    expect(screen.queryByLabelText("Ballash komponenti")).not.toBeInTheDocument();
+  });
+
+  it("with a SAT profile a new section can be created with a SAT component only", async () => {
+    vi.mocked(testsApi.get).mockResolvedValue({ ...TEST_OUT, scoring_profile: "sat" });
+    vi.mocked(examSectionsApi.list).mockResolvedValue([]);
+    vi.mocked(examSectionsApi.create).mockResolvedValue({
+      id: "s9", test_id: "t1", name: "Math", order_number: 0, duration: null, score_component: "sat_math", created_at: "", updated_at: "",
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText("Profil")).toHaveValue("sat"));
+    await user.click(screen.getByText("+ Bo'lim qo'shish"));
+
+    const select = screen.getByLabelText("Ballash komponenti");
+    const values = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(values).toEqual(["", "sat_reading_writing", "sat_math"]);
+
+    await user.type(screen.getByLabelText("Nomi"), "Math");
+    await user.selectOptions(select, "sat_math");
+    await user.click(screen.getByText("Saqlash"));
+    await waitFor(() => expect(examSectionsApi.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Math", score_component: "sat_math" })));
+  });
+
+  it("shows the tables button only for table-convertible components", async () => {
+    vi.mocked(testsApi.get).mockResolvedValue({ ...TEST_OUT, scoring_profile: "ielts" });
+    vi.mocked(examSectionsApi.list).mockResolvedValue([
+      { id: "s1", test_id: "t1", name: "Listening", order_number: 0, duration: null, score_component: "ielts_listening", created_at: "", updated_at: "" },
+      { id: "s2", test_id: "t1", name: "Writing", order_number: 1, duration: null, score_component: "ielts_writing", created_at: "", updated_at: "" },
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Listening")).toBeInTheDocument());
+    expect(screen.getAllByText("Shkala jadvallari")).toHaveLength(1);
+    expect(screen.getByText(/IELTS Writing/)).toBeInTheDocument();
+  });
+});

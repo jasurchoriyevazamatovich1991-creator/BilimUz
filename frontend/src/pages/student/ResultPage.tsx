@@ -15,6 +15,7 @@ import { useTest } from "@/hooks/useTests";
 import { useIssueCertificate } from "@/hooks/useCertificates";
 import type { QuestionReviewOut, ResultSectionOut } from "@/api/results";
 import { FormulaText } from "@/components/questions/FormulaText";
+import { OVERALL_STATUS_LABELS, SCALED_STATUS_LABELS, overallLabel } from "@/lib/scaledScoring";
 
 function formatTimeSpent(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -139,10 +140,39 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
 function SectionScoreRow({ section, index }: { section: ResultSectionOut; index: number }) {
   const label = section.name ?? `Bo'lim ${index + 1}`;
   const scoreText = section.raw_score === null ? "—" : `${section.raw_score} ball`;
+  // Task 4 — exam-specific scaled score. Shown only when the backend
+  // actually produced one; otherwise its status explains why (never a
+  // made-up number). Plain percentage tests have no scaled_status.
+  const hasScaledInfo = section.scaled_status != null;
+  const scaledNote = section.scaled_status ? SCALED_STATUS_LABELS[section.scaled_status] ?? "" : "";
   return (
-    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0">
+    <div className="flex items-center justify-between border-b border-border py-2 text-sm last:border-0" data-testid="section-score-row">
       <span className="text-foreground">{label}</span>
-      <span className="font-medium text-foreground/80">{scoreText}</span>
+      <span className="text-right">
+        {hasScaledInfo && section.scaled_score != null ? (
+          <>
+            <span className="font-semibold text-foreground" data-testid="section-scaled-score">{section.scaled_score}</span>
+            <span className="ml-2 text-xs text-foreground/50">({scoreText})</span>
+          </>
+        ) : (
+          <span className="font-medium text-foreground/80">{scoreText}</span>
+        )}
+        {hasScaledInfo && scaledNote ? <span className="block text-xs text-foreground/50">{scaledNote}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/** Task 4 — overall IELTS band / SAT total, or why it isn't available. */
+function OverallScaledScore({ profile, score, status }: { profile: string; score: number | null | undefined; status: string | null | undefined }) {
+  return (
+    <div className="mb-3 rounded-md bg-primary/5 p-3 text-center" data-testid="overall-scaled-score">
+      <p className="text-xs text-foreground/60">{overallLabel(profile)}</p>
+      {status === "scaled" && score != null ? (
+        <p className="text-2xl font-semibold text-foreground">{score}</p>
+      ) : (
+        <p className="text-sm text-foreground/60">{status ? OVERALL_STATUS_LABELS[status] ?? "—" : "—"}</p>
+      )}
     </div>
   );
 }
@@ -238,6 +268,9 @@ export function ResultPage() {
             <CardTitle className="text-base">Bo'limlar bo'yicha natija</CardTitle>
           </CardHeader>
           <CardContent>
+            {result.scoring_profile ? (
+              <OverallScaledScore profile={result.scoring_profile} score={result.overall_scaled_score} status={result.overall_status} />
+            ) : null}
             {result.sections.map((section, index) => (
               <SectionScoreRow key={section.id} section={section} index={index} />
             ))}

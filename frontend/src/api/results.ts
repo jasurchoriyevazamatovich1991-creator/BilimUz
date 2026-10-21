@@ -80,6 +80,10 @@ export interface ResultSectionOut {
   order_number: number | null;
   raw_score: number | null;
   scaled_score: number | null;
+  // Task 4 — optional so pre-Task-4 fixtures stay valid.
+  score_component?: string | null;
+  scaled_status?: string | null;
+  conversion_table_version?: number | null;
 }
 
 export interface ResultDetailOut extends ResultOut {
@@ -92,6 +96,10 @@ export interface ResultDetailOut extends ResultOut {
   questions: QuestionReviewOut[];
   /** Already ordered by ExamSection.order_number by the backend. */
   sections: ResultSectionOut[];
+  // Task 4 — null for a plain percentage-scored test.
+  scoring_profile?: string | null;
+  overall_scaled_score?: number | null;
+  overall_status?: string | null;
 }
 
 export const resultsApi = {

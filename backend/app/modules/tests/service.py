@@ -21,23 +21,27 @@ from app.modules.tests.exceptions import (
     DuplicateRoutingThresholdRuleException,
     ExamModuleNotFoundException,
     ExamSectionNotFoundException,
+    InvalidScoringConfigurationException,
     InvalidStatusTransitionException,
     InvalidTestReferenceException,
+    ScoringConfigurationConflictException,
     MockTestRequiresSubjectException,
     QuestionGroupNotFoundException,
     RoutingThresholdRuleNotFoundException,
     TestNotFoundException,
 )
-from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule, Test, TestStatus
+from app.modules.tests.models import ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule, ScoreConversionTable, Test, TestStatus
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
     QuestionGroupMediaRepository,
     QuestionGroupRepository,
     RoutingThresholdRuleRepository,
+    ScoreConversionTableRepository,
     TestRepository,
 )
 from app.modules.tests.schemas import (
+    ConversionTableCreateRequest,
     ExamModuleCreateRequest,
     ExamModuleUpdateRequest,
     ExamSectionCreateRequest,
@@ -50,6 +54,12 @@ from app.modules.tests.schemas import (
     TestCreateRequest,
     TestListParams,
     TestUpdateRequest,
+)
+from app.modules.results.scaled_scoring import (
+    COMPONENTS,
+    SCORING_PROFILES,
+    InvalidConversionTable,
+    validate_conversion_table,
 )
 from app.modules.uploads.constants import UPLOAD_STATUS_PENDING
 from app.modules.uploads.repository import UploadRepository
@@ -180,9 +190,30 @@ class ExamSectionService:
     the already-existing repositories, clean domain exceptions instead
     of raw IntegrityError)."""
 
-    def __init__(self, repo: ExamSectionRepository, test_repo: TestRepository):
+    def __init__(self, repo: ExamSectionRepository, test_repo: TestRepository, table_repo: ScoreConversionTableRepository | None = None):
         self.repo = repo
         self.test_repo = test_repo
+        # Task 4 — optional (pre-Task-4 constructions keep working); used
+        # only to refuse a score_component change once tables exist.
+        self.table_repo = table_repo
+
+    def _validate_score_component(self, test, component: str | None, exclude_id: uuid.UUID | None = None) -> None:
+        """Task 4 — a section's component must belong to its test's
+        scoring_profile and be unique among the test's active sections."""
+        if component is None:
+            return
+        spec = COMPONENTS.get(component)
+        if spec is None:
+            raise InvalidScoringConfigurationException(f"score_component quyidagilardan biri bo'lishi kerak: {', '.join(COMPONENTS)}")
+        if test.scoring_profile is None:
+            raise InvalidScoringConfigurationException("Avval testga ballash profili (IELTS/SAT/GRE) belgilanishi kerak")
+        if spec.profile != test.scoring_profile:
+            raise InvalidScoringConfigurationException(
+                f"'{component}' komponenti '{test.scoring_profile}' profiliga tegishli emas"
+            )
+        for existing in self.repo.list_for_test(test.id):
+            if existing.score_component == component and existing.id != exclude_id:
+                raise InvalidScoringConfigurationException(f"Bu testda '{component}' komponentli bo'lim allaqachon bor")
 
     def _ensure_no_duplicate_order(self, test_id: uuid.UUID, order_number: int, exclude_id: uuid.UUID | None = None) -> None:
         for existing in self.repo.list_for_test(test_id):
@@ -190,11 +221,16 @@ class ExamSectionService:
                 raise DuplicateOrderNumberException(f"Bu test uchun order_number={order_number} allaqachon band")
 
     def create_section(self, data: ExamSectionCreateRequest, actor_id: uuid.UUID) -> ExamSection:
-        if self.test_repo.get_by_id(data.test_id) is None:
+        test = self.test_repo.get_by_id(data.test_id)
+        if test is None:
             raise InvalidTestReferenceException("Ko'rsatilgan test (test_id) mavjud emas")
         self._ensure_no_duplicate_order(data.test_id, data.order_number)
+        self._validate_score_component(test, data.score_component)
 
-        section = ExamSection(test_id=data.test_id, name=data.name, order_number=data.order_number, duration=data.duration)
+        section = ExamSection(
+            test_id=data.test_id, name=data.name, order_number=data.order_number, duration=data.duration,
+            score_component=data.score_component,
+        )
         self.repo.create(section)
         log_action(self.repo.db, action="exam_section.created", user_id=actor_id, entity_type="exam_section", entity_id=section.id)
         self.repo.commit()
@@ -216,6 +252,12 @@ class ExamSectionService:
         payload = data.model_dump(exclude_unset=True)
         if "order_number" in payload:
             self._ensure_no_duplicate_order(section.test_id, payload["order_number"], exclude_id=section.id)
+        if "score_component" in payload and payload["score_component"] != section.score_component:
+            if self.table_repo is not None and self.table_repo.has_any(section.id):
+                raise ScoringConfigurationConflictException(
+                    "Bu bo'limga konversiya jadvallari biriktirilgan — komponentni o'zgartirib bo'lmaydi"
+                )
+            self._validate_score_component(self.test_repo.get_by_id(section.test_id), payload["score_component"], exclude_id=section.id)
         self.repo.update(section, payload)
         log_action(self.repo.db, action="exam_section.updated", user_id=actor_id, entity_type="exam_section", entity_id=section.id)
         self.repo.commit()
@@ -508,3 +550,95 @@ class QuestionGroupMediaService:
         self.repo.soft_delete(media, actor_id)
         log_action(self.repo.db, action="question_group.media_removed", user_id=actor_id, entity_type="question_group", entity_id=group_id)
         self.repo.commit()
+
+
+class ExamScoringService:
+    """Task 4 — Admin/Super Admin configuration of exam-specific scaled
+    scoring: a test's scoring profile and its sections' versioned
+    raw-to-scaled conversion tables. Validation rules live in the pure
+    results/scaled_scoring module."""
+
+    def __init__(
+        self, test_repo: TestRepository, section_repo: ExamSectionRepository,
+        module_repo: ExamModuleRepository, table_repo: ScoreConversionTableRepository,
+    ):
+        self.test_repo = test_repo
+        self.section_repo = section_repo
+        self.module_repo = module_repo
+        self.table_repo = table_repo
+
+    def set_scoring_profile(self, test_id: uuid.UUID, profile: str | None, actor_id: uuid.UUID) -> Test:
+        test = self.test_repo.get_by_id(test_id)
+        if test is None or test.deleted_at is not None:
+            raise TestNotFoundException("Test topilmadi")
+        if profile is not None and profile not in SCORING_PROFILES:
+            raise InvalidScoringConfigurationException(f"scoring_profile quyidagilardan biri bo'lishi kerak: {', '.join(SCORING_PROFILES)}")
+        if profile != test.scoring_profile:
+            mismatched = [
+                s.name for s in self.section_repo.list_for_test(test.id)
+                if s.score_component is not None and COMPONENTS[s.score_component].profile != profile
+            ]
+            if mismatched:
+                raise ScoringConfigurationConflictException(
+                    "Avval bu bo'limlarning ballash komponentini olib tashlang: " + ", ".join(mismatched)
+                )
+        test.scoring_profile = profile
+        test.updated_by = actor_id
+        self.test_repo.db.flush()
+        log_action(self.test_repo.db, action="test.scoring_profile_set", user_id=actor_id, entity_type="test", entity_id=test.id,
+                   metadata={"scoring_profile": profile})
+        self.test_repo.db.commit()
+        return test
+
+    def _active_section(self, section_id: uuid.UUID) -> ExamSection:
+        section = self.section_repo.get_by_id(section_id)
+        if section is None or section.deleted_at is not None:
+            raise ExamSectionNotFoundException("Bo'lim topilmadi")
+        return section
+
+    def list_tables(self, section_id: uuid.UUID) -> list[tuple[ScoreConversionTable, bool]]:
+        self._active_section(section_id)
+        tables = self.table_repo.list_for_section(section_id)
+        current: dict = {}
+        for t in tables:
+            key = t.routing_variant
+            if key not in current or t.version > current[key].version:
+                current[key] = t
+        current_ids = {t.id for t in current.values()}
+        return [(t, t.id in current_ids) for t in tables]
+
+    def publish_table(self, section_id: uuid.UUID, data: ConversionTableCreateRequest, actor_id: uuid.UUID) -> ScoreConversionTable:
+        self._active_section(section_id)
+        section = self.table_repo.lock_section(section_id)
+        if section is None:
+            raise ExamSectionNotFoundException("Bo'lim topilmadi")
+        test = self.test_repo.get_by_id(section.test_id)
+        if test is None or test.scoring_profile is None:
+            raise InvalidScoringConfigurationException("Avval testga ballash profili (IELTS/SAT/GRE) belgilanishi kerak")
+        if section.score_component is None:
+            raise InvalidScoringConfigurationException("Avval bo'limga ballash komponenti belgilanishi kerak")
+        if data.routing_variant is not None:
+            variants = {m.routing_variant for m in self.module_repo.list_for_section(section.id) if m.routing_variant}
+            if data.routing_variant not in variants:
+                raise InvalidScoringConfigurationException(
+                    f"routing_variant='{data.routing_variant}' bu bo'limdagi hech bir modulda yo'q"
+                )
+        try:
+            entries = validate_conversion_table(
+                section.score_component, data.method,
+                [{"raw": e.raw, "scaled": e.scaled} for e in data.entries],
+            )
+        except InvalidConversionTable as exc:
+            raise InvalidScoringConfigurationException(str(exc))
+
+        table = ScoreConversionTable(
+            section_id=section.id, routing_variant=data.routing_variant,
+            version=self.table_repo.max_version(section.id, data.routing_variant) + 1,
+            method=data.method, entries=entries, created_by=actor_id,
+        )
+        self.table_repo.create(table)
+        log_action(self.table_repo.db, action="score_conversion_table.published", user_id=actor_id,
+                   entity_type="exam_section", entity_id=section.id,
+                   metadata={"table_id": str(table.id), "version": table.version, "routing_variant": data.routing_variant})
+        self.table_repo.commit()
+        return table
