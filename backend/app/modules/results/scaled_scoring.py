@@ -62,6 +62,13 @@ STATUS_NO_TABLE = "no_conversion_table"
 STATUS_OUT_OF_RANGE = "raw_out_of_range"
 STATUS_AMBIGUOUS_VARIANT = "ambiguous_variant"
 STATUS_NO_COMPONENT = "no_score_component"
+# Task 5 — a manually graded section where some, but not all, responses
+# have a finalized review.
+STATUS_PARTIALLY_GRADED = "partially_graded"
+
+# Task 5 — components scored by a human grader with a rubric
+# (grading module), never by a conversion table.
+MANUAL_COMPONENTS = tuple(code for code, spec in COMPONENTS.items() if not spec.table_convertible)
 
 # Overall statuses (results.overall_status).
 OVERALL_SCALED = "scaled"
@@ -201,6 +208,15 @@ def ielts_overall_band(component_bands: list[Fraction]) -> Fraction:
     the next whole band (i.e. round half up to 0.5)."""
     mean = sum(component_bands, Fraction(0)) / len(component_bands)
     return _round_to_step(mean, Fraction(1, 2))
+
+
+def overall_components(profile: str) -> tuple[str, ...]:
+    """Components whose scores make up a profile's overall score."""
+    if profile == PROFILE_IELTS:
+        return IELTS_OVERALL_COMPONENTS
+    if profile == PROFILE_SAT:
+        return SAT_TOTAL_COMPONENTS
+    return ()
 
 
 def compute_overall(profile: str, scaled_by_component: dict[str, Fraction | None]) -> tuple[Fraction | None, str]:

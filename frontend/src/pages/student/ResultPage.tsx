@@ -117,6 +117,28 @@ function QuestionReviewCard({ question, index }: { question: QuestionReviewOut; 
         <p className="text-sm text-foreground/80">Javobingiz: {question.text_answer}</p>
       ) : null}
 
+      {/* Task 5 — finalized manual grade. Feedback is plain, auto-escaped
+          text (never rendered as HTML). */}
+      {question.manual_grade ? (
+        <div className="mt-2 rounded-md bg-primary/5 p-3 text-sm" data-testid="manual-grade">
+          <p className="font-medium text-foreground">
+            Baho: {question.manual_grade.reported_score}
+            {question.manual_grade.is_provisional ? <span className="ml-2 text-xs font-normal text-amber-700">(provisional)</span> : null}
+            {question.manual_grade.revision_number > 1 ? <span className="ml-2 text-xs font-normal text-foreground/50">(tuzatilgan)</span> : null}
+          </p>
+          {question.manual_grade.criteria.length > 0 ? (
+            <ul className="mt-1 text-xs text-foreground/70">
+              {question.manual_grade.criteria.map((c) => (
+                <li key={c.key}>{c.label}: {c.score} / {c.max}</li>
+              ))}
+            </ul>
+          ) : null}
+          {question.manual_grade.feedback ? (
+            <p className="mt-2 whitespace-pre-wrap text-foreground/80">Izoh: {question.manual_grade.feedback}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {question.explanation ? (
         // Sprint 80 — explanation already had its own dedicated
         // sanitize_rich_text field_validator since Sprint 32
@@ -158,18 +180,22 @@ function SectionScoreRow({ section, index }: { section: ResultSectionOut; index:
           <span className="font-medium text-foreground/80">{scoreText}</span>
         )}
         {hasScaledInfo && scaledNote ? <span className="block text-xs text-foreground/50">{scaledNote}</span> : null}
+        {section.is_provisional ? <span className="block text-xs text-amber-700">Provisional (rubrika tasdiqlanmagan)</span> : null}
       </span>
     </div>
   );
 }
 
 /** Task 4 — overall IELTS band / SAT total, or why it isn't available. */
-function OverallScaledScore({ profile, score, status }: { profile: string; score: number | null | undefined; status: string | null | undefined }) {
+function OverallScaledScore({ profile, score, status, provisional }: { profile: string; score: number | null | undefined; status: string | null | undefined; provisional?: boolean }) {
   return (
     <div className="mb-3 rounded-md bg-primary/5 p-3 text-center" data-testid="overall-scaled-score">
       <p className="text-xs text-foreground/60">{overallLabel(profile)}</p>
       {status === "scaled" && score != null ? (
-        <p className="text-2xl font-semibold text-foreground">{score}</p>
+        <p className="text-2xl font-semibold text-foreground">
+          {score}
+          {provisional ? <span className="ml-2 text-xs font-normal text-amber-700">(provisional)</span> : null}
+        </p>
       ) : (
         <p className="text-sm text-foreground/60">{status ? OVERALL_STATUS_LABELS[status] ?? "—" : "—"}</p>
       )}
@@ -269,7 +295,7 @@ export function ResultPage() {
           </CardHeader>
           <CardContent>
             {result.scoring_profile ? (
-              <OverallScaledScore profile={result.scoring_profile} score={result.overall_scaled_score} status={result.overall_status} />
+              <OverallScaledScore profile={result.scoring_profile} score={result.overall_scaled_score} status={result.overall_status} provisional={result.is_provisional} />
             ) : null}
             {result.sections.map((section, index) => (
               <SectionScoreRow key={section.id} section={section} index={index} />

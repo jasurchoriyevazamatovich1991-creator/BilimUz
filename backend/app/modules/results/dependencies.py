@@ -9,6 +9,7 @@ from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.questions.repository import QuestionRepository
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
 from app.modules.results.service import RankingService, ResultService
+from app.modules.grading.repository import ReviewRepository
 from app.modules.tests.repository import ExamModuleRepository, ExamSectionRepository, QuestionGroupRepository, ScoreConversionTableRepository, TestRepository
 
 
@@ -51,6 +52,8 @@ def get_result_service(
         # Task 4 — exam-specific scaled scoring lookups (read-only here).
         conversion_table_repository=ScoreConversionTableRepository(db),
         exam_module_repository=ExamModuleRepository(db),
+        # Task 5 — finalized manual reviews (read-only here).
+        manual_review_repository=ReviewRepository(db),
     )
 
 

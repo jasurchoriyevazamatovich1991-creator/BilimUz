@@ -36,6 +36,9 @@ class Result(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     overall_scaled_score: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
     # 'scaled' | 'pending' | 'not_reported' (GRE has no combined score).
     overall_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Task 5 (migration 0026) — True when the overall score depends on a
+    # manual grade made with a rubric not marked as validated.
+    is_provisional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class Statistics(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -113,3 +116,6 @@ class ResultSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     conversion_table_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("score_conversion_tables.id"), nullable=True,
     )
+    # Task 5 (migration 0026) — manual-graded section scored with an
+    # unvalidated rubric.
+    is_provisional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")

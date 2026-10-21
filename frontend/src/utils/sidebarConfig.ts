@@ -34,6 +34,10 @@ export const ADMIN_ITEMS: SidebarItem[] = [
   { label: "Testlar", path: "/admin/tests" },
   { label: "Savollar", path: "/admin/questions" },
   { label: "Natijalar", path: "/admin/results" },
+  // Task 5 — manual grading (backend GRADE_SUBMISSIONS permission decides
+  // access; the pages explain a 403) and rubric configuration.
+  { label: "Baholash", path: "/admin/grading" },
+  { label: "Rubrikalar", path: "/admin/rubrics" },
   { label: "Sertifikatlar", path: "/admin/certificates" },
   { label: "Analitika", path: "/admin/analytics" },
   { label: "To'lovlar", path: "/admin/payments" },
@@ -62,6 +66,9 @@ export const TEACHER_ITEMS: SidebarItem[] = [
   { label: "Milliy Sertifikat", path: "/teacher/national-certificate" },
   { label: "Testlar", path: "/teacher/tests" },
   { label: "Natijalar", path: "/teacher/results" },
+  // Task 5 — visible to every Teacher; only teachers whose role was granted
+  // GRADE_SUBMISSIONS get data (others see an explanation).
+  { label: "Baholash", path: "/teacher/grading" },
   { label: "Statistika", path: "/teacher/statistics" },
   { label: "Profil", path: "/teacher/profile" },
   // Sprint 14 addition: needed for the Header dropdown's new Settings

@@ -30,6 +30,7 @@ from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.catalog import models as catalog_models  # noqa: F401  — Sprint 91 Phase 1
 from app.modules.certificates import models as certificates_models  # noqa: F401
 from app.modules.entitlements import models as entitlements_models  # noqa: F401  — Sprint 91 Phase 1
+from app.modules.grading import models as grading_models  # noqa: F401  — Task 5
 from app.modules.grades import models as grades_models  # noqa: F401
 from app.modules.learning_centers import models as learning_centers_models  # noqa: F401
 from app.modules.lessons import models as lessons_models  # noqa: F401

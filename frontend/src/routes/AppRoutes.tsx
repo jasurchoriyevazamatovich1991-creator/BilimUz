@@ -59,6 +59,9 @@ import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { ADMIN_ITEMS, TEACHER_ITEMS, APPLICANT_STUDENT_ITEMS } from "@/utils/sidebarConfig";
 import type { SidebarItem } from "@/utils/sidebarConfig";
+import { GradingQueuePage } from "@/pages/grading/GradingQueuePage";
+import { GradingItemPage } from "@/pages/grading/GradingItemPage";
+import { RubricsPage } from "@/pages/admin/RubricsPage";
 
 /** Renders every non-dashboard sidebar item as a <Route> pointing at
  * PlaceholderPage — the dashboard item (index route) is handled
@@ -131,7 +134,13 @@ export function AppRoutes() {
               Teacher cannot read or write ExamSection/ExamModule/
               QuestionGroup at all (verified in tests/router.py). */}
           <Route path="/admin/tests/:testId/exam-config" element={<ExamConfigPage />} />
+          {/* Task 5 — manual grading and rubric configuration. */}
+          <Route path="/admin/grading" element={<GradingQueuePage basePath="/admin" />} />
+          <Route path="/admin/grading/:attemptId/:questionId" element={<GradingItemPage basePath="/admin" />} />
+          <Route path="/admin/rubrics" element={<RubricsPage />} />
           {placeholderRoutesFor(ADMIN_ITEMS, "/admin", [
+            "/admin/grading",
+            "/admin/rubrics",
             "/admin/users",
             "/admin/roles",
             "/admin/permissions",
@@ -165,7 +174,11 @@ export function AppRoutes() {
           <Route path="/teacher/tests/:testId/questions" element={<TestQuestionsListPage basePath="/teacher" />} />
           <Route path="/teacher/tests/:testId/questions/new" element={<QuestionFormPage basePath="/teacher" />} />
           <Route path="/teacher/tests/:testId/questions/:questionId" element={<QuestionFormPage basePath="/teacher" />} />
+          {/* Task 5 — grading for teachers granted GRADE_SUBMISSIONS. */}
+          <Route path="/teacher/grading" element={<GradingQueuePage basePath="/teacher" />} />
+          <Route path="/teacher/grading/:attemptId/:questionId" element={<GradingItemPage basePath="/teacher" />} />
           {placeholderRoutesFor(TEACHER_ITEMS, "/teacher", [
+            "/teacher/grading",
             "/teacher/subjects",
             "/teacher/grades",
             "/teacher/topics",

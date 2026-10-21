@@ -40,6 +40,7 @@ export function componentsForProfile(profile: ScoringProfile | null | undefined)
 export const SCALED_STATUS_LABELS: Record<string, string> = {
   scaled: "",
   pending_manual_grading: "Baholovchi tekshiruvi kutilmoqda",
+  partially_graded: "Qisman baholangan — qolgan javoblar tekshirilmoqda",
   no_conversion_table: "Shkala ballari hali sozlanmagan",
   raw_out_of_range: "Shkala balli hisoblab bo'lmadi",
   ambiguous_variant: "Shkala balli hisoblab bo'lmadi",

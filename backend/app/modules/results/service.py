@@ -15,10 +15,23 @@ from app.modules.attempts.module_execution_service import ModuleExecutionService
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
 from app.modules.results.exceptions import AttemptNotFinishedException, ResultNotFoundException
+from decimal import Decimal
+from fractions import Fraction
+
+from app.modules.grading.repository import ReviewRepository, RubricRepository
+from app.modules.grading.rules import compute_section_score
 from app.modules.results import scaled_scoring as ss
 from app.modules.results.models import Result, ResultSection
 from app.modules.results.repository import RankingRepository, ResultRepository, ResultSectionRepository, StatisticsRepository
-from app.modules.results.schemas import OptionReviewOut, QuestionReviewOut, ResultDetailOut, ResultListParams, ResultSectionOut
+from app.modules.results.schemas import (
+    ManualGradeCriterionOut,
+    ManualGradeOut,
+    OptionReviewOut,
+    QuestionReviewOut,
+    ResultDetailOut,
+    ResultListParams,
+    ResultSectionOut,
+)
 from app.modules.tests.repository import (
     ExamModuleRepository,
     ExamSectionRepository,
@@ -72,6 +85,9 @@ class ResultService:
         # no_conversion_table (never invented).
         conversion_table_repository: ScoreConversionTableRepository | None = None,
         exam_module_repository: ExamModuleRepository | None = None,
+        # Task 5 — finalized manual reviews (IELTS Writing/Speaking, GRE
+        # AWA). Without it, manual sections stay pending_manual_grading.
+        manual_review_repository: ReviewRepository | None = None,
     ):
         self.repo = repository
         self.stats_repo = statistics_repository
@@ -85,6 +101,7 @@ class ResultService:
         self.group_repo = question_group_repository
         self.table_repo = conversion_table_repository
         self.module_repo = exam_module_repository
+        self.review_repo = manual_review_repository
 
     def create_result(self, attempt_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         attempt = self.attempt_repo.get_by_id(attempt_id)
@@ -172,7 +189,9 @@ class ResultService:
         if not sections:
             return
         delivered_variants = self._delivered_variants_by_section(attempt, sections) if profile is not None else {}
+        finalized_reviews = self._finalized_reviews_by_question(attempt.id) if profile is not None else {}
         scaled_by_component: dict = {}
+        provisional_by_component: dict = {}
 
         answers = self.answer_repo.list_for_attempt(attempt.id)
         answers_by_question = {a.question_id: a for a in answers}
@@ -217,22 +236,117 @@ class ResultService:
                 raw_score=scoring_result.score, scaled_score=None,
             )
             if profile is not None:
+                manual_questions = [q for q in delivered_section_questions if not is_auto_gradable(q)]
                 has_ungraded = len(questions) != len(delivered_section_questions)
-                scaled, status, table = self._scale_section(
+                scaled, status, table, provisional = self._scale_section(
                     profile, section, scoring_result.score, has_ungraded, delivered_variants.get(section.id, set()),
+                    manual_questions, finalized_reviews,
                 )
                 row.score_component = section.score_component
                 row.scaled_status = status
                 row.scaled_score = float(scaled) if scaled is not None else None
                 row.conversion_table_id = table.id if table is not None else None
+                row.is_provisional = provisional
                 if section.score_component is not None:
                     scaled_by_component[section.score_component] = scaled
+                    provisional_by_component[section.score_component] = provisional
             self.result_section_repo.create(row)
 
         if profile is not None:
-            overall, overall_status = ss.compute_overall(profile, scaled_by_component)
-            result.overall_scaled_score = float(overall) if overall is not None else None
-            result.overall_status = overall_status
+            self._apply_overall(result, profile, scaled_by_component, provisional_by_component)
+
+    @staticmethod
+    def _apply_overall(result, profile: str, scaled_by_component: dict, provisional_by_component: dict) -> None:
+        overall, overall_status = ss.compute_overall(profile, scaled_by_component)
+        result.overall_scaled_score = float(overall) if overall is not None else None
+        result.overall_status = overall_status
+        # Provisional only when an actual overall score relies on a
+        # provisional (unvalidated-rubric) section.
+        result.is_provisional = overall_status == ss.OVERALL_SCALED and any(
+            provisional_by_component.get(c, False) for c in ss.overall_components(profile)
+        )
+
+    def _finalized_reviews_by_question(self, attempt_id) -> dict:
+        if self.review_repo is None:
+            return {}
+        return {r.question_id: r for r in self.review_repo.list_finalized_for_attempt(attempt_id)}
+
+    @staticmethod
+    def _manual_section_score(component: str, manual_questions: list, finalized: dict):
+        """Task 5 — (scaled, status, provisional) for a manually graded
+        section from its delivered questions' FINALIZED reviews only.
+        Uses the reviews' stored reported scores — a later rubric change
+        never rewrites them. Weights = each question's `score` field."""
+        if not manual_questions:
+            return None, ss.STATUS_PENDING_MANUAL, False
+        graded = [(q, finalized[q.id]) for q in manual_questions if q.id in finalized]
+        if not graded:
+            return None, ss.STATUS_PENDING_MANUAL, False
+        if len(graded) < len(manual_questions):
+            return None, ss.STATUS_PARTIALLY_GRADED, False
+        scaled = compute_section_score(component, [
+            (Fraction(Decimal(str(q.score))), Fraction(Decimal(str(r.reported_score)))) for q, r in graded
+        ])
+        return scaled, ss.STATUS_SCALED, any(r.is_provisional for _, r in graded)
+
+    def _manual_grades_for_student(self, attempt_id) -> dict:
+        """Task 5 — {question_id: ManualGradeOut} from FINALIZED reviews of
+        this (already ownership-checked) result's attempt. Excludes drafts,
+        superseded history, internal notes and grader identity."""
+        finalized = self._finalized_reviews_by_question(attempt_id)
+        if not finalized:
+            return {}
+        rubrics = {r.id: r for r in RubricRepository(self.review_repo.db).list_by_ids({r.rubric_id for r in finalized.values()})}
+        out = {}
+        for qid, review in finalized.items():
+            rubric = rubrics.get(review.rubric_id)
+            criteria = [
+                ManualGradeCriterionOut(key=c["key"], label=c["label"], score=review.criterion_scores.get(c["key"], ""), max=c["max"])
+                for c in (rubric.criteria if rubric else [])
+            ]
+            out[qid] = ManualGradeOut(
+                reported_score=float(review.reported_score), criteria=criteria, feedback=review.feedback,
+                is_provisional=bool(review.is_provisional), revision_number=review.revision_number,
+                finalized_at=review.finalized_at,
+            )
+        return out
+
+    def refresh_manual_scores(self, attempt_id) -> None:
+        """Task 5 — called after a manual review is finalized. Recomputes
+        the manually graded sections of this attempt's EXISTING Result (if
+        the student hasn't created it yet, create_result() will compute
+        them) and then its overall score. Table-scored sections are read
+        back as stored, never recomputed. Caller commits."""
+        result = self.repo.get_by_attempt_id(attempt_id)
+        if result is None or result.scoring_profile is None or self.section_repo is None or self.result_section_repo is None:
+            return
+        attempt = self.attempt_repo.get_by_id(attempt_id)
+        rows = {r.section_id: r for r in self.result_section_repo.list_for_result(result.id)}
+        effective_ids = set(self._effective_result_question_ids(attempt))
+        finalized = self._finalized_reviews_by_question(attempt_id)
+
+        for section in self.section_repo.list_for_test(result.test_id):
+            row = rows.get(section.id)
+            spec = ss.COMPONENTS.get(section.score_component) if section.score_component else None
+            if row is None or spec is None or spec.table_convertible or spec.profile != result.scoring_profile:
+                continue
+            manual_questions = [
+                q for q in self.question_repo.list_by_section(section.id) if q.id in effective_ids and not is_auto_gradable(q)
+            ]
+            scaled, status, provisional = self._manual_section_score(section.score_component, manual_questions, finalized)
+            row.scaled_score = float(scaled) if scaled is not None else None
+            row.scaled_status = status
+            row.is_provisional = provisional
+
+        scaled_by_component, provisional_by_component = {}, {}
+        for row in rows.values():
+            if row.score_component:
+                scaled_by_component[row.score_component] = (
+                    Fraction(Decimal(str(row.scaled_score))) if row.scaled_score is not None else None
+                )
+                provisional_by_component[row.score_component] = bool(row.is_provisional)
+        self._apply_overall(result, result.scoring_profile, scaled_by_component, provisional_by_component)
+        self.repo.db.flush()
 
     def _delivered_variants_by_section(self, attempt, sections) -> dict:
         """Task 4 — for each section, the routing_variant(s) of the modules
@@ -249,25 +363,31 @@ class ResultService:
                     variants.setdefault(section.id, set()).add(module.routing_variant)
         return variants
 
-    def _scale_section(self, profile: str, section, raw_score: float, has_ungraded: bool, variants: set):
-        """Task 4 — returns (scaled Fraction | None, status, table | None).
-        Never invents a score: every path that cannot produce one says why."""
+    def _scale_section(self, profile: str, section, raw_score: float, has_ungraded: bool, variants: set,
+                       manual_questions: list | None = None, finalized_reviews: dict | None = None):
+        """Task 4/5 — returns (scaled Fraction | None, status, table | None,
+        is_provisional). Never invents a score: every path that cannot
+        produce one says why."""
         component = section.score_component
         spec = ss.COMPONENTS.get(component) if component else None
         if spec is None or spec.profile != profile:
-            return None, ss.STATUS_NO_COMPONENT, None
-        if not spec.table_convertible or has_ungraded:
-            # Writing/Speaking/AWA, or the section's raw score is incomplete
-            # because some delivered answers await manual grading.
-            return None, ss.STATUS_PENDING_MANUAL, None
+            return None, ss.STATUS_NO_COMPONENT, None, False
+        if not spec.table_convertible:
+            # Task 5 — Writing/Speaking/AWA: finalized manual reviews only.
+            scaled, status, provisional = self._manual_section_score(component, manual_questions or [], finalized_reviews or {})
+            return scaled, status, None, provisional
+        if has_ungraded:
+            # The section's raw score is incomplete because some delivered
+            # answers are not auto-gradable (e.g. an unconfigured short_answer).
+            return None, ss.STATUS_PENDING_MANUAL, None, False
         if len(variants) > 1:
-            return None, ss.STATUS_AMBIGUOUS_VARIANT, None
+            return None, ss.STATUS_AMBIGUOUS_VARIANT, None, False
         variant = next(iter(variants)) if variants else None
         table = self.table_repo.get_current(section.id, variant) if self.table_repo is not None else None
         if table is None:
-            return None, ss.STATUS_NO_TABLE, None
+            return None, ss.STATUS_NO_TABLE, None, False
         scaled, status = ss.convert_raw_score(component, table.method, table.entries, round(raw_score, 2))
-        return scaled, status, table
+        return scaled, status, table, False
 
     def get_result(self, result_id: uuid.UUID, user_id: uuid.UUID) -> Result:
         result = self.repo.get_by_id(result_id)
@@ -326,6 +446,7 @@ class ResultService:
         never an arbitrary re-sort."""
         result = self.get_result(result_id, user_id)
         section_outs = self._get_result_sections(result)
+        manual_grades = self._manual_grades_for_student(result.attempt_id)
         attempt = self.attempt_repo.get_by_id(result.attempt_id)
         answers = self.answer_repo.list_for_attempt(result.attempt_id)
         answers_by_question = {a.question_id: a for a in answers}
@@ -384,6 +505,7 @@ class ResultService:
                 group_id=group.id if group is not None else None,
                 group_title=group.title if group is not None else None,
                 stimulus_text=group.stimulus_text if group is not None else None,
+                manual_grade=manual_grades.get(question.id),
             ))
 
         time_spent_seconds = None
@@ -395,7 +517,7 @@ class ResultService:
             score=result.score, percentage=result.percentage, is_passed=result.is_passed,
             status=result.status, created_at=result.created_at,
             scoring_profile=result.scoring_profile, overall_scaled_score=result.overall_scaled_score,
-            overall_status=result.overall_status,
+            overall_status=result.overall_status, is_provisional=bool(result.is_provisional),
             total_questions=len(question_ids), correct_answers=correct_count,
             incorrect_answers=incorrect_count, unanswered=unanswered_count,
             time_spent_seconds=time_spent_seconds, questions=question_reviews,
@@ -452,6 +574,7 @@ class ResultService:
                 raw_score=row.raw_score, scaled_score=row.scaled_score,
                 score_component=row.score_component, scaled_status=row.scaled_status,
                 conversion_table_version=versions.get(row.conversion_table_id),
+                is_provisional=bool(row.is_provisional),
             )
             for row in rows
         ]

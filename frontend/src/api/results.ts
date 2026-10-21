@@ -65,6 +65,18 @@ export interface QuestionReviewOut {
   group_id?: string | null;
   group_title?: string | null;
   stimulus_text?: string | null;
+  /** Task 5 — current finalized manual grade (never drafts or notes). */
+  manual_grade?: ManualGradeOut | null;
+}
+
+/** Task 5 — student-visible part of a finalized manual review. */
+export interface ManualGradeOut {
+  reported_score: number;
+  criteria: { key: string; label: string; score: string; max: string }[];
+  feedback: string | null;
+  is_provisional: boolean;
+  revision_number: number;
+  finalized_at: string;
 }
 
 /** Sprint 55 (backend) / Sprint 73 — RS-FE-1 (frontend): read-only
@@ -84,6 +96,8 @@ export interface ResultSectionOut {
   score_component?: string | null;
   scaled_status?: string | null;
   conversion_table_version?: number | null;
+  /** Task 5 — manually graded with an unvalidated rubric. */
+  is_provisional?: boolean;
 }
 
 export interface ResultDetailOut extends ResultOut {
@@ -100,6 +114,8 @@ export interface ResultDetailOut extends ResultOut {
   scoring_profile?: string | null;
   overall_scaled_score?: number | null;
   overall_status?: string | null;
+  /** Task 5 — overall relies on a provisional manual grade. */
+  is_provisional?: boolean;
 }
 
 export const resultsApi = {

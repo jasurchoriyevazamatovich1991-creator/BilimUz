@@ -70,6 +70,28 @@ class QuestionReviewOut(BaseModel):
     group_id: uuid.UUID | None = None
     group_title: str | None = None
     stimulus_text: str | None = None
+    # Task 5 — the CURRENT finalized manual grade of this question, if any.
+    # Never a draft, never internal grader notes or grader identity.
+    manual_grade: "ManualGradeOut | None" = None
+
+
+class ManualGradeCriterionOut(BaseModel):
+    key: str
+    label: str
+    score: str
+    max: str
+
+
+class ManualGradeOut(BaseModel):
+    """Task 5 — student-visible part of a finalized manual review."""
+    reported_score: float
+    criteria: list[ManualGradeCriterionOut]
+    feedback: str | None
+    # True when the rubric version used is not marked as validated.
+    is_provisional: bool
+    # >1 means the grade was corrected through the audited revision flow.
+    revision_number: int
+    finalized_at: datetime
 
 
 class ResultSectionOut(BaseModel):
@@ -104,6 +126,8 @@ class ResultSectionOut(BaseModel):
     score_component: str | None = None
     scaled_status: str | None = None
     conversion_table_version: int | None = None
+    # Task 5 — manual section graded with an unvalidated rubric.
+    is_provisional: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -116,6 +140,8 @@ class ResultDetailOut(ResultOut):
     scoring_profile: str | None = None
     overall_scaled_score: float | None = None
     overall_status: str | None = None
+    # Task 5 — the overall score relies on a provisional manual grade.
+    is_provisional: bool = False
     total_questions: int
     correct_answers: int
     incorrect_answers: int
@@ -155,3 +181,6 @@ class RankingRecomputeResponse(BaseModel):
     subject_id: uuid.UUID | None
     period: str
     ranked_count: int
+
+
+QuestionReviewOut.model_rebuild()

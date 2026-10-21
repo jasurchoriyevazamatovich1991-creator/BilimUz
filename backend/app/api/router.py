@@ -18,6 +18,7 @@ from app.modules.audit_logs.router import router as audit_logs_router
 from app.modules.auth.router import router as auth_router
 from app.modules.catalog.router import router as catalog_products_router
 from app.modules.entitlements.router import router as entitlements_router
+from app.modules.grading.router import router as grading_router
 from app.modules.certificates.router import router as certificates_router
 from app.modules.certificates.router import template_router as certificate_templates_router
 from app.modules.grades.router import router as grades_router
@@ -81,5 +82,7 @@ api_router.include_router(catalog_products_router)
 # Admin Management of Mock Test Entitlements (Task D) — grant/extend/
 # revoke/admin-list + the student-facing /entitlements/me self-view.
 api_router.include_router(entitlements_router)
+# Task 5 — manual grading (IELTS Writing/Speaking, GRE AWA).
+api_router.include_router(grading_router)
 
 # Sprint 12 complete. As modules are implemented, register them here.
