@@ -11,9 +11,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormulaText } from "@/components/questions/FormulaText";
 import { ApiError } from "@/api/client";
-import type { ReviewOut } from "@/api/grading";
+import { gradingApi, type ReviewOut } from "@/api/grading";
 import { useFinalizeReview, useReviseReview, useSaveDraft, useSubmission } from "@/hooks/useGrading";
 import { MANUAL_COMPONENT_LABELS, REVIEW_STATUS_LABELS, criterionError } from "@/lib/grading";
+
+/** Task 6 — loads the Speaking recording through the permission-checked
+ * grading endpoint as a Blob (no public/signed URL) only when asked. */
+function ResponseAudio({ attemptId, questionId }: { attemptId: string; questionId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+
+  async function load() {
+    setLoading(true);
+    setFailed(null);
+    try {
+      setUrl(URL.createObjectURL(await gradingApi.getAudio(attemptId, questionId)));
+    } catch (err) {
+      setFailed(err instanceof ApiError && err.status === 403 ? "Audio tinglash uchun ruxsat yo'q." : "Audioni yuklab bo'lmadi.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (url) return <audio controls src={url} aria-label="Talabaning og'zaki javobi" className="mb-3 w-full" data-testid="response-audio" />;
+  return (
+    <div className="mb-3">
+      <Button type="button" variant="outline" onClick={load} disabled={loading}>{loading ? "Yuklanmoqda..." : "Audio javobni tinglash"}</Button>
+      {failed ? <p role="alert" className="mt-1 text-sm text-destructive">{failed}</p> : null}
+    </div>
+  );
+}
 
 export function GradingItemPage({ basePath = "/admin" }: { basePath?: string }) {
   const { attemptId = "", questionId = "" } = useParams<{ attemptId: string; questionId: string }>();
@@ -92,13 +121,15 @@ export function GradingItemPage({ basePath = "/admin" }: { basePath?: string }) 
       <Card>
         <CardHeader><CardTitle className="text-base">Talaba javobi</CardTitle></CardHeader>
         <CardContent>
-          {data.score_component === "ielts_speaking" ? (
-            <p className="mb-2 text-xs text-foreground/50">Speaking audio yozish hali mavjud emas — saqlangan matnli javob ko'rsatilmoqda.</p>
+          {data.has_audio ? (
+            <ResponseAudio attemptId={attemptId} questionId={questionId} />
+          ) : data.score_component === "ielts_speaking" ? (
+            <p className="mb-2 text-xs text-foreground/50">Talaba audio yozuv yubormagan — faqat matnli javob (bo'lsa) ko'rsatilmoqda.</p>
           ) : null}
           {data.response_text ? (
             <p className="whitespace-pre-wrap text-sm text-foreground" data-testid="response-text">{data.response_text}</p>
           ) : (
-            <p className="text-sm text-foreground/50">Talaba javob yozmagan.</p>
+            data.has_audio ? null : <p className="text-sm text-foreground/50">Talaba javob yozmagan.</p>
           )}
         </CardContent>
       </Card>

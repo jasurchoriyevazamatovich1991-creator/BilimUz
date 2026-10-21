@@ -221,3 +221,38 @@ export function useSubmitModule(attemptId: string) {
     onError: (error) => addToast(error instanceof ApiError ? error.message : "Modulni yakunlab bo'lmadi"),
   });
 }
+
+/**
+ * Task 6 — "mark for review" toggle. The server's response (the full,
+ * authoritative marked list) replaces the cached one; answers in the
+ * cache are never touched, so marking can't clear or submit an answer.
+ */
+export function useSetReviewMark(attemptId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+  return useMutation({
+    mutationFn: ({ questionId, marked }: { questionId: string; marked: boolean }) =>
+      attemptsApi.setReviewMark(attemptId, questionId, marked),
+    onSuccess: (out) => {
+      queryClient.setQueryData(["attempts", "detail", attemptId], (old: import("@/api/attempts").AttemptDetailOut | undefined) =>
+        old ? { ...old, marked_question_ids: out.marked_question_ids } : old,
+      );
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Belgini saqlab bo'lmadi"),
+  });
+}
+
+/** Task 6 — after a confirmed upload, reflect "has a recording" locally
+ * (the response row now exists server-side, so it also counts as answered). */
+export function useMarkAudioUploaded(attemptId: string) {
+  const queryClient = useQueryClient();
+  return (questionId: string) =>
+    queryClient.setQueryData(["attempts", "detail", attemptId], (old: import("@/api/attempts").AttemptDetailOut | undefined) => {
+      if (!old) return old;
+      const exists = old.answered.some((a) => a.question_id === questionId);
+      const answered = exists
+        ? old.answered.map((a) => (a.question_id === questionId ? { ...a, has_audio: true, is_answered: true } : a))
+        : [...old.answered, { question_id: questionId, is_answered: true, selected_option: null, selected_options: null, text_answer: null, has_audio: true }];
+      return { ...old, answered };
+    });
+}

@@ -215,6 +215,7 @@ class GradingService:
             attempt_id=attempt_id, question_id=question_id, test_title=test.title, section_name=section.name,
             score_component=section.score_component, question_text=question.question_text,
             question_type=question.question_type, response_text=answer.text_answer if answer else None,
+            has_audio=answer is not None and answer.audio_upload_id is not None,
             status=self._queue_status([r for r in reviews if r.status != REVIEW_STATUS_SUPERSEDED]),
             rubric=self._rubric_out(working, current is not None and working.id == current.id) if working is not None else None,
             reviews=[self._review_out(r, versions) for r in reviews],
@@ -306,3 +307,12 @@ class GradingService:
                    entity_id=revision.id, metadata={"supersedes_id": str(finalized.id), "reason": reason.strip()[:200]})
         self.review_repo.commit()
         return revision
+
+
+    def open_response_audio(self, attempt_id: uuid.UUID, question_id: uuid.UUID, attempt_service):
+        """Task 6 — the student's recorded Speaking response for a gradable
+        item. Same item checks as every other grading endpoint (finished
+        attempt, delivered manual question), then the attempts module's
+        own private-storage reader."""
+        self._resolve_item(attempt_id, question_id)
+        return attempt_service.open_answer_audio(attempt_id, question_id)

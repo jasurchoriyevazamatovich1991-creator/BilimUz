@@ -9,11 +9,17 @@ OptionRepository — all read-only, unmodified except for the one additive
 method (QuestionRepository.list_all_for_test) documented in the
 questions module's git history for this sprint.
 """
+import io
 import uuid
 from datetime import datetime, timezone
+from typing import BinaryIO
 
 from app.core.audit import log_action
 from app.modules.attempts.exceptions import (
+    InvalidSpeakingAudioException,
+    SpeakingAudioNotAllowedException,
+    SpeakingAudioNotFoundException,
+    SpeakingAudioTooLargeException,
     AttemptMediaNotFoundException,
     AttemptMediaUnavailableException,
     AttemptNotActiveException,
@@ -28,7 +34,14 @@ from app.modules.attempts.exceptions import (
     ResultNotAvailableException,
     TestNotPublishedException,
 )
-from app.modules.attempts.constants import ACTIVE_STATUSES, DEFAULT_MAX_ATTEMPTS
+from app.modules.attempts.constants import (
+    ACTIVE_STATUSES,
+    DEFAULT_MAX_ATTEMPTS,
+    SPEAKING_AUDIO_EXTENSION_MIME,
+    SPEAKING_AUDIO_MAX_BYTES,
+    SPEAKING_AUDIO_MIME_TYPES,
+    SPEAKING_COMPONENT,
+)
 from app.modules.attempts.models import AttemptStatus, TestAttempt
 from app.modules.attempts.repository import AnswerRepository, AttemptRepository
 from app.modules.attempts.scoring import DEFAULT_SCORING_STRATEGY, is_auto_gradable
@@ -48,7 +61,8 @@ from app.modules.attempts.schemas import (
 from app.modules.attempts.validators import build_question_order, compute_expiry, is_expired
 from app.modules.questions.answer_matching import InvalidNumericAnswer, grade_short_answer
 from app.modules.questions.repository import MediaRepository, OptionRepository, QuestionRepository
-from app.modules.uploads.constants import PRESIGNED_DOWNLOAD_TTL_SECONDS, UPLOAD_STATUS_READY
+from app.modules.uploads.constants import FILE_TYPE_AUDIO, PRESIGNED_DOWNLOAD_TTL_SECONDS, UPLOAD_STATUS_READY
+from app.modules.uploads.models import Upload
 from app.modules.uploads.repository import UploadRepository
 from app.modules.uploads.storage import StorageBackend
 from app.modules.tests.repository import ExamSectionRepository, QuestionGroupMediaRepository, QuestionGroupRepository, TestRepository
@@ -258,7 +272,8 @@ class AttemptService:
         groups_by_id = {g.id: g for g in self.group_repo.list_active_by_ids(list(group_ids))} if self.group_repo is not None and group_ids else {}
 
         media_by_question = self._delivered_media_by_question(questions)
-        question_views = [self._to_question_view(q, groups_by_id, media_by_question) for q in questions if q is not None]
+        capabilities = self._question_capabilities(attempt, questions)
+        question_views = [self._to_question_view(q, groups_by_id, media_by_question, capabilities) for q in questions if q is not None]
         answered_states = [
             AnsweredQuestionState(
                 question_id=qid, is_answered=qid in answers,
@@ -268,13 +283,150 @@ class AttemptService:
                 # docstring. Needed so the student UI can resume a
                 # previously-typed short_answer/essay answer.
                 text_answer=answers[qid].text_answer if qid in answers else None,
+                # Task 6 — only a flag; the audio itself is streamed by its
+                # own owner-checked endpoint.
+                has_audio=qid in answers and answers[qid].audio_upload_id is not None,
             )
             for qid in effective_question_order
         ]
+        delivered = set(effective_question_order)
         return AttemptDetailOut(
             **AttemptOut.model_validate(attempt).model_dump(), questions=question_views, answered=answered_states,
             module_id=active_module_id, module_expires_at=active_module_expires_at,
+            marked_question_ids=[q for q in self._marked_ids(attempt) if q in delivered],
         )
+
+    # --- Task 6: mark for review -------------------------------------------
+
+    @staticmethod
+    def _marked_ids(attempt) -> list:
+        marked = attempt.review_marked_question_ids
+        return list(marked) if isinstance(marked, (list, tuple)) else []
+
+    def set_review_mark(self, attempt_id: uuid.UUID, question_id: uuid.UUID, user_id: uuid.UUID, marked: bool) -> list[uuid.UUID]:
+        """Flags/unflags a question for later review. Owner only (404),
+        active attempt only (409 — lazy expiry runs first), and only for a
+        question the attempt is currently delivering (422). Never touches
+        the Answer row, so an answer is never created, changed or cleared.
+        Returns the attempt's current marks within the delivery scope."""
+        attempt = self.get_attempt(attempt_id, user_id)
+        attempt = self._lock_attempt(attempt)
+        if attempt.status not in ACTIVE_STATUSES:
+            raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
+        delivered, _, _ = self._resolve_delivery(attempt)
+        if question_id not in set(delivered):
+            raise InvalidQuestionReferenceException("Bu savol ushbu urinishga tegishli emas")
+        current = [q for q in self._marked_ids(attempt) if q != question_id]
+        if marked:
+            current.append(question_id)
+        attempt.review_marked_question_ids = current
+        self.repo.commit()
+        delivered_set = set(delivered)
+        return [q for q in current if q in delivered_set]
+
+    # --- Task 6: IELTS Speaking audio ---------------------------------------
+
+    def _question_capabilities(self, attempt, questions) -> dict:
+        """{question_id: (calculator_enabled, accepts_audio)} from each
+        question's section — one sections query per attempt."""
+        if self.section_repo is None:
+            return {}
+        sections = {s.id: s for s in self.section_repo.list_for_test(attempt.test_id)}
+        test = self.test_repo.get_by_id(attempt.test_id)
+        profile = getattr(test, "scoring_profile", None)
+        out = {}
+        for q in questions:
+            section = sections.get(q.section_id) if q.section_id is not None else None
+            if section is None:
+                continue
+            accepts_audio = (
+                section.score_component == SPEAKING_COMPONENT and profile == "ielts" and not is_auto_gradable(q)
+            )
+            out[q.id] = (bool(section.calculator_enabled is True), accepts_audio)
+        return out
+
+    def _speaking_question(self, attempt, question_id: uuid.UUID):
+        delivered, _, _ = self._resolve_delivery(attempt)
+        if question_id not in set(delivered):
+            raise InvalidQuestionReferenceException("Bu savol ushbu urinishga tegishli emas")
+        question = self.question_repo.get_by_id(question_id)
+        if question is None or not self._question_capabilities(attempt, [question]).get(question.id, (False, False))[1]:
+            raise SpeakingAudioNotAllowedException("Bu savolga ovozli javob qabul qilinmaydi (faqat IELTS Speaking)")
+        return question
+
+    def upload_speaking_audio(
+        self, attempt_id: uuid.UUID, question_id: uuid.UUID, user_id: uuid.UUID,
+        stream: BinaryIO, content_type: str, declared_size: int | None,
+    ):
+        """Stores the student's recorded Speaking response for their OWN
+        active attempt. Server-side checks: ownership (404), lazy expiry +
+        active status (409), question delivered (422) and Speaking-eligible
+        (422), MIME allowlist (422), non-empty (422) and size limit (413 —
+        enforced on the bytes actually read, not only the declared size).
+        Saved through the configured StorageBackend as a private Upload
+        owned by the student; re-recording replaces (and removes) the
+        previous file. Returns the Upload."""
+        if self.storage is None or self.upload_repo is None:
+            raise SpeakingAudioNotAllowedException("Ovozli javob saqlash sozlanmagan")
+        attempt = self.get_attempt(attempt_id, user_id)
+        attempt = self._lock_attempt(attempt)
+        if attempt.status not in ACTIVE_STATUSES:
+            raise AttemptNotActiveException("Bu urinish allaqachon yakunlangan")
+        self._speaking_question(attempt, question_id)
+
+        mime = (content_type or "").split(";")[0].strip().lower()
+        extension = SPEAKING_AUDIO_MIME_TYPES.get(mime)
+        if extension is None:
+            raise InvalidSpeakingAudioException("Audio formati qo'llab-quvvatlanmaydi (webm, ogg, mp4, mp3, wav)")
+        if declared_size is not None and declared_size > SPEAKING_AUDIO_MAX_BYTES:
+            raise SpeakingAudioTooLargeException("Audio hajmi 20 MB dan oshmasligi kerak")
+        data = stream.read(SPEAKING_AUDIO_MAX_BYTES + 1)
+        if len(data) > SPEAKING_AUDIO_MAX_BYTES:
+            raise SpeakingAudioTooLargeException("Audio hajmi 20 MB dan oshmasligi kerak")
+        if not data:
+            raise InvalidSpeakingAudioException("Audio fayl bo'sh")
+
+        file_url = self.storage.save(f"speaking-{uuid.uuid4()}{extension}", io.BytesIO(data))
+        try:
+            upload = self.upload_repo.create(Upload(
+                user_id=user_id, file_name=f"speaking-{question_id}{extension}", file_url=file_url,
+                file_type=FILE_TYPE_AUDIO, size_bytes=len(data), status=UPLOAD_STATUS_READY,
+            ))
+            existing = self.answer_repo.get(attempt_id, question_id)
+            previous = self.upload_repo.get_by_id(existing.audio_upload_id) if existing is not None and existing.audio_upload_id else None
+            # Only the audio reference is written: a typed text answer for
+            # the same question (existing workflow) is left untouched.
+            self.answer_repo.upsert(attempt_id, question_id, {"audio_upload_id": upload.id, "is_correct": None})
+            if previous is not None:
+                self.upload_repo.soft_delete(previous)
+            log_action(self.repo.db, action="attempt.speaking_audio_uploaded", user_id=user_id, entity_type="answer",
+                       entity_id=attempt_id, metadata={"question_id": str(question_id), "size_bytes": len(data)})
+            self.repo.commit()
+        except Exception:
+            self.storage.delete(file_url)  # never leave an orphaned file behind a failed write
+            raise
+        if previous is not None:
+            self.storage.delete(previous.file_url)
+        return upload
+
+    def open_own_speaking_audio(self, attempt_id: uuid.UUID, question_id: uuid.UUID, user_id: uuid.UUID):
+        """(upload, stream, mime) of the caller's OWN recording for this
+        question (404 for anyone else / no recording)."""
+        attempt = self._get_owned_attempt(attempt_id, user_id)
+        return self.open_answer_audio(attempt.id, question_id)
+
+    def open_answer_audio(self, attempt_id: uuid.UUID, question_id: uuid.UUID):
+        """Reads a stored Speaking recording. NO authorization of its own:
+        callers must have authorized the caller first (owner check above,
+        or the grading module's permission + item checks)."""
+        if self.storage is None or self.upload_repo is None:
+            raise SpeakingAudioNotFoundException("Ovozli javob topilmadi")
+        answer = self.answer_repo.get(attempt_id, question_id)
+        upload = self.upload_repo.get_by_id(answer.audio_upload_id) if answer is not None and answer.audio_upload_id else None
+        if upload is None:
+            raise SpeakingAudioNotFoundException("Ovozli javob topilmadi")
+        mime = next((m for ext, m in SPEAKING_AUDIO_EXTENSION_MIME.items() if upload.file_name.endswith(ext)), "application/octet-stream")
+        return upload, self.storage.read(upload.file_url), mime
 
     def list_my_attempts(self, user_id: uuid.UUID, params: AttemptListParams) -> tuple[list[TestAttempt], int]:
         return self.repo.list_for_user(user_id, params)
@@ -898,7 +1050,9 @@ class AttemptService:
             )
         return by_question
 
-    def _to_question_view(self, question, groups_by_id: dict | None = None, media_by_question: dict | None = None) -> QuestionForAttemptOut:
+    def _to_question_view(self, question, groups_by_id: dict | None = None, media_by_question: dict | None = None,
+                          capabilities: dict | None = None) -> QuestionForAttemptOut:
+        calculator_enabled, accepts_audio = (capabilities or {}).get(question.id, (False, False))
         options = [OptionForAttemptOut.model_validate(o) for o in question.options if o.deleted_at is None]
         # Sprint 77 — group_by_id intentionally looked up here rather
         # than passed pre-resolved per question: a missing key (group
@@ -917,4 +1071,5 @@ class AttemptService:
             # attach-ordered view; the group itself is already known to be
             # active and in this attempt's delivery scope (groups_by_id).
             group_media=[AttemptGroupMediaOut(id=m.id, media_type=m.media_type) for m in group.media] if group is not None else [],
+            calculator_enabled=calculator_enabled, accepts_audio=accepts_audio,
         )

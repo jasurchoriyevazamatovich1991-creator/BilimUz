@@ -116,6 +116,11 @@ class QuestionForAttemptOut(BaseModel):
     # question is ungrouped or its group has none. Identical for every
     # question of the same group, so the UI can key one player per group.
     group_media: list[AttemptGroupMediaOut] = []
+    # Task 6 — UI capabilities, derived server-side from the question's
+    # section (never a secret): on-screen calculator allowed by the admin,
+    # and whether a recorded Speaking response is accepted.
+    calculator_enabled: bool = False
+    accepts_audio: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -135,6 +140,27 @@ class AnsweredQuestionState(BaseModel):
     # Does not touch scoring, AUTO_GRADABLE_QUESTION_TYPES, or any
     # denominator logic.
     text_answer: str | None = None
+    # Task 6 — a recorded Speaking response exists (fetch it through
+    # GET /attempts/{id}/questions/{qid}/audio; never a URL here).
+    has_audio: bool = False
+
+
+class ReviewMarkRequest(BaseModel):
+    """Task 6 — only the flag; attempt/student come from the path/token."""
+    model_config = {"extra": "forbid"}
+    marked: bool
+
+
+class ReviewMarkOut(BaseModel):
+    question_id: uuid.UUID
+    marked: bool
+    marked_question_ids: list[uuid.UUID]
+
+
+class SpeakingAudioOut(BaseModel):
+    question_id: uuid.UUID
+    mime_type: str
+    size_bytes: int
 
 
 class AttemptOut(BaseModel):
@@ -183,6 +209,9 @@ class AttemptDetailOut(AttemptOut):
     # was created with no `duration` (module.duration is None) — both
     # pre-existing, unchanged states.
     module_expires_at: datetime | None = None
+    # Task 6 — "mark for review" flags of the currently delivered
+    # questions (navigation state only; independent of answers).
+    marked_question_ids: list[uuid.UUID] = []
 
 
 class ModuleForAttemptOut(BaseModel):

@@ -122,3 +122,27 @@ class InvalidNumericAnswerException(AppException):
     answer."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code = "INVALID_NUMERIC_ANSWER"
+
+
+
+class SpeakingAudioNotAllowedException(AppException):
+    """Task 6 — audio is only accepted for a delivered, manually graded
+    question in an IELTS Speaking section of an IELTS-profile test."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "SPEAKING_AUDIO_NOT_ALLOWED"
+
+
+class InvalidSpeakingAudioException(AppException):
+    """Task 6 — unsupported MIME type or an empty file."""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "INVALID_SPEAKING_AUDIO"
+
+
+class SpeakingAudioTooLargeException(AppException):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    error_code = "SPEAKING_AUDIO_TOO_LARGE"
+
+
+class SpeakingAudioNotFoundException(AppException):
+    status_code = status.HTTP_404_NOT_FOUND
+    error_code = "SPEAKING_AUDIO_NOT_FOUND"

@@ -118,6 +118,9 @@ class SubmissionDetailOut(BaseModel):
     # The student's stored response; None when left blank. Speaking
     # responses are the stored text — audio capture does not exist yet.
     response_text: str | None
+    # Task 6 — a recorded Speaking response exists; stream it through
+    # GET /grading/submissions/{attempt_id}/{question_id}/audio.
+    has_audio: bool = False
     status: str
     rubric: RubricOut | None
     reviews: list[ReviewOut]

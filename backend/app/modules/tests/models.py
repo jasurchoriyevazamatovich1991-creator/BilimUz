@@ -133,6 +133,10 @@ class ExamSection(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # results/scaled_scoring.COMPONENTS. Must match the test's
     # scoring_profile; unique among a test's active sections.
     score_component: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Task 6 (migration 0027) — whether the on-screen calculator is offered
+    # for this section's questions. Off by default: no section gets a
+    # calculator unless an admin explicitly enables it.
+    calculator_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
 
 class ExamModule(Base, UUIDPrimaryKeyMixin, TimestampMixin):

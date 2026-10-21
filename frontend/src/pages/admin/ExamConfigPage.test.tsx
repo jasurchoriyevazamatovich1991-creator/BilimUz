@@ -334,3 +334,49 @@ describe("ExamConfigPage — Task 4 scaled scoring configuration", () => {
     expect(screen.getByText(/IELTS Writing/)).toBeInTheDocument();
   });
 });
+
+describe("ExamConfigPage — Task 6 calculator flag", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.getState().setUser({ id: "u1", first_name: "A", last_name: "B", phone: null, email: null, role: "Admin" });
+    vi.mocked(testsApi.get).mockResolvedValue({ ...TEST_OUT, scoring_profile: "sat" });
+    vi.mocked(routingThresholdRulesApi.list).mockResolvedValue([]);
+    vi.mocked(examModulesApi.listForTest).mockResolvedValue([]);
+    vi.mocked(questionGroupsApi.list).mockResolvedValue([]);
+  });
+
+  it("is off by default and is sent only when the admin ticks it", async () => {
+    vi.mocked(examSectionsApi.list).mockResolvedValue([]);
+    vi.mocked(examSectionsApi.create).mockResolvedValue({
+      id: "s9", test_id: "t1", name: "Math", order_number: 0, duration: null, calculator_enabled: true, created_at: "", updated_at: "",
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText("Profil")).toHaveValue("sat"));
+    await user.click(screen.getByText("+ Bo'lim qo'shish"));
+    const box = screen.getByLabelText("Imtihon davomida kalkulyatorga ruxsat berish");
+    expect(box).not.toBeChecked();
+    await user.type(screen.getByLabelText("Nomi"), "Math");
+    await user.click(box);
+    await user.click(screen.getByText("Saqlash"));
+    await waitFor(() => expect(examSectionsApi.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Math", calculator_enabled: true })));
+  });
+
+  it("shows the flag on a section and lets the admin switch it off", async () => {
+    vi.mocked(examSectionsApi.list).mockResolvedValue([
+      { id: "s1", test_id: "t1", name: "Math", order_number: 0, duration: null, score_component: "sat_math", calculator_enabled: true, created_at: "", updated_at: "" },
+    ]);
+    vi.mocked(examSectionsApi.update).mockResolvedValue({
+      id: "s1", test_id: "t1", name: "Math", order_number: 0, duration: null, calculator_enabled: false, created_at: "", updated_at: "",
+    });
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText(/· Kalkulyator/)).toBeInTheDocument();
+    await user.click(screen.getAllByText("Tahrirlash")[0]);
+    const box = screen.getByLabelText("Imtihon davomida kalkulyatorga ruxsat berish");
+    expect(box).toBeChecked();
+    await user.click(box);
+    await user.click(screen.getByText("Saqlash"));
+    await waitFor(() => expect(examSectionsApi.update).toHaveBeenCalledWith("s1", expect.objectContaining({ calculator_enabled: false })));
+  });
+});

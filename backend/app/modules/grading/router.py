@@ -15,8 +15,11 @@ only through GET /results/{id}.
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 
 from app.core.schemas import success_response
+from app.modules.attempts.dependencies import get_attempt_service
+from app.modules.attempts.service import AttemptService
 from app.modules.auth.dependencies import require_roles
 from app.modules.grading.constants import GRADE_SUBMISSIONS_PERMISSION
 from app.modules.grading.dependencies import get_grading_service, get_rubric_service
@@ -110,3 +113,22 @@ def revise(
 ):
     review = service.revise(attempt_id, question_id, data.reason, grader_id=user.id)
     return success_response(ReviewOut.model_validate(review), "Tuzatish qoralamasi ochildi.")
+
+
+@router.get(
+    "/submissions/{attempt_id}/{question_id}/audio",
+    summary="Stream the student's recorded Speaking response (graders)",
+    description="Task 6. GRADE_SUBMISSIONS permission and the same item checks as the other grading "
+                "endpoints (finished attempt, delivered manually graded question). Authenticated stream, "
+                "no public or signed URL. 404 when nothing was recorded.",
+)
+def get_response_audio(
+    attempt_id: uuid.UUID, question_id: uuid.UUID,
+    service: GradingService = Depends(get_grading_service),
+    attempt_service: AttemptService = Depends(get_attempt_service),
+    _user: User = Depends(_grader),
+):
+    upload, stream, mime = service.open_response_audio(attempt_id, question_id, attempt_service)
+    return StreamingResponse(stream, media_type=mime, headers={
+        "Content-Disposition": f'inline; filename="{upload.file_name}"', "Cache-Control": "private, no-store",
+    })

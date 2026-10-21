@@ -229,7 +229,7 @@ class ExamSectionService:
 
         section = ExamSection(
             test_id=data.test_id, name=data.name, order_number=data.order_number, duration=data.duration,
-            score_component=data.score_component,
+            score_component=data.score_component, calculator_enabled=data.calculator_enabled,
         )
         self.repo.create(section)
         log_action(self.repo.db, action="exam_section.created", user_id=actor_id, entity_type="exam_section", entity_id=section.id)
@@ -250,6 +250,8 @@ class ExamSectionService:
     def update_section(self, section_id: uuid.UUID, data: ExamSectionUpdateRequest, actor_id: uuid.UUID) -> ExamSection:
         section = self.get_section(section_id)
         payload = data.model_dump(exclude_unset=True)
+        if payload.get("calculator_enabled", False) is None:
+            payload.pop("calculator_enabled")  # null = leave unchanged (column is NOT NULL)
         if "order_number" in payload:
             self._ensure_no_duplicate_order(section.test_id, payload["order_number"], exclude_id=section.id)
         if "score_component" in payload and payload["score_component"] != section.score_component:

@@ -91,6 +91,8 @@ export interface SubmissionDetailOut {
   status: QueueStatus;
   rubric: RubricOut | null;
   reviews: ReviewOut[];
+  // Task 6 — a recorded Speaking response exists (optional for older fixtures).
+  has_audio?: boolean;
 }
 
 export interface DraftSaveRequest {
@@ -114,4 +116,10 @@ export const gradingApi = {
   finalize: (attemptId: string, questionId: string) => unwrap<ReviewOut>(httpClient.post(`${item(attemptId, questionId)}/finalize`)),
   revise: (attemptId: string, questionId: string, reason: string) =>
     unwrap<ReviewOut>(httpClient.post(`${item(attemptId, questionId)}/revise`, { reason })),
+  // Task 6 — the student's Speaking recording, streamed through the
+  // permission-checked grading endpoint (GRADE_SUBMISSIONS).
+  getAudio: async (attemptId: string, questionId: string): Promise<Blob> => {
+    const response = await httpClient.get<Blob>(`${item(attemptId, questionId)}/audio`, { responseType: "blob" });
+    return response.data;
+  },
 };

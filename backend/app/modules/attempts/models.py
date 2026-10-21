@@ -39,6 +39,10 @@ class TestAttempt(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=AttemptStatus.IN_PROGRESS)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     question_order: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
+    # Task 6 (migration 0027) — questions the student flagged "mark for
+    # review". Navigation state only: deliberately NOT an Answer row (an
+    # Answer's existence means "answered"), never read by scoring.
+    review_marked_question_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
 
 
 class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -76,6 +80,10 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # how those are recorded, completely unchanged). Grading/scoring of
     # a free-text answer is explicitly out of scope for this sprint.
     text_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Task 6 (migration 0027) — the student's recorded Speaking response,
+    # a private Upload row (never a public URL). Served only through the
+    # owner's attempt endpoint and the grader endpoint.
+    audio_upload_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True)
 
 
 class AttemptModuleProgress(Base, UUIDPrimaryKeyMixin, TimestampMixin):

@@ -30,6 +30,8 @@ export interface ExamSectionOut {
   duration: number | null;
   // Task 4 — e.g. "sat_math"; optional so older fixtures stay valid.
   score_component?: string | null;
+  // Task 6 — on-screen calculator allowed during this section (default off).
+  calculator_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +42,7 @@ export interface ExamSectionCreateRequest {
   order_number: number;
   duration?: number;
   score_component?: string;
+  calculator_enabled?: boolean;
 }
 
 export interface ExamSectionUpdateRequest {
@@ -47,6 +50,7 @@ export interface ExamSectionUpdateRequest {
   order_number?: number;
   duration?: number | null;
   score_component?: string | null;
+  calculator_enabled?: boolean;
 }
 
 /** Task 4 — an immutable, versioned raw-to-scaled table (Admin only). */

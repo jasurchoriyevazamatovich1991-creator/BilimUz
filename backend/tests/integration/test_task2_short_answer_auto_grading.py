@@ -245,6 +245,7 @@ def test_attempt_payload_does_not_expose_accepted_answers(client, pg_session):
     assert set(detail.json()["data"]["questions"][0]) == {
         "id", "question_text", "question_type", "score", "options", "group_id", "group_title", "stimulus_text", "media",
         "group_media",  # Task 3 — group media descriptors (id/media_type only), still no answer data
+        "calculator_enabled", "accepts_audio",  # Task 6 — UI capability flags, no answer data
     }
 
 

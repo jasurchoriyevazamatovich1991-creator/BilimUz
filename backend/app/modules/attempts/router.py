@@ -10,11 +10,15 @@ tests/questions, which are Admin/Teacher-authored content.
 """
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.core.schemas import success_response
 from app.modules.attempts.dependencies import get_attempt_service
 from app.modules.attempts.schemas import (
+    ReviewMarkOut,
+    ReviewMarkRequest,
+    SpeakingAudioOut,
     AttemptDetailOut,
     AttemptMediaViewUrlOut,
     AttemptListParams,
@@ -228,3 +232,60 @@ def submit_module(
     result_out = SubmitModuleResultOut(**outcome)
     message = "Imtihon yakunlandi." if outcome["completed"] else "Modul yakunlandi, keyingi modulga o'tildi."
     return success_response(result_out, message)
+
+
+# --- Task 6: mark for review & IELTS Speaking audio ---
+
+@router.put(
+    "/{attempt_id}/review-marks/{question_id}",
+    summary="Mark or unmark a question for later review",
+    description="Task 6. Owner-only (404 otherwise); active attempt only (409 ATTEMPT_NOT_ACTIVE after "
+                "submission/expiry); the question must be currently delivered (422). Never creates, "
+                "changes or clears the answer.",
+)
+def set_review_mark(
+    attempt_id: uuid.UUID, question_id: uuid.UUID, data: ReviewMarkRequest,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    marked_ids = service.set_review_mark(attempt_id, question_id, user.id, data.marked)
+    return success_response(
+        ReviewMarkOut(question_id=question_id, marked=question_id in marked_ids, marked_question_ids=marked_ids),
+        "Belgi yangilandi.",
+    )
+
+
+@router.post(
+    "/{attempt_id}/questions/{question_id}/audio",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload the recorded IELTS Speaking response",
+    description="Task 6. Multipart field `file`. Owner-only, active attempt, delivered IELTS Speaking question "
+                "(422 SPEAKING_AUDIO_NOT_ALLOWED otherwise). Accepts audio/webm, ogg, mp4, mpeg, wav up to 20 MB "
+                "(413 when larger, 422 for other types or an empty file). Stored privately; re-recording replaces it.",
+)
+def upload_speaking_audio(
+    attempt_id: uuid.UUID, question_id: uuid.UUID,
+    file: UploadFile = File(...),
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    upload = service.upload_speaking_audio(attempt_id, question_id, user.id, file.file, file.content_type or "", file.size)
+    mime = (file.content_type or "").split(";")[0].strip().lower()
+    return success_response(SpeakingAudioOut(question_id=question_id, mime_type=mime, size_bytes=upload.size_bytes), "Ovozli javob saqlandi.")
+
+
+@router.get(
+    "/{attempt_id}/questions/{question_id}/audio",
+    summary="Stream your own recorded Speaking response",
+    description="Task 6. Owner-only (404 for anyone else or when nothing was recorded). Authenticated "
+                "stream — there is no public or signed URL.",
+)
+def get_speaking_audio(
+    attempt_id: uuid.UUID, question_id: uuid.UUID,
+    service: AttemptService = Depends(get_attempt_service),
+    user: User = Depends(get_current_user),
+):
+    upload, stream, mime = service.open_own_speaking_audio(attempt_id, question_id, user.id)
+    return StreamingResponse(stream, media_type=mime, headers={
+        "Content-Disposition": f'inline; filename="{upload.file_name}"', "Cache-Control": "private, no-store",
+    })

@@ -170,6 +170,8 @@ class ExamSectionCreateRequest(BaseModel):
     duration: int | None = Field(default=None, gt=0)
     # Task 4 — e.g. 'sat_math'; must belong to the test's scoring_profile.
     score_component: str | None = None
+    # Task 6 — offer the on-screen calculator for this section (default off).
+    calculator_enabled: bool = False
 
 
 class ExamSectionUpdateRequest(BaseModel):
@@ -177,6 +179,7 @@ class ExamSectionUpdateRequest(BaseModel):
     order_number: int | None = Field(default=None, ge=0)
     duration: int | None = Field(default=None, gt=0)
     score_component: str | None = None
+    calculator_enabled: bool | None = None
 
 
 class ExamSectionOut(BaseModel):
@@ -186,6 +189,7 @@ class ExamSectionOut(BaseModel):
     order_number: int
     duration: int | None
     score_component: str | None = None
+    calculator_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 

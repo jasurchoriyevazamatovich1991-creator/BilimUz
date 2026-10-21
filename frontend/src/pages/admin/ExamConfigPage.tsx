@@ -77,6 +77,8 @@ interface SectionFormValues {
   duration: string;
   /** Task 4 — "" = no score component. */
   score_component: string;
+  /** Task 6 — on-screen calculator allowed (default off). */
+  calculator_enabled?: boolean;
 }
 
 function SectionForm({
@@ -150,6 +152,18 @@ function SectionForm({
           </select>
         </div>
       ) : null}
+      <div className="flex items-center gap-2 sm:col-span-3">
+        <input
+          id={`${id}-calculator`}
+          type="checkbox"
+          checked={!!values.calculator_enabled}
+          onChange={(e) => setValues((v) => ({ ...v, calculator_enabled: e.target.checked }))}
+          className="accent-primary"
+        />
+        <label htmlFor={`${id}-calculator`} className="text-xs font-medium text-foreground/70">
+          Imtihon davomida kalkulyatorga ruxsat berish
+        </label>
+      </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={isSaving}>{isSaving ? "..." : "Saqlash"}</Button>
         {onCancel ? <Button type="button" variant="outline" onClick={onCancel}>Bekor qilish</Button> : null}
@@ -485,6 +499,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
         test_id: testId, name: values.name, order_number: values.order_number,
         duration: values.duration ? Number(values.duration) : undefined,
         ...(values.score_component ? { score_component: values.score_component } : {}),
+        ...(values.calculator_enabled ? { calculator_enabled: true } : {}),
       },
       { onSuccess: () => setAddingSection(false) },
     );
@@ -499,6 +514,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
           // Task 4 — only sent when the test has a profile, so editing a
           // plain test's section never touches the field.
           ...(componentOptions.length > 0 ? { score_component: values.score_component || null } : {}),
+          calculator_enabled: !!values.calculator_enabled,
         },
       },
       { onSuccess: () => setEditingSectionId(null) },
@@ -641,6 +657,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                         name: section.name, order_number: section.order_number,
                         duration: section.duration ? String(section.duration) : "",
                         score_component: section.score_component ?? "",
+                        calculator_enabled: !!section.calculator_enabled,
                       }}
                       componentOptions={componentOptions}
                       isSaving={updateSection.isPending}
@@ -654,6 +671,7 @@ export function ExamConfigPage({ basePath = "/admin" }: { basePath?: string }) {
                         <p className="text-xs text-foreground/50">
                           Tartib: {section.order_number}{section.duration ? ` · ${section.duration} daq` : ""}
                           {section.score_component ? ` · ${SCORE_COMPONENTS[section.score_component]?.label ?? section.score_component}` : ""}
+                          {section.calculator_enabled ? " · Kalkulyator" : ""}
                         </p>
                       </div>
                       <div className="flex gap-3">

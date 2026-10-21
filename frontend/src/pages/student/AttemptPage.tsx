@@ -29,6 +29,13 @@
  * by `submitMutation.isPending` checked before either call fires, plus
  * a local ref as a synchronous belt-and-suspenders guard against the
  * rare case where two calls could otherwise land in the same tick.
+ *
+ * Task 6 — three additions, none of which touch answer saving or the
+ * Timer: a "mark for review" toggle (persisted server-side per attempt,
+ * shown as a flag in the navigator), an on-screen calculator for
+ * questions whose section allows it (local state only), and an audio
+ * recorder for IELTS Speaking questions (`accepts_audio`), shown above
+ * the existing text field, which keeps working as before.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -38,8 +45,12 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Timer } from "@/components/attempts/Timer";
 import { QuestionNavigator } from "@/components/attempts/QuestionNavigator";
 import { AttemptMediaList } from "@/components/attempts/AttemptMedia";
+import { ExamCalculator } from "@/components/attempts/ExamCalculator";
+import { SpeakingRecorder } from "@/components/attempts/SpeakingRecorder";
 import { FormulaText } from "@/components/questions/FormulaText";
-import { useAttempt, useModuleForAttempt, useSaveAnswer, useSubmitAndCreateResult, useSubmitModule } from "@/hooks/useAttempt";
+import {
+  useAttempt, useMarkAudioUploaded, useModuleForAttempt, useSaveAnswer, useSetReviewMark, useSubmitAndCreateResult, useSubmitModule,
+} from "@/hooks/useAttempt";
 import { useCreateResultForFinishedAttempt } from "@/hooks/useResults";
 
 /** Small helper isolated so its own loading state doesn't affect the
@@ -66,6 +77,9 @@ export function AttemptPage() {
   const { data: attempt, isLoading, isError } = useAttempt(attemptId);
   const saveAnswer = useSaveAnswer(attemptId ?? "");
   const submitAndCreateResult = useSubmitAndCreateResult(attemptId ?? "");
+  const setReviewMark = useSetReviewMark(attemptId ?? "");
+  const markAudioUploaded = useMarkAudioUploaded(attemptId ?? "");
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
 
   // Sprint 76 — module-aware additions. moduleId is null for a
   // non-modular attempt (attempt.module_id is null/undefined there) —
@@ -173,14 +187,26 @@ export function AttemptPage() {
   // checking for a non-empty trimmed string is safe for both that case
   // and the short_answer/essay case without needing the question_type
   // here.
+  // Task 6 — a stored Speaking recording also counts as answered.
+  const audioIds = new Set(attempt.answered.filter((a) => a.has_audio).map((a) => a.question_id));
   const answeredIndices = new Set(
     attempt.questions.reduce<number[]>((acc, q, i) => {
       const value = answeredMap.get(q.id);
-      const isAnswered = Array.isArray(value) ? value.length > 0 : value != null && value.trim().length > 0;
+      const isAnswered = audioIds.has(q.id) || (Array.isArray(value) ? value.length > 0 : value != null && value.trim().length > 0);
       if (isAnswered) acc.push(i);
       return acc;
     }, []),
   );
+  // Task 6 — review flags, kept entirely separate from answers.
+  const markedIds = new Set(attempt.marked_question_ids ?? []);
+  const markedIndices = new Set(attempt.questions.flatMap((q, i) => (markedIds.has(q.id) ? [i] : [])));
+  const isCurrentMarked = currentQuestion ? markedIds.has(currentQuestion.id) : false;
+  const calculatorAllowed = !!currentQuestion?.calculator_enabled;
+
+  function handleToggleReviewMark() {
+    if (!currentQuestion || setReviewMark.isPending) return;
+    setReviewMark.mutate({ questionId: currentQuestion.id, marked: !isCurrentMarked });
+  }
 
   function handleSelectOption(optionId: string) {
     if (!currentQuestion) return;
@@ -313,7 +339,19 @@ export function AttemptPage() {
         <span className="text-sm text-foreground/60">
           Savol {currentIndex + 1} / {attempt.questions.length}
         </span>
-        {effectiveExpiresAt ? <Timer expiresAt={effectiveExpiresAt} onExpire={handleTimerExpire} /> : null}
+        <div className="flex items-center gap-2">
+          {calculatorAllowed ? (
+            <button
+              type="button"
+              onClick={() => setCalculatorOpen((o) => !o)}
+              aria-pressed={calculatorOpen}
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-primary/5"
+            >
+              🧮 Kalkulyator
+            </button>
+          ) : null}
+          {effectiveExpiresAt ? <Timer expiresAt={effectiveExpiresAt} onExpire={handleTimerExpire} /> : null}
+        </div>
       </div>
 
       <div className="mb-6">
@@ -321,12 +359,27 @@ export function AttemptPage() {
           totalQuestions={attempt.questions.length}
           currentIndex={currentIndex}
           answeredIndices={answeredIndices}
+          markedIndices={markedIndices}
           onNavigate={setCurrentIndex}
         />
       </div>
 
       {currentQuestion ? (
         <div className="mb-6 rounded-lg border border-border p-5">
+          {/* Task 6 — review flag: navigation state only, never an answer. */}
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleToggleReviewMark}
+              disabled={setReviewMark.isPending}
+              aria-pressed={isCurrentMarked}
+              className={`rounded-md border px-3 py-1.5 text-sm disabled:opacity-60 ${
+                isCurrentMarked ? "border-amber-500 bg-amber-50 text-amber-800" : "border-border text-foreground/70 hover:bg-foreground/5"
+              }`}
+            >
+              {isCurrentMarked ? "⚑ Belgilangan — belgini olib tashlash" : "⚐ Ko'rib chiqish uchun belgilash"}
+            </button>
+          </div>
           {/* Sprint 77 — shared stimulus/passage context for a grouped
               question (QuestionGroup.stimulus_text). Rendered from
               currentQuestion's own group_title/stimulus_text — this
@@ -400,6 +453,20 @@ export function AttemptPage() {
             media={(currentQuestion.media ?? []).filter((m) => !m.option_id)}
             owner="Savol"
           />
+          {/* Task 6 — IELTS Speaking: record an audio response. Keyed by the
+              question so moving away stops the microphone. The text field
+              below stays available (existing workflow, e.g. notes). */}
+          {currentQuestion.accepts_audio ? (
+            <div className="mb-4">
+              <SpeakingRecorder
+                key={currentQuestion.id}
+                attemptId={attemptId ?? ""}
+                questionId={currentQuestion.id}
+                hasSavedAudio={audioIds.has(currentQuestion.id)}
+                onUploaded={markAudioUploaded}
+              />
+            </div>
+          ) : null}
           {currentQuestion.question_type === "short_answer" || currentQuestion.question_type === "essay" ? (
             // Sprint 68 — short_answer gets a single-line text input,
             // essay gets a multi-line textarea. Neither question type
@@ -505,6 +572,8 @@ export function AttemptPage() {
           {isSubmitPending ? "Yuborilmoqda..." : isModular ? "Modulni yakunlash" : "Yakunlash"}
         </Button>
       </div>
+
+      {calculatorOpen && calculatorAllowed ? <ExamCalculator onClose={() => setCalculatorOpen(false)} /> : null}
 
       <ConfirmDialog
         open={confirmSubmitOpen}

@@ -133,12 +133,39 @@ describe("GradingItemPage", () => {
     await waitFor(() => expect(gradingApi.revise).toHaveBeenCalledWith("a1", "q1", "Coherence mis-scored"));
   });
 
-  it("explains a missing rubric and the missing Speaking audio capture", async () => {
+  // Task 6 — Speaking audio capture now exists, so the old "not available
+  // yet" note became "the student did not send a recording".
+  it("explains a missing rubric and a Speaking response without a recording", async () => {
     vi.mocked(gradingApi.getSubmission).mockResolvedValue(SUB({ rubric: null, score_component: "ielts_speaking", response_text: null }));
     renderAt(<GradingItemPage />);
     expect(await screen.findByText(/rubrika hali sozlanmagan/)).toBeInTheDocument();
-    expect(screen.getByText(/audio yozish hali mavjud emas/)).toBeInTheDocument();
+    expect(screen.getByText(/audio yozuv yubormagan/)).toBeInTheDocument();
     expect(screen.getByText("Talaba javob yozmagan.")).toBeInTheDocument();
+    expect(gradingApi.getAudio).not.toHaveBeenCalled();
+  });
+
+  it("Task 6 — plays the Speaking recording through the grading endpoint on request", async () => {
+    vi.mocked(gradingApi.getSubmission).mockResolvedValue(SUB({ score_component: "ielts_speaking", response_text: null, has_audio: true }));
+    vi.mocked(gradingApi.getAudio).mockResolvedValue(new Blob(["x"], { type: "audio/webm" }));
+    const createUrl = vi.fn(() => "blob:grader-audio");
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    renderAt(<GradingItemPage />);
+    const btn = await screen.findByRole("button", { name: "Audio javobni tinglash" });
+    expect(gradingApi.getAudio).not.toHaveBeenCalled();
+    expect(screen.queryByText("Talaba javob yozmagan.")).not.toBeInTheDocument();
+    fireEvent.click(btn);
+    const audio = await screen.findByTestId("response-audio");
+    expect(gradingApi.getAudio).toHaveBeenCalledWith("a1", "q1");
+    expect(audio).toHaveAttribute("src", "blob:grader-audio");
+  });
+
+  it("Task 6 — a 403 on the recording shows a permission message", async () => {
+    vi.mocked(gradingApi.getSubmission).mockResolvedValue(SUB({ score_component: "ielts_speaking", has_audio: true }));
+    vi.mocked(gradingApi.getAudio).mockRejectedValue(new ApiError("forbidden", null, 403));
+    renderAt(<GradingItemPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Audio javobni tinglash" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("ruxsat yo'q");
+    expect(screen.getByTestId("response-text")).toHaveTextContent("The chart shows...");
   });
 
   it("shows a permission message on 403", async () => {

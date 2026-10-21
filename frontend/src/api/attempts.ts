@@ -72,6 +72,11 @@ export interface QuestionForAttemptOut {
   media?: AttemptMediaOut[];
   // Task 3 — identical for every question of the same group.
   group_media?: AttemptGroupMediaOut[];
+  // Task 6 — server-derived capabilities (optional for fixture
+  // compatibility): the admin enabled the on-screen calculator for this
+  // question's section; a recorded IELTS Speaking response is accepted.
+  calculator_enabled?: boolean;
+  accepts_audio?: boolean;
 }
 
 export interface AnsweredQuestionState {
@@ -91,6 +96,10 @@ export interface AnsweredQuestionState {
   // short_answer/essay answer can be resumed. null unless this question
   // is short_answer/essay and has a saved answer.
   text_answer: string | null;
+  // Task 6 — a Speaking recording is stored for this question. The audio
+  // itself is fetched through the authenticated stream endpoint; no URL
+  // is ever part of this payload.
+  has_audio?: boolean;
 }
 
 export interface AttemptDetailOut extends AttemptOut {
@@ -108,7 +117,24 @@ export interface AttemptDetailOut extends AttemptOut {
   // attempt `expires_at` above. null when module_id is null, or when
   // the active module has no duration set.
   module_expires_at?: string | null;
+  // Task 6 — questions flagged "mark for review" (navigation state only).
+  marked_question_ids?: string[];
 }
+
+export interface ReviewMarkOut {
+  question_id: string;
+  marked: boolean;
+  marked_question_ids: string[];
+}
+
+export interface SpeakingAudioOut {
+  question_id: string;
+  mime_type: string;
+  size_bytes: number;
+}
+
+/** Task 6 — mirrors backend SPEAKING_AUDIO_MAX_BYTES (checked again server-side). */
+export const SPEAKING_AUDIO_MAX_BYTES = 20 * 1024 * 1024;
 
 // Sprint 76 — student-scoped module/section metadata (Sprint A,
 // post-75). Deliberately excludes difficulty_tier/routing_group/
@@ -212,4 +238,40 @@ export const attemptsApi = {
   // Task 3 — same, for question-group media.
   getGroupMediaViewUrl: (attemptId: string, mediaId: string) =>
     unwrap<AttemptMediaViewUrlOut>(httpClient.get(`/attempts/${attemptId}/group-media/${mediaId}/view-url`)),
+
+  // Task 6 — toggle "mark for review". Only the flag is sent; attempt and
+  // student come from the URL and the access token.
+  setReviewMark: (attemptId: string, questionId: string, marked: boolean) =>
+    unwrap<ReviewMarkOut>(httpClient.put(`/attempts/${attemptId}/review-marks/${questionId}`, { marked })),
+
+  // Task 6 — upload a recorded Speaking response (multipart). Progress is
+  // the real XHR upload progress; `signal` lets the caller cancel.
+  uploadSpeakingAudio: (
+    attemptId: string,
+    questionId: string,
+    audio: Blob,
+    opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+  ) => {
+    const form = new FormData();
+    const ext = audio.type.includes("ogg") ? "ogg" : audio.type.includes("mp4") ? "m4a" : "webm";
+    form.append("file", audio, `speaking.${ext}`);
+    return unwrap<SpeakingAudioOut>(
+      httpClient.post(`/attempts/${attemptId}/questions/${questionId}/audio`, form, {
+        // axios drops this for FormData so the browser adds the boundary;
+        // it must not stay application/json (the client default).
+        headers: { "Content-Type": "multipart/form-data" },
+        signal: opts.signal,
+        onUploadProgress: (e) => {
+          if (opts.onProgress && e.total) opts.onProgress(e.loaded / e.total);
+        },
+      }),
+    );
+  },
+
+  // Task 6 — the student's own stored recording, as a Blob (authenticated
+  // stream; never a public or signed URL).
+  getOwnSpeakingAudio: async (attemptId: string, questionId: string): Promise<Blob> => {
+    const response = await httpClient.get<Blob>(`/attempts/${attemptId}/questions/${questionId}/audio`, { responseType: "blob" });
+    return response.data;
+  },
 };
