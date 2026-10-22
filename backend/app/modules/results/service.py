@@ -459,6 +459,13 @@ class ResultService:
                 table_max = max(_frac(e["raw"]) for e in table.entries)
                 if raw_max is None or raw_max != table_max:
                     return _Scaled(None, None, osr.STATUS_RAW_SCALE_MISMATCH, table=table)
+                # Task 9 — publishing refuses adaptive sections, but modules
+                # can gain a routing_variant later; re-check at scoring time so
+                # a paper table never scores an adaptive Digital SAT section.
+                if self.module_repo is not None and any(
+                    m.routing_variant for m in self.module_repo.list_for_section(section.id)
+                ):
+                    return _Scaled(None, None, osr.STATUS_ADAPTIVE_SECTION, table=table)
             if table.method == ss.METHOD_RANGE:
                 lower, upper, status = ss.convert_raw_range(table.entries, raw)
             else:

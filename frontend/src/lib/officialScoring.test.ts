@@ -48,3 +48,19 @@ describe("Task 8 — scale mismatch wording", () => {
     expect(SCALED_STATUS_LABELS.raw_scale_mismatch).toMatch(/SAT: jadvaldagi eng katta xom ball/);
   });
 });
+
+describe("Task 9 — estimate wording follows the actual source", () => {
+  it("names IELTS.org only for the IELTS.org indicative source", async () => {
+    const { scoreBasisExplanation, isIeltsIndicativeSource, practiceDisclaimer } = await import("./scaledScoring");
+    expect(isIeltsIndicativeSource("https://www.ielts.org/take-a-test/your-results/ielts-scoring-in-detail")).toBe(true);
+    expect(isIeltsIndicativeSource("https://example.com/ielts.org/")).toBe(false);
+    expect(isIeltsIndicativeSource(null)).toBe(false);
+    expect(scoreBasisExplanation("estimate", "ielts", { sourceUrl: "https://www.ielts.org/x" })).toContain("IELTS.org");
+    expect(scoreBasisExplanation("estimate", "ielts")).not.toContain("IELTS.org");
+    expect(scoreBasisExplanation("estimate", "ielts", { overall: true })).not.toContain("IELTS.org");
+    for (const p of ["ielts", "sat", "gre"]) {
+      expect(scoreBasisExplanation("estimate", p, { overall: true })).toMatch(/natija(si)? emas/);
+      expect(practiceDisclaimer(p)).toMatch(/rasmiy .* natijasi emas/);
+    }
+  });
+});

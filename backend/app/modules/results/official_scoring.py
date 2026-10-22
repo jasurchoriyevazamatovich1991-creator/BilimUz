@@ -66,6 +66,10 @@ IELTS_MODULES = (IELTS_ACADEMIC, IELTS_GENERAL_TRAINING)
 STATUS_BELOW_DOCUMENTED_RANGE = "below_documented_range"
 STATUS_RAW_SCALE_MISMATCH = "raw_scale_mismatch"
 STATUS_IELTS_MODULE_UNKNOWN = "ielts_module_unknown"
+# Task 9 — an official paper (nonadaptive) practice-test table found on a
+# section whose modules now route students adaptively (modules gained a
+# routing_variant after the table was published). Never scored with it.
+STATUS_ADAPTIVE_SECTION = "adaptive_section_not_supported"
 
 VERIFIED_AT = "2026-10-21"
 

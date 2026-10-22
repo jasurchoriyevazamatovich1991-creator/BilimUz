@@ -16,7 +16,7 @@ import { useIssueCertificate } from "@/hooks/useCertificates";
 import type { QuestionReviewOut, ResultSectionOut } from "@/api/results";
 import { FormulaText } from "@/components/questions/FormulaText";
 import {
-  OVERALL_STATUS_LABELS, SCALED_STATUS_LABELS, SCORE_BASIS_LABELS, formatScoreRange, overallLabel, scoreBasisExplanation,
+  OVERALL_STATUS_LABELS, SCALED_STATUS_LABELS, SCORE_BASIS_LABELS, formatScoreRange, overallLabel, practiceDisclaimer, scoreBasisExplanation,
   type ScoreBasis,
 } from "@/lib/scaledScoring";
 
@@ -196,7 +196,7 @@ function SectionScoreRow({ section, index, profile }: { section: ResultSectionOu
           <span className={`mr-1 rounded px-1.5 py-0.5 ${basis === "official_practice_test" || basis === "official_rule" ? "bg-primary/10 text-primary" : "bg-amber-50 text-amber-800"}`}>
             {SCORE_BASIS_LABELS[basis]}
           </span>
-          {scoreBasisExplanation(basis, profile)}
+          {scoreBasisExplanation(basis, profile, { sourceUrl: source?.url })}
           {source ? (
             <span className="block">
               Manba:{" "}
@@ -234,13 +234,14 @@ function OverallScaledScore({ profile, score, status, provisional, lower, upper,
           </p>
           {basis ? (
             <p className="mt-1 text-xs text-foreground/60" data-testid="overall-basis">
-              <span className="font-medium">{SCORE_BASIS_LABELS[basis]}.</span> {scoreBasisExplanation(basis, profile)}
+              <span className="font-medium">{SCORE_BASIS_LABELS[basis]}.</span> {scoreBasisExplanation(basis, profile, { overall: true })}
             </p>
           ) : null}
         </>
       ) : (
         <p className="text-sm text-foreground/60">{status ? OVERALL_STATUS_LABELS[status] ?? "—" : "—"}</p>
       )}
+      <p className="mt-2 text-xs text-foreground/50" data-testid="practice-disclaimer">{practiceDisclaimer(profile)}</p>
     </div>
   );
 }

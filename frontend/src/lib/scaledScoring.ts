@@ -51,6 +51,8 @@ export const SCALED_STATUS_LABELS: Record<string, string> = {
   // for a different number of one-mark items than this section has.
   raw_scale_mismatch: "Savollar soni yoki ballari manba shkalasiga mos emas — ball hisoblanmadi (IELTS: 40 ta bir ballik savol; SAT: jadvaldagi eng katta xom ball)",
   ielts_module_unknown: "IELTS moduli (Academic/General Training) belgilanmagan — Reading bandi hisoblanmadi",
+  // Task 9
+  adaptive_section_not_supported: "Bo'lim adaptiv — paper (nonadaptive) amaliy test jadvali qo'llanmaydi, ball hisoblanmadi",
 };
 
 export const OVERALL_STATUS_LABELS: Record<string, string> = {
@@ -58,6 +60,13 @@ export const OVERALL_STATUS_LABELS: Record<string, string> = {
   pending: "Umumiy ball barcha bo'limlar baholangandan keyin chiqadi",
   not_reported: "Bu imtihonda umumiy ball berilmaydi — bo'limlar alohida baholanadi",
 };
+
+/** Task 9 — shown on every exam-profile result, including results created
+ * before provenance was recorded, so no number reads as an official score. */
+export function practiceDisclaimer(profile: string | null | undefined): string {
+  const exam = profile === "ielts" ? "IELTS" : profile === "sat" ? "SAT" : profile === "gre" ? "GRE (ETS)" : "imtihon";
+  return `Bu BilimUz platformasidagi amaliy natija — rasmiy ${exam} natijasi emas.`;
+}
 
 export function overallLabel(profile: string | null | undefined): string {
   if (profile === "ielts") return "Umumiy band (Overall)";
@@ -103,16 +112,37 @@ export const SCORE_BASIS_LABELS: Record<ScoreBasis, string> = {
   rubric: "Baholovchi (rubrika)",
 };
 
-/** One-line explanation shown under the score. */
-export function scoreBasisExplanation(basis: ScoreBasis, profile?: string | null): string {
+/** True when an estimate comes from the IELTS.org indicative reference points
+ * (the backend's code registry), not from an administrator's own table. */
+export function isIeltsIndicativeSource(sourceUrl?: string | null): boolean {
+  return !!sourceUrl && /^https:\/\/www\.ielts\.org\//.test(sourceUrl);
+}
+
+/** One-line explanation shown under the score.
+ *
+ * Task 9 — an "estimate" is described by where it actually comes from: only
+ * an estimate whose source is IELTS.org is called IELTS.org-based (an admin's
+ * own IELTS estimate table used to be mislabelled that way). For an overall
+ * score the wording says the overall inherits the estimate. */
+export function scoreBasisExplanation(
+  basis: ScoreBasis, profile?: string | null, opts: { sourceUrl?: string | null; overall?: boolean } = {},
+): string {
   switch (basis) {
     case "official_practice_test":
       return "Rasmiy amaliy test (paper, nonadaptive) jadvali bo'yicha taxminiy oraliq — rasmiy SAT natijasi emas va adaptiv SAT ballini aniq bashorat qilmaydi.";
     case "estimate":
-      return profile === "ielts"
-        ? "IELTS.org e'lon qilgan o'rtacha ko'rsatkichlar asosida indikativ oraliq — aniq chegaralar test versiyasiga qarab farq qiladi. Rasmiy IELTS natijasi emas."
-        : profile === "gre"
-          ? "Taxminiy ball. ETS ballni equating orqali hisoblaydi va ochiq jadval chop etmaydi — bu rasmiy GRE natijasi emas."
+      if (opts.overall) {
+        return profile === "ielts"
+          ? "Kamida bitta bo'lim balli taxminiy, shuning uchun umumiy band ham taxminiy oraliq. Rasmiy IELTS natijasi emas."
+          : "Kamida bitta bo'lim balli taxminiy, shuning uchun umumiy ball ham taxminiy — rasmiy natija emas.";
+      }
+      if (profile === "ielts" && isIeltsIndicativeSource(opts.sourceUrl)) {
+        return "IELTS.org e'lon qilgan o'rtacha ko'rsatkichlar asosida indikativ oraliq — aniq chegaralar test versiyasiga qarab farq qiladi. Rasmiy IELTS natijasi emas.";
+      }
+      return profile === "gre"
+        ? "Taxminiy ball. ETS ballni equating orqali hisoblaydi va ochiq jadval chop etmaydi — bu rasmiy GRE natijasi emas."
+        : profile === "ielts"
+          ? "Administrator kiritgan taxminiy jadval bo'yicha ball — rasmiy IELTS natijasi emas."
           : "Taxminiy ball — rasmiy natija emas.";
     case "unverified_table":
       return "Administrator kiritgan jadval; manbasi tasdiqlanmagan — rasmiy natija emas.";
