@@ -2,8 +2,9 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.modules.auth.validators import validate_password_strength, validate_uzbek_phone
 from app.modules.users.constants import ADMIN_SETTABLE_STATUSES
 from app.modules.users.validators import validate_birth_date, validate_person_name
 
@@ -78,3 +79,33 @@ class UserListParams(BaseModel):
     role_id: uuid.UUID | None = None
     status: str | None = None
     sort: str = "-created_at"
+
+
+class UserCreateRequest(BaseModel):
+    """Task 10.1 — an Admin/Super Admin creates an account directly (public
+    self-registration is disabled until real phone verification exists).
+    The account is created 'active'; which roles the actor may assign is
+    decided in UserService.create_user, never trusted from the request."""
+    model_config = {"extra": "forbid"}
+
+    first_name: str = Field(min_length=2, max_length=100)
+    last_name: str = Field(min_length=2, max_length=100)
+    phone: str
+    email: EmailStr | None = None
+    password: str = Field(min_length=12, max_length=72)
+    role: str = "Student"
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _create_names(cls, v: str) -> str:
+        return validate_person_name(v)
+
+    @field_validator("phone")
+    @classmethod
+    def _create_phone(cls, v: str) -> str:
+        return validate_uzbek_phone(v)
+
+    @field_validator("password")
+    @classmethod
+    def _create_password(cls, v: str) -> str:
+        return validate_password_strength(v)

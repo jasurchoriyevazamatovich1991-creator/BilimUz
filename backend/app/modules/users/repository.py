@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.users.models import User
 from app.modules.users.schemas import UserListParams
+from app.core.sorting import sortable_column
 
 
 class UserRepository:
@@ -43,7 +44,7 @@ class UserRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(User, field_name, User.created_at)
+        column = sortable_column(User, field_name, User.created_at)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def update(self, user: User, data: dict) -> User:

@@ -4,10 +4,9 @@
  * replaced. Every shape verified against real backend
  * app/modules/users/{schemas,router}.py before writing.
  *
- * NOTE: no `create`/`delete` methods exist here — the backend has no
- * POST /users or DELETE /users/{id} endpoint (verified exhaustively,
- * see docs/Sprint15_Users_Management_UI_Architecture.md's Critical
- * Finding). Approved decision: List/View/Edit only this sprint.
+ * Task 10.1 — `create` added (POST /users, Admin/Super Admin): public
+ * self-registration is disabled, so administrators create accounts. There
+ * is still no DELETE /users/{id}.
  */
 import { httpClient, unwrap } from "./client";
 import type { PaginatedResponse } from "@/types/pagination";
@@ -45,7 +44,19 @@ export interface UserAdminUpdateRequest {
   status?: "active" | "inactive";
 }
 
+/** Task 10.1 — the backend decides which roles the actor may assign. */
+export interface UserCreateRequest {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email?: string;
+  password: string;
+  role: string;
+}
+
 export const usersApi = {
+  create: (data: UserCreateRequest) => unwrap<UserOut>(httpClient.post("/users", data)),
+
   count: async (): Promise<number> => {
     const result = await unwrap<PaginatedResponse<UserOut>>(httpClient.get("/users", { params: { per_page: 1 } }));
     return result.meta.total;

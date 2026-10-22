@@ -13,6 +13,10 @@ import { StatusBadge } from "@/components/users/StatusBadge";
 import { useUsersList } from "@/hooks/useUsers";
 import { useRoles, useRoleNameLookup } from "@/hooks/useRoles";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Button } from "@/components/ui/button";
+import { CreateUserForm } from "@/components/users/CreateUserForm";
+import { useAuthStore } from "@/store/authStore";
+import { creatableRoles } from "@/lib/registration";
 
 const PER_PAGE = 20;
 
@@ -22,6 +26,10 @@ export function UsersListPage() {
   const [searchInput, setSearchInput] = useState("");
   const [roleId, setRoleId] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  // Task 10.1 — administrators create accounts (public registration is off).
+  const actorRole = useAuthStore((st) => st.user?.role);
+  const canCreate = creatableRoles(actorRole).length > 0;
+  const [creating, setCreating] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchInput, 400);
   const { data: roles } = useRoles();
@@ -46,7 +54,13 @@ export function UsersListPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-semibold text-foreground">Foydalanuvchilar</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-foreground">Foydalanuvchilar</h1>
+        {canCreate && !creating ? (
+          <Button type="button" onClick={() => setCreating(true)}>Foydalanuvchi qo'shish</Button>
+        ) : null}
+      </div>
+      {creating ? <CreateUserForm onDone={() => setCreating(false)} /> : null}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <Input

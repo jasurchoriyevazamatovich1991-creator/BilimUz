@@ -12,8 +12,11 @@ WORKDIR /app
 # System deps needed to build psycopg2 (not psycopg2-binary would need more,
 # but we keep libpq-dev for compatibility if the binary wheel is unavailable
 # on a given platform).
+# Task 10.1 — ffmpeg provides ffprobe, which measures the duration of
+# uploaded Speaking recordings (app/core/media_probe.py); without it audio
+# uploads are refused with 503.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev gcc \
+    && apt-get install -y --no-install-recommends libpq-dev gcc ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

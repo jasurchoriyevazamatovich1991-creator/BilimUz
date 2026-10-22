@@ -39,6 +39,18 @@ class InvalidTokenException(AppException):
     error_code = "INVALID_TOKEN"
 
 
+class RegistrationDisabledException(AppException):
+    """Task 10.1 — public self-registration is switched off."""
+    status_code = status.HTTP_403_FORBIDDEN
+    error_code = "REGISTRATION_DISABLED"
+
+
+class AccountDisabledException(AppException):
+    """Task 10 — the account was deactivated ('inactive') or banned."""
+    status_code = status.HTTP_403_FORBIDDEN
+    error_code = "ACCOUNT_DISABLED"
+
+
 class VerificationCodeInvalidException(AppException):
     status_code = status.HTTP_400_BAD_REQUEST
     error_code = "VERIFICATION_CODE_INVALID"

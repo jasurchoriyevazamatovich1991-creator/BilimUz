@@ -14,7 +14,12 @@ import jwt
 from pydantic import ValidationError
 
 from app.core.audit import log_action
+from sqlalchemy import select
+
+from app.modules.roles.models import Role
 from app.core.exceptions import (
+    AppException,
+    AccountDisabledException,
     InvalidCredentialsException,
     InvalidTokenException,
     UserAlreadyExistsException,
@@ -33,9 +38,10 @@ from app.modules.auth.exceptions import CurrentPasswordIncorrectException, Passw
 from app.modules.auth.models import LoginHistory, RefreshToken, VerificationCode
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import RegisterRequest, SessionOut
-from app.modules.users.models import User
+from app.modules.users.models import User, account_block_message, is_user_disabled
 
-DEFAULT_STUDENT_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")  # seeded in DB
+DEFAULT_STUDENT_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")  # legacy, unused by register() (Task 10.1)
+STUDENT_ROLE_NAME = "Student"
 
 
 class AuthService:
@@ -57,8 +63,14 @@ class AuthService:
                 errors=[e.message for e in validation.errors],
             )
 
+        # Task 10.1 — roles are seeded with random UUIDs (migration 0001), so
+        # the old fixed DEFAULT_STUDENT_ROLE_ID never existed and every
+        # registration failed on the users.role_id foreign key.
+        student_role = self.repo.db.execute(select(Role).where(Role.name == STUDENT_ROLE_NAME)).scalar_one_or_none()
+        if student_role is None:
+            raise AppException("Student roli topilmadi")
         user = User(
-            role_id=DEFAULT_STUDENT_ROLE_ID,
+            role_id=student_role.id,
             first_name=data.first_name,
             last_name=data.last_name,
             phone=data.phone,
@@ -102,6 +114,12 @@ class AuthService:
             log_action(self.repo.db, action="auth.login_failed", ip_address=ip, metadata={"identifier": identifier})
             self.repo.commit()
             raise InvalidCredentialsException("Login yoki parol noto'g'ri")
+        # Task 10 — checked only after the password matched, so it reveals
+        # nothing to someone who doesn't know the password.
+        if is_user_disabled(user):
+            log_action(self.repo.db, action="auth.login_blocked_disabled", user_id=user.id, ip_address=ip)
+            self.repo.commit()
+            raise AccountDisabledException(f"{account_block_message(user)} — administrator bilan bog'laning")
 
         tokens = self._issue_token_pair(user.id, ip, device)
         self.repo.record_login(LoginHistory(user_id=user.id, ip_address=ip, device=device))
@@ -119,6 +137,11 @@ class AuthService:
             raise InvalidTokenException("Token bekor qilingan yoki topilmadi")
 
         self.repo.revoke_refresh_token(stored)  # rotation: old token is single-use
+        # Task 10 — a deactivated/banned (or deleted) account can't mint new tokens.
+        owner = self.repo.get_user_by_id(uuid.UUID(payload.sub))
+        if owner is None or is_user_disabled(owner):
+            self.repo.commit()
+            raise AccountDisabledException(account_block_message(owner) if owner is not None else "Akkaunt faol emas")
         tokens = self._issue_token_pair(uuid.UUID(payload.sub), stored.ip_address, stored.user_agent)
         self.repo.commit()
         return tokens

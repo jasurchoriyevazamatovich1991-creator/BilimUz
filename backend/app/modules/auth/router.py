@@ -7,7 +7,7 @@ verify) carry a Redis-backed rate limit per Security Engineer policy.
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 
 from app.core.config import Settings, get_settings
-from app.core.exceptions import InvalidTokenException
+from app.core.exceptions import InvalidTokenException, RegistrationDisabledException
 from app.core.middleware.rate_limit import rate_limit
 from app.core.schemas import success_response
 from app.core.security.cookies import clear_refresh_token_cookies, set_refresh_token_cookies
@@ -51,12 +51,23 @@ def get_auth_service(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(rate_limit("register", *REGISTER_RATE_LIMIT))],
 )
-def register(data: RegisterRequest, service: AuthService = Depends(get_auth_service)):
-    user, plain_code = service.register(data)
-    # TODO(notifications module): send `plain_code` via SMS provider instead of returning it.
-    return success_response(
-        {"user_id": str(user.id), "debug_code": plain_code}, "Ro'yxatdan o'tish muvaffaqiyatli. Tasdiqlash kodi yuborildi."
-    )
+def register(
+    data: RegisterRequest,
+    service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+):
+    # Task 10.1 — closed unless explicitly enabled; checked before any work.
+    if not settings.PUBLIC_REGISTRATION_ENABLED:
+        raise RegistrationDisabledException(
+            "Ochiq ro'yxatdan o'tish o'chirilgan — akkaunt olish uchun administrator bilan bog'laning"
+        )
+    user, _plain_code = service.register(data)
+    # Task 10.1 — the one-time code is NEVER returned in any environment
+    # (it used to be sent back as `debug_code`, which made the phone check
+    # meaningless). It must be delivered out of band (SMS provider, not yet
+    # configured); until then the account stays 'pending_verification' and
+    # cannot log in.
+    return success_response({"user_id": str(user.id)}, "Ro'yxatdan o'tish qabul qilindi. Tasdiqlash kodi telefon raqamingizga yuboriladi.")
 
 
 @router.post("/verify", dependencies=[Depends(rate_limit("verify", *VERIFY_RATE_LIMIT))])

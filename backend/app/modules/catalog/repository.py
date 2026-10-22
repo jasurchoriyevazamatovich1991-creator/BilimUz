@@ -17,6 +17,7 @@ from app.modules.catalog.models import CatalogProduct
 from app.modules.catalog.schemas import CatalogProductListParams
 from app.modules.grades.models import Grade
 from app.modules.subjects.models import Subject
+from app.core.sorting import sortable_column
 
 
 class CatalogProductRepository:
@@ -66,7 +67,7 @@ class CatalogProductRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(CatalogProduct, field_name, CatalogProduct.created_at)
+        column = sortable_column(CatalogProduct, field_name, CatalogProduct.created_at)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, product: CatalogProduct) -> CatalogProduct:

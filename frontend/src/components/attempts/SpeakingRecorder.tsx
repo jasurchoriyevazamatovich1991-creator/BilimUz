@@ -34,6 +34,8 @@ function uploadMessage(err: unknown): string {
     if (err.status === 409) return "Urinish faol emas — yozuvni yuborib bo'lmaydi.";
     if (err.status === 401 || err.status === 403 || err.status === 404) return "Yozuvni yuborishga ruxsat yo'q.";
     if (err.status === 422) return err.message || "Yozuv qabul qilinmadi.";
+    // Task 10.1 — the server could not verify the recording (ffprobe unavailable).
+    if (err.status === 503) return err.message || "Server yozuvni hozir tekshira olmadi. Birozdan keyin qayta yuboring.";
     if (err.status === undefined) return "Tarmoq xatosi — yozuv yuborilmadi. Internet aloqasini tekshirib, qayta yuboring.";
   }
   return "Yozuvni yuborib bo'lmadi. Qayta urinib ko'ring.";

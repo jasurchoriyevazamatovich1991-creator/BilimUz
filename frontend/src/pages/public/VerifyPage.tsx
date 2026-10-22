@@ -5,7 +5,6 @@ import { ApiError } from "@/api/client";
 
 interface VerifyLocationState {
   userId: string;
-  debugCode: string;
 }
 
 const CODE_LENGTH = 6;
@@ -73,12 +72,9 @@ export function VerifyPage() {
       <h1 className="mb-2 text-2xl font-semibold text-foreground">Tasdiqlash</h1>
       <p className="mb-6 text-sm text-foreground/60">Kodni kiriting</p>
 
-      {/* Backend has no real SMS delivery yet (see api/auth.ts) — the
-          debug_code is shown here as-is, exactly as the backend
-          returned it. Not a fake/mocked delivery mechanism. */}
-      <div className="mb-4 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-        Vaqtinchalik kod (SMS hali ulanmagan): <strong>{state.debugCode}</strong>
-      </div>
+      {/* Task 10.1 — the one-time code is never shown here: it is delivered
+          out of band (SMS), never returned by the API. */}
+      <p className="mb-4 text-xs text-foreground/50">Kod ro'yxatdan o'tishda ko'rsatilgan telefon raqamingizga yuboriladi.</p>
 
       {errorMessage ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">

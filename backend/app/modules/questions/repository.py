@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.modules.questions.models import Question, QuestionMedia, QuestionOption
 from app.modules.questions.schemas import QuestionListParams
+from app.core.sorting import sortable_column
 
 # Sprint 39 Phase 3C bug fix: QuestionRepository defines a method named
 # `list` (below), which — without `from __future__ import annotations`
@@ -71,7 +72,7 @@ class QuestionRepository:
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
         descending = params.sort.startswith("-")
         field_name = params.sort.lstrip("-")
-        column = getattr(Question, field_name, Question.created_at)
+        column = sortable_column(Question, field_name, Question.created_at)
         stmt = stmt.order_by(column.desc() if descending else column.asc())
         stmt = stmt.offset((params.page - 1) * params.per_page).limit(params.per_page)
         stmt = stmt.options(selectinload(Question.options), selectinload(Question.media))

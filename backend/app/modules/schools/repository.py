@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.schools.models import School
 from app.modules.schools.schemas import SchoolListParams
+from app.core.sorting import sortable_column
 
 
 class SchoolRepository:
@@ -42,7 +43,7 @@ class SchoolRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(School, field_name, School.name)
+        column = sortable_column(School, field_name, School.name)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, school: School) -> School:

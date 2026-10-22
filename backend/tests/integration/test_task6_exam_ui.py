@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core.security.password_service import PasswordService
+from tests.integration.audio_fixtures import audio_bytes
 from app.main import app
 from app.modules.attempts.models import Answer, TestAttempt
 from app.modules.permissions.models import Permission, RolePermission
@@ -24,7 +25,9 @@ from app.modules.users.models import User, UserStatus
 
 PASSWORD = "Integration-T3st-P@ss1"
 API = "/api/v1"
-WEBM = b"\x1aE\xdf\xa3" + b"\x00" * 2048  # tiny WebM-looking payload
+# Task 10.1 — a real 1-second WebM/Opus recording: the server now decodes
+# uploads to measure their duration, so a signature-only payload is refused.
+WEBM = audio_bytes("webm_live", 1)
 
 
 def _user(db, role="Student") -> User:
@@ -257,7 +260,7 @@ def test_speaking_audio_upload_playback_and_rerecord(client, pg_session, storage
 
     first = pg_session.query(Upload).filter(Upload.file_name.like(f"speaking-{s1.id}%")).one()
     first_path = first.file_url
-    second = b"OggS" + b"\x01" * 1000
+    second = audio_bytes("ogg", 2)
     assert ctx.upload(attempt_id, s1, data=second, mime="audio/ogg").status_code == 201
     assert client.get(f"{API}/attempts/{attempt_id}/questions/{s1.id}/audio", headers=ctx.sh).content == second
     pg_session.expire_all()

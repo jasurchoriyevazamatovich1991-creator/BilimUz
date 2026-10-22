@@ -2,8 +2,27 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRegister } from "@/hooks/useAuth";
 import { ApiError } from "@/api/client";
+import { isPublicRegistrationEnabled } from "@/lib/registration";
+
+/** Task 10.1 — shown instead of the form while public registration is off. */
+function RegistrationClosed() {
+  return (
+    <div className="mx-auto flex max-w-md flex-col justify-center px-6 py-16" data-testid="registration-closed">
+      <h1 className="mb-4 text-2xl font-semibold text-foreground">Ro'yxatdan o'tish</h1>
+      <p className="mb-6 text-sm text-foreground/70">
+        Ochiq ro'yxatdan o'tish hozircha yopiq. Akkaunt olish uchun o'quv markazingiz yoki maktabingiz
+        administratoriga murojaat qiling — u sizga login va parol beradi.
+      </p>
+      <Link to="/login" className="text-sm text-primary hover:underline">Kirish sahifasiga qaytish</Link>
+    </div>
+  );
+}
 
 export function RegisterPage() {
+  return isPublicRegistrationEnabled() ? <RegisterForm /> : <RegistrationClosed />;
+}
+
+function RegisterForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -17,11 +36,8 @@ export function RegisterPage() {
       { first_name: firstName, last_name: lastName, phone, password },
       {
         onSuccess: (result) => {
-          // The backend does not send a real SMS yet (see api/auth.ts's
-          // RegisterResponse docstring) — `debug_code` is passed through
-          // to the Verify page via navigation state exactly as the
-          // backend returned it. No mock/fake delivery is simulated here.
-          navigate("/verify", { state: { userId: result.user_id, debugCode: result.debug_code } });
+          // Task 10.1 — the code is delivered out of band, never in the response.
+          navigate("/verify", { state: { userId: result.user_id } });
         },
       },
     );

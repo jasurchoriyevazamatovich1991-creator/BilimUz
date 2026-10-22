@@ -48,8 +48,10 @@ WORKDIR /app
 # Runtime-only: libpq5 (the psycopg2 shared library dependency) without
 # the -dev headers or a compiler — gcc/libpq-dev from stage 1 are not
 # present here at all.
+# Task 10.1 — ffmpeg (ffprobe) is a runtime requirement: it measures the
+# duration of uploaded Speaking recordings (app/core/media_probe.py).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 curl \
+    && apt-get install -y --no-install-recommends libpq5 curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv

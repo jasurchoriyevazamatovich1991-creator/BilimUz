@@ -40,7 +40,10 @@ describe("UsersListPage", () => {
     await waitFor(() => expect(screen.getByText("Aziz Karimov")).toBeInTheDocument());
   });
 
-  it("NEVER renders a Create/Add User button anywhere on the page (approved decision — no backend support)", async () => {
+  // Task 10.1 — POST /users now exists for Admin/Super Admin (see
+  // UsersListPage.task10_1.test.tsx); without an administrator role signed
+  // in there is still no create button.
+  it("renders no Create/Add User button when no administrator is signed in", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Aziz Karimov")).toBeInTheDocument());
     expect(screen.queryByText(/qo'shish/i)).not.toBeInTheDocument();

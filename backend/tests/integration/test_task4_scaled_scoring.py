@@ -133,7 +133,8 @@ def test_admin_sets_and_clears_scoring_profile(client, pg_session):
     pg_session.commit()
     r = _set_profile(ctx, test, "sat")
     assert r.status_code == 200 and r.json()["data"]["scoring_profile"] == "sat"
-    assert client.get(f"{API}/tests/{test.id}").json()["data"]["scoring_profile"] == "sat"
+    # Task 10.1 — the test is a draft, so it is read as staff (anonymous now gets 404).
+    assert client.get(f"{API}/tests/{test.id}", headers=ctx.ah).json()["data"]["scoring_profile"] == "sat"
     assert _set_profile(ctx, test, None).json()["data"]["scoring_profile"] is None
     assert _set_profile(ctx, test, "toefl").status_code == 422
 

@@ -8,8 +8,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 
 from app.core.schemas import success_response
-from app.modules.auth.dependencies import require_roles
-from app.modules.tests.exceptions import InvalidTestReferenceException
+from app.modules.auth.dependencies import get_optional_user, require_roles
+from app.modules.tests.exceptions import InvalidTestReferenceException, TestNotFoundException
+from app.modules.tests.models import TestStatus
 from app.modules.tests.dependencies import (
     get_exam_module_service,
     get_exam_scoring_service,
@@ -75,7 +76,13 @@ def list_tests(
     status_filter: str | None = Query(default=None, alias="status", description="draft, published, or archived"),
     sort: str = Query(default="-created_at"),
     service: TestService = Depends(get_test_service),
+    viewer: User | None = Depends(get_optional_user),
 ):
+    # Task 10.1 — only staff may list unpublished (draft/archived) tests;
+    # everyone else (anonymous, students) always gets published tests only,
+    # whatever ?status= they send.
+    if not _is_content_staff(viewer):
+        status_filter = TestStatus.PUBLISHED.value
     params = TestListParams(
         page=page, per_page=per_page, search=search, subject_id=subject_id,
         grade_id=grade_id, topic_id=topic_id, difficulty=difficulty, status=status_filter, sort=sort,
@@ -481,9 +488,26 @@ def set_scoring_profile(
     summary="Get a test by ID",
     description="Returns test metadata (not its questions — see the questions module). 404 if not found.",
 )
-def get_test(test_id: uuid.UUID, service: TestService = Depends(get_test_service)):
+def get_test(
+    test_id: uuid.UUID,
+    service: TestService = Depends(get_test_service),
+    viewer: User | None = Depends(get_optional_user),
+):
     test = service.get_test(test_id)
+    # Task 10.1 — a draft is invisible (404, same as a missing test) to
+    # anyone but staff. Archived tests stay readable: students' past results
+    # link to them.
+    if test.status == TestStatus.DRAFT.value and not _is_content_staff(viewer):
+        raise TestNotFoundException("Test topilmadi")
     return success_response(TestOut.model_validate(test), "Test topildi.")
+
+
+# Roles that author and manage test content (same set as the write endpoints).
+CONTENT_STAFF_ROLES = ("Admin", "Super Admin", "Teacher")
+
+
+def _is_content_staff(user: User | None) -> bool:
+    return user is not None and user.role.name in CONTENT_STAFF_ROLES
 
 
 @router.post(

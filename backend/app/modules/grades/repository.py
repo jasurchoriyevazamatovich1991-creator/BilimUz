@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.grades.models import Grade
 from app.modules.grades.schemas import GradeListParams
+from app.core.sorting import sortable_column
 
 
 class GradeRepository:
@@ -44,7 +45,7 @@ class GradeRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Grade, field_name, Grade.name)
+        column = sortable_column(Grade, field_name, Grade.name)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, grade: Grade) -> Grade:

@@ -15,14 +15,14 @@ from fastapi import Depends, Header
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import InvalidTokenException, RateLimitExceededException, UserNotFoundException
+from app.core.exceptions import AccountDisabledException, InvalidTokenException, RateLimitExceededException, UserNotFoundException
 from app.core.redis_client import redis_client
 from app.core.security.dependencies import get_jwt_service
 from app.core.security.jwt_service import JWTService
 from app.core.security.schemas import TokenType
 from app.db.session import get_db
 from app.modules.auth.repository import AuthRepository
-from app.modules.users.models import User
+from app.modules.users.models import User, account_block_message, is_user_disabled
 
 
 def get_auth_repository(db: Session = Depends(get_db)) -> AuthRepository:
@@ -49,7 +49,26 @@ def get_current_user(
     user = repo.get_user_by_id(uuid.UUID(payload.sub))
     if user is None:
         raise UserNotFoundException("Foydalanuvchi topilmadi")
+    # Task 10 — a deactivated/banned account loses access immediately, not
+    # only when its access token expires.
+    if is_user_disabled(user):
+        raise AccountDisabledException(account_block_message(user))
     return user
+
+
+def get_optional_user(
+    authorization: str | None = Header(default=None),
+    repo: AuthRepository = Depends(get_auth_repository),
+    jwt_service: JWTService = Depends(get_jwt_service),
+) -> User | None:
+    """Task 10.1 — for endpoints that are public but show more to staff.
+    No Authorization header -> anonymous (None). A header that is present
+    but invalid/expired is still rejected (401), exactly like
+    get_current_user, so a stale token is refreshed instead of silently
+    downgrading the caller to anonymous."""
+    if not authorization:
+        return None
+    return get_current_user(authorization=authorization, repo=repo, jwt_service=jwt_service)
 
 
 def require_roles(*allowed_role_names: str):

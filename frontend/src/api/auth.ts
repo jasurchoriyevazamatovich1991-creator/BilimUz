@@ -2,9 +2,11 @@
  * Auth API module — mirrors backend/app/modules/auth/ one-to-one.
  * Every shape below was read directly from the real
  * auth/schemas.py + auth/router.py (not assumed) before writing this
- * file, so it matches the actual backend exactly, including the
- * `debug_code` field in RegisterResponse — this is a REAL, current
- * backend response shape (see README note below), not a mock.
+ * file, so it matches the actual backend exactly.
+ *
+ * Task 10.1 — RegisterResponse no longer carries `debug_code`: the backend
+ * never returns the one-time code (it must arrive out of band), and public
+ * registration is disabled unless explicitly enabled.
  */
 import { httpClient, unwrap } from "./client";
 import { readCsrfCookie } from "@/utils/csrfCookie";
@@ -19,16 +21,6 @@ export interface RegisterRequest {
 
 export interface RegisterResponse {
   user_id: string;
-  /**
-   * The backend currently returns the verification code directly in
-   * this field instead of sending it via SMS — see
-   * backend/app/modules/auth/router.py's own TODO comment
-   * ("TODO(notifications module): send `plain_code` via SMS provider
-   * instead of returning it"). The frontend consumes this AS-IS,
-   * exactly as approved for Sprint 13 — no mock/fake SMS delivery is
-   * built here to paper over it.
-   */
-  debug_code: string;
 }
 
 export interface VerifyRequest {

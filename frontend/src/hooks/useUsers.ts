@@ -8,7 +8,7 @@
  */
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { usersApi, type UserAdminUpdateRequest, type UserListParams } from "@/api/users";
+import { usersApi, type UserAdminUpdateRequest, type UserCreateRequest, type UserListParams } from "@/api/users";
 import { useToastStore } from "@/store/toastStore";
 import { ApiError } from "@/api/client";
 
@@ -74,5 +74,19 @@ export function useChangeUserRole(userId: string) {
     onError: (error) => {
       addToast(error instanceof ApiError ? error.message : "Rolni o'zgartirib bo'lmadi");
     },
+  });
+}
+
+/** Task 10.1 — administrator creates an account (active immediately). */
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
+  return useMutation({
+    mutationFn: (data: UserCreateRequest) => usersApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users", "list"] });
+      addToast("Foydalanuvchi yaratildi", "success");
+    },
+    onError: (error) => addToast(error instanceof ApiError ? error.message : "Foydalanuvchini yaratib bo'lmadi"),
   });
 }

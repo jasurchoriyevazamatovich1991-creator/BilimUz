@@ -5,13 +5,14 @@ grant themselves or anyone else Super Admin (privilege escalation).
 """
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from app.modules.auth.dependencies import get_current_user, require_roles
 from app.core.schemas import success_response
 from app.modules.users.dependencies import get_user_service
 from app.modules.users.schemas import (
     UserAdminUpdateRequest,
+    UserCreateRequest,
     UserListParams,
     UserOut,
     UserRoleChangeRequest,
@@ -56,6 +57,23 @@ def list_users(
         "meta": {"page": page, "per_page": per_page, "total": total, "total_pages": (total + per_page - 1) // per_page},
     }
     return success_response(data, "Foydalanuvchilar ro'yxati.")
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a user (Admin/Super Admin)",
+    description="Task 10.1 — public self-registration is disabled, so accounts are created by administrators. "
+                "The account is active immediately. Admin may create Student/Teacher; Super Admin also Admin. "
+                "403 for a role the actor may not assign, 409 for a duplicate phone/email, 422 for invalid data.",
+)
+def create_user(
+    data: UserCreateRequest,
+    service: UserService = Depends(get_user_service),
+    admin: User = Depends(require_roles("Admin", "Super Admin")),
+):
+    user = service.create_user(data, actor=admin)
+    return success_response(UserOut.model_validate(user), "Foydalanuvchi yaratildi.")
 
 
 @router.get("/{user_id}")

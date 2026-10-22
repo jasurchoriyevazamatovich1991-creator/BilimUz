@@ -20,6 +20,8 @@ from app.modules.attempts.exceptions import (
     SpeakingAudioNotAllowedException,
     SpeakingAudioNotFoundException,
     SpeakingAudioTooLargeException,
+    SpeakingAudioTooLongException,
+    SpeakingAudioUnverifiableException,
     AttemptMediaNotFoundException,
     AttemptMediaUnavailableException,
     AttemptNotActiveException,
@@ -34,11 +36,15 @@ from app.modules.attempts.exceptions import (
     ResultNotAvailableException,
     TestNotPublishedException,
 )
+from app.core.media_probe import AudioProbeFailed, AudioProbeUnavailable, audio_duration_seconds
 from app.modules.attempts.constants import (
     ACTIVE_STATUSES,
     DEFAULT_MAX_ATTEMPTS,
     SPEAKING_AUDIO_EXTENSION_MIME,
     SPEAKING_AUDIO_MAX_BYTES,
+    SPEAKING_AUDIO_DURATION_GRACE_SECONDS,
+    SPEAKING_AUDIO_MAX_SECONDS,
+    audio_content_matches,
     SPEAKING_AUDIO_MIME_TYPES,
     SPEAKING_COMPONENT,
 )
@@ -385,6 +391,18 @@ class AttemptService:
             raise SpeakingAudioTooLargeException("Audio hajmi 20 MB dan oshmasligi kerak")
         if not data:
             raise InvalidSpeakingAudioException("Audio fayl bo'sh")
+        if not audio_content_matches(mime, data):
+            raise InvalidSpeakingAudioException("Fayl mazmuni e'lon qilingan audio formatiga mos emas")
+        # Task 10.1 — duration from the decoded audio packets, never from the
+        # browser or the container header.
+        try:
+            seconds = audio_duration_seconds(data, mime)
+        except AudioProbeUnavailable:
+            raise SpeakingAudioUnverifiableException("Serverda audio tekshiruvi vaqtincha mavjud emas — keyinroq qayta urinib ko'ring")
+        except AudioProbeFailed:
+            raise InvalidSpeakingAudioException("Audio faylni o'qib bo'lmadi — qayta yozib ko'ring")
+        if seconds > SPEAKING_AUDIO_MAX_SECONDS + SPEAKING_AUDIO_DURATION_GRACE_SECONDS:
+            raise SpeakingAudioTooLongException("Yozuv 15 daqiqadan oshmasligi kerak")
 
         file_url = self.storage.save(f"speaking-{uuid.uuid4()}{extension}", io.BytesIO(data))
         try:

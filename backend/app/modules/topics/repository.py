@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.topics.models import Topic
 from app.modules.topics.schemas import TopicListParams
+from app.core.sorting import sortable_column
 
 
 class TopicRepository:
@@ -42,7 +43,7 @@ class TopicRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Topic, field_name, Topic.order_number)
+        column = sortable_column(Topic, field_name, Topic.order_number)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, topic: Topic) -> Topic:

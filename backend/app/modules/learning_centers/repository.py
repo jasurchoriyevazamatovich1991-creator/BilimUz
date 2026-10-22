@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.learning_centers.models import LearningCenter
 from app.modules.learning_centers.schemas import LearningCenterListParams
+from app.core.sorting import sortable_column
 
 
 class LearningCenterRepository:
@@ -42,7 +43,7 @@ class LearningCenterRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(LearningCenter, field_name, LearningCenter.name)
+        column = sortable_column(LearningCenter, field_name, LearningCenter.name)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, center: LearningCenter) -> LearningCenter:

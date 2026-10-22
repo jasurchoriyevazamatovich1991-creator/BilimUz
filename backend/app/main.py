@@ -25,7 +25,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,   # never "*" — see .env.example
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    # Task 10 — PUT added: Task 4–6 endpoints use it (PUT /tests/{id}/scoring-
+    # profile, PUT /grading/submissions/.../draft, PUT /attempts/{id}/review-
+    # marks/{qid}); without it a cross-origin browser (local dev: frontend
+    # :5173 -> backend :8000) fails the CORS preflight for all three.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     # Sprint 86: X-CSRF-Token added — the frontend must send it on
     # cookie-authenticated /auth/refresh and /auth/logout calls (see
     # core/security/csrf.py); without it in this list, the browser's CORS

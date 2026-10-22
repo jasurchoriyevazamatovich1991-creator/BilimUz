@@ -18,6 +18,33 @@ class UserStatus(StrEnum):
     PENDING_VERIFICATION = "pending_verification"
 
 
+# Task 10 / 10.1 — statuses that must not authenticate (login, token
+# refresh, or any request with a still-valid access token). Task 10.1 adds
+# 'pending_verification': an account whose phone was never verified must
+# not get access (public registration is disabled; administrators create
+# accounts as 'active' — see users/service.create_user).
+DISABLED_USER_STATUSES = frozenset({UserStatus.INACTIVE.value, UserStatus.BANNED.value, UserStatus.PENDING_VERIFICATION.value})
+
+_BLOCK_MESSAGES = {
+    UserStatus.INACTIVE.value: "Akkaunt faol emas",
+    UserStatus.BANNED.value: "Akkaunt faol emas",
+    UserStatus.PENDING_VERIFICATION.value: "Akkaunt hali tasdiqlanmagan",
+}
+
+
+def _status_value(user):
+    status = getattr(user, "status", None)
+    return status.value if isinstance(status, UserStatus) else status
+
+
+def is_user_disabled(user) -> bool:
+    return _status_value(user) in DISABLED_USER_STATUSES
+
+
+def account_block_message(user) -> str:
+    return _BLOCK_MESSAGES.get(_status_value(user), "Akkaunt faol emas")
+
+
 class UserGender(StrEnum):
     MALE = "male"
     FEMALE = "female"

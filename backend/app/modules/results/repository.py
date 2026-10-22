@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.modules.results.models import Ranking, Result, ResultSection, Statistics
+from app.core.sorting import sortable_column
 
 
 class ResultRepository:
@@ -41,7 +42,7 @@ class ResultRepository:
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Result, field_name, Result.created_at)
+        column = sortable_column(Result, field_name, Result.created_at)
         stmt = stmt.order_by(column.desc() if descending else column.asc())
         stmt = stmt.offset((page - 1) * per_page).limit(per_page)
 

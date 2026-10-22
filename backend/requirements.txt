@@ -1,4 +1,7 @@
-fastapi==0.115.0
+fastapi==0.159.1
+# Task 10.1 — pinned explicitly: starlette>=1.3.1 closes the known
+# multipart/form, Host-header and request-path advisories of 0.38.x.
+starlette==1.9.0
 uvicorn[standard]==0.32.0
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
@@ -7,9 +10,9 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 passlib==1.7.4
 argon2-cffi==23.1.0
-pyjwt==2.9.0
-cryptography==43.0.3
-python-multipart==0.0.12
+pyjwt==2.15.1
+cryptography==50.0.2
+python-multipart==0.0.32
 redis==5.1.1
 pytest==8.3.3
 httpx==0.27.2
@@ -24,7 +27,7 @@ boto3==1.35.36
 # unsafe tags before anything is ever persisted). The standard,
 # well-audited choice for this rather than a bespoke regex-based
 # sanitizer, which is a well-known way to introduce XSS bypasses.
-bleach==6.1.0
+bleach==6.4.0
 # Sprint 39 Phase 3D — pydantic.EmailStr (used in auth/schemas.py's
 # RegisterRequest.email since the earliest auth sprints) requires this
 # at runtime; it was never actually listed here, which only became

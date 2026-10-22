@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.modules.roles.models import Role
 from app.modules.roles.schemas import RoleListParams
 from app.modules.users.models import User
+from app.core.sorting import sortable_column
 
 
 class RoleRepository:
@@ -44,7 +45,7 @@ class RoleRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Role, field_name, Role.name)
+        column = sortable_column(Role, field_name, Role.name)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def count_users_with_role(self, role_id: uuid.UUID) -> int:

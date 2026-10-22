@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.subjects.models import Subject
 from app.modules.subjects.schemas import SubjectListParams
+from app.core.sorting import sortable_column
 
 
 class SubjectRepository:
@@ -46,7 +47,7 @@ class SubjectRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Subject, field_name, Subject.created_at)
+        column = sortable_column(Subject, field_name, Subject.created_at)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, subject: Subject) -> Subject:

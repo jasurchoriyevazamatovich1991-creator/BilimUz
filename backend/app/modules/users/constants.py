@@ -14,3 +14,10 @@ DEFAULT_SORT_FIELD = "-created_at"
 # has its own dedicated endpoint (ban_user) so it's always paired with an
 # audit-logged reason, never silently set through a generic PATCH.
 ADMIN_SETTABLE_STATUSES = ("active", "inactive")
+
+# Task 10.1 — which roles each administrator role may give a NEW account.
+# Super Admin accounts are never created through the API (seed script only).
+CREATABLE_ROLES_BY_ACTOR = {
+    "Admin": ("Student", "Teacher"),
+    "Super Admin": ("Student", "Teacher", "Admin"),
+}

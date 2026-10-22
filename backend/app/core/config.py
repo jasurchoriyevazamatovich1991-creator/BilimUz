@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION"
     JWT_ALGORITHM: str = "HS256"
+    # Task 10.1 — public self-registration (POST /auth/register). Off by
+    # default: there is no SMS provider, so a phone number can't be
+    # verified; administrators create accounts instead (POST /users).
+    PUBLIC_REGISTRATION_ENABLED: bool = False
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 

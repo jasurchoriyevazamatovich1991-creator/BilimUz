@@ -146,3 +146,16 @@ class SpeakingAudioTooLargeException(AppException):
 class SpeakingAudioNotFoundException(AppException):
     status_code = status.HTTP_404_NOT_FOUND
     error_code = "SPEAKING_AUDIO_NOT_FOUND"
+
+
+class SpeakingAudioTooLongException(AppException):
+    """Task 10.1 — recording longer than SPEAKING_AUDIO_MAX_SECONDS."""
+    status_code = 422
+    error_code = "SPEAKING_AUDIO_TOO_LONG"
+
+
+class SpeakingAudioUnverifiableException(AppException):
+    """Task 10.1 — the server cannot check the recording (ffprobe missing);
+    refused rather than stored unchecked."""
+    status_code = 503
+    error_code = "SPEAKING_AUDIO_UNVERIFIABLE"

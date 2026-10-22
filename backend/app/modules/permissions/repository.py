@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.modules.permissions.models import Permission, RolePermission
 from app.modules.permissions.schemas import PermissionListParams
+from app.core.sorting import sortable_column
 
 
 class PermissionRepository:
@@ -37,7 +38,7 @@ class PermissionRepository:
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
         descending = params.sort.startswith("-")
         field_name = params.sort.lstrip("-")
-        column = getattr(Permission, field_name, Permission.module)
+        column = sortable_column(Permission, field_name, Permission.module)
         stmt = stmt.order_by(column.desc() if descending else column.asc())
         stmt = stmt.offset((params.page - 1) * params.per_page).limit(params.per_page)
 

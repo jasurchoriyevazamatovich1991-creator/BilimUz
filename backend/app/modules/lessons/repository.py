@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.lessons.models import Lesson
 from app.modules.lessons.schemas import LessonListParams
+from app.core.sorting import sortable_column
 
 
 class LessonRepository:
@@ -50,7 +51,7 @@ class LessonRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Lesson, field_name, Lesson.created_at)
+        column = sortable_column(Lesson, field_name, Lesson.created_at)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, lesson: Lesson) -> Lesson:

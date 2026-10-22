@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useLogin } from "@/hooks/useAuth";
+import { isPublicRegistrationEnabled } from "@/lib/registration";
 import { ApiError } from "@/api/client";
 
 export function LoginPage() {
@@ -64,12 +65,20 @@ export function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-foreground/60">
-        Akkountingiz yo'qmi?{" "}
-        <Link to="/register" className="text-primary hover:underline">
-          Ro'yxatdan o'ting
-        </Link>
-      </p>
+      {/* Task 10.1 — accounts are created by an administrator unless public
+          registration is explicitly enabled for this deployment. */}
+      {isPublicRegistrationEnabled() ? (
+        <p className="mt-6 text-center text-sm text-foreground/60">
+          Akkountingiz yo'qmi?{" "}
+          <Link to="/register" className="text-primary hover:underline">
+            Ro'yxatdan o'ting
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-sm text-foreground/60" data-testid="admin-managed-accounts">
+          Akkauntingiz yo'qmi? O'quv markazingiz yoki maktabingiz administratoriga murojaat qiling.
+        </p>
+      )}
     </div>
   );
 }

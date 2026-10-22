@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.tests.models import Test, ExamModule, ExamSection, QuestionGroup, QuestionGroupMedia, RoutingThresholdRule, ScoreConversionTable
 from app.modules.tests.schemas import TestListParams
+from app.core.sorting import sortable_column
 
 
 class TestRepository:
@@ -46,7 +47,7 @@ class TestRepository:
     def _apply_sort(self, stmt, sort: str):
         descending = sort.startswith("-")
         field_name = sort.lstrip("-")
-        column = getattr(Test, field_name, Test.created_at)
+        column = sortable_column(Test, field_name, Test.created_at)
         return stmt.order_by(column.desc() if descending else column.asc())
 
     def create(self, test: Test) -> Test:
