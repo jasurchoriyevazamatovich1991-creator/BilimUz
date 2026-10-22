@@ -42,7 +42,7 @@ Yoki repository ildizidan Docker Compose orqali (Postgres+Redis+backend birga): 
 Birinchi Super Admin foydalanuvchisini yaratish (migratsiyalar qo'llanilgandan keyin, idempotent — ikkinchi marta ishga tushirish xavfsiz, duplikat yaratmaydi):
 
 ```bash
-SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD=YOUR_STRONG_PASSWORD python scripts/seed_admin.py
+SUPERADMIN_EMAIL=admin@example.com SUPERADMIN_PASSWORD=YOUR_STRONG_PASSWORD python -m scripts.seed_admin
 ```
 
 ## Modullar (`app/modules/`, 27 ta)
