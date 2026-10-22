@@ -1,0 +1,5138 @@
+{
+ "dataset": "sat_paper_practice_tables",
+ "description": "Official College Board raw-score conversion tables (lower/upper section score) for the paper (nonadaptive) versions of the digital SAT Practice Tests. Exact values, not interpolated.",
+ "rules": {
+  "reading_writing_raw": "0-66 (two modules of 0-33)",
+  "math_raw": "0-54 (two modules of 0-27)",
+  "total_range": "sum of the two section lower values .. sum of the two section upper values"
+ },
+ "forms": {
+  "sat_practice_test_4": {
+   "form_id": "sat_practice_test_4",
+   "practice_test_number": 4,
+   "guide_title": "Scoring Your Paper SAT Practice Test #4",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #4",
+   "document_code": "2324-BB-852",
+   "copyright_year": 2023,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-4-digital.pdf",
+   "pdf_sha256": "c518fd9af053b94417040a90f74e9f85763e0be759a5efdf3c86b13f60566262",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 6,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 7,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 8,
+       "lower": 200,
+       "upper": 220
+      },
+      {
+       "raw": 9,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 10,
+       "lower": 230,
+       "upper": 250
+      },
+      {
+       "raw": 11,
+       "lower": 240,
+       "upper": 260
+      },
+      {
+       "raw": 12,
+       "lower": 250,
+       "upper": 270
+      },
+      {
+       "raw": 13,
+       "lower": 260,
+       "upper": 280
+      },
+      {
+       "raw": 14,
+       "lower": 280,
+       "upper": 300
+      },
+      {
+       "raw": 15,
+       "lower": 290,
+       "upper": 310
+      },
+      {
+       "raw": 16,
+       "lower": 320,
+       "upper": 340
+      },
+      {
+       "raw": 17,
+       "lower": 340,
+       "upper": 360
+      },
+      {
+       "raw": 18,
+       "lower": 350,
+       "upper": 370
+      },
+      {
+       "raw": 19,
+       "lower": 360,
+       "upper": 380
+      },
+      {
+       "raw": 20,
+       "lower": 370,
+       "upper": 390
+      },
+      {
+       "raw": 21,
+       "lower": 370,
+       "upper": 390
+      },
+      {
+       "raw": 22,
+       "lower": 380,
+       "upper": 400
+      },
+      {
+       "raw": 23,
+       "lower": 390,
+       "upper": 410
+      },
+      {
+       "raw": 24,
+       "lower": 400,
+       "upper": 420
+      },
+      {
+       "raw": 25,
+       "lower": 410,
+       "upper": 430
+      },
+      {
+       "raw": 26,
+       "lower": 420,
+       "upper": 440
+      },
+      {
+       "raw": 27,
+       "lower": 420,
+       "upper": 440
+      },
+      {
+       "raw": 28,
+       "lower": 430,
+       "upper": 450
+      },
+      {
+       "raw": 29,
+       "lower": 440,
+       "upper": 460
+      },
+      {
+       "raw": 30,
+       "lower": 450,
+       "upper": 470
+      },
+      {
+       "raw": 31,
+       "lower": 460,
+       "upper": 480
+      },
+      {
+       "raw": 32,
+       "lower": 460,
+       "upper": 480
+      },
+      {
+       "raw": 33,
+       "lower": 470,
+       "upper": 490
+      },
+      {
+       "raw": 34,
+       "lower": 480,
+       "upper": 500
+      },
+      {
+       "raw": 35,
+       "lower": 490,
+       "upper": 510
+      },
+      {
+       "raw": 36,
+       "lower": 490,
+       "upper": 510
+      },
+      {
+       "raw": 37,
+       "lower": 500,
+       "upper": 520
+      },
+      {
+       "raw": 38,
+       "lower": 510,
+       "upper": 530
+      },
+      {
+       "raw": 39,
+       "lower": 520,
+       "upper": 540
+      },
+      {
+       "raw": 40,
+       "lower": 530,
+       "upper": 550
+      },
+      {
+       "raw": 41,
+       "lower": 540,
+       "upper": 560
+      },
+      {
+       "raw": 42,
+       "lower": 540,
+       "upper": 560
+      },
+      {
+       "raw": 43,
+       "lower": 550,
+       "upper": 570
+      },
+      {
+       "raw": 44,
+       "lower": 560,
+       "upper": 580
+      },
+      {
+       "raw": 45,
+       "lower": 570,
+       "upper": 590
+      },
+      {
+       "raw": 46,
+       "lower": 580,
+       "upper": 600
+      },
+      {
+       "raw": 47,
+       "lower": 590,
+       "upper": 610
+      },
+      {
+       "raw": 48,
+       "lower": 590,
+       "upper": 610
+      },
+      {
+       "raw": 49,
+       "lower": 600,
+       "upper": 620
+      },
+      {
+       "raw": 50,
+       "lower": 610,
+       "upper": 630
+      },
+      {
+       "raw": 51,
+       "lower": 620,
+       "upper": 640
+      },
+      {
+       "raw": 52,
+       "lower": 630,
+       "upper": 650
+      },
+      {
+       "raw": 53,
+       "lower": 630,
+       "upper": 650
+      },
+      {
+       "raw": 54,
+       "lower": 640,
+       "upper": 660
+      },
+      {
+       "raw": 55,
+       "lower": 650,
+       "upper": 670
+      },
+      {
+       "raw": 56,
+       "lower": 660,
+       "upper": 680
+      },
+      {
+       "raw": 57,
+       "lower": 670,
+       "upper": 690
+      },
+      {
+       "raw": 58,
+       "lower": 680,
+       "upper": 700
+      },
+      {
+       "raw": 59,
+       "lower": 690,
+       "upper": 710
+      },
+      {
+       "raw": 60,
+       "lower": 700,
+       "upper": 720
+      },
+      {
+       "raw": 61,
+       "lower": 710,
+       "upper": 730
+      },
+      {
+       "raw": 62,
+       "lower": 720,
+       "upper": 740
+      },
+      {
+       "raw": 63,
+       "lower": 730,
+       "upper": 750
+      },
+      {
+       "raw": 64,
+       "lower": 750,
+       "upper": 770
+      },
+      {
+       "raw": 65,
+       "lower": 770,
+       "upper": 790
+      },
+      {
+       "raw": 66,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 6,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 7,
+       "lower": 200,
+       "upper": 220
+      },
+      {
+       "raw": 8,
+       "lower": 200,
+       "upper": 230
+      },
+      {
+       "raw": 9,
+       "lower": 220,
+       "upper": 250
+      },
+      {
+       "raw": 10,
+       "lower": 250,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 280,
+       "upper": 310
+      },
+      {
+       "raw": 12,
+       "lower": 290,
+       "upper": 320
+      },
+      {
+       "raw": 13,
+       "lower": 300,
+       "upper": 330
+      },
+      {
+       "raw": 14,
+       "lower": 310,
+       "upper": 340
+      },
+      {
+       "raw": 15,
+       "lower": 320,
+       "upper": 350
+      },
+      {
+       "raw": 16,
+       "lower": 330,
+       "upper": 360
+      },
+      {
+       "raw": 17,
+       "lower": 330,
+       "upper": 360
+      },
+      {
+       "raw": 18,
+       "lower": 340,
+       "upper": 370
+      },
+      {
+       "raw": 19,
+       "lower": 350,
+       "upper": 380
+      },
+      {
+       "raw": 20,
+       "lower": 360,
+       "upper": 390
+      },
+      {
+       "raw": 21,
+       "lower": 370,
+       "upper": 400
+      },
+      {
+       "raw": 22,
+       "lower": 370,
+       "upper": 400
+      },
+      {
+       "raw": 23,
+       "lower": 380,
+       "upper": 410
+      },
+      {
+       "raw": 24,
+       "lower": 390,
+       "upper": 420
+      },
+      {
+       "raw": 25,
+       "lower": 400,
+       "upper": 430
+      },
+      {
+       "raw": 26,
+       "lower": 420,
+       "upper": 450
+      },
+      {
+       "raw": 27,
+       "lower": 430,
+       "upper": 460
+      },
+      {
+       "raw": 28,
+       "lower": 440,
+       "upper": 470
+      },
+      {
+       "raw": 29,
+       "lower": 460,
+       "upper": 490
+      },
+      {
+       "raw": 30,
+       "lower": 470,
+       "upper": 500
+      },
+      {
+       "raw": 31,
+       "lower": 480,
+       "upper": 510
+      },
+      {
+       "raw": 32,
+       "lower": 500,
+       "upper": 530
+      },
+      {
+       "raw": 33,
+       "lower": 510,
+       "upper": 540
+      },
+      {
+       "raw": 34,
+       "lower": 520,
+       "upper": 550
+      },
+      {
+       "raw": 35,
+       "lower": 530,
+       "upper": 560
+      },
+      {
+       "raw": 36,
+       "lower": 550,
+       "upper": 580
+      },
+      {
+       "raw": 37,
+       "lower": 560,
+       "upper": 590
+      },
+      {
+       "raw": 38,
+       "lower": 570,
+       "upper": 600
+      },
+      {
+       "raw": 39,
+       "lower": 580,
+       "upper": 610
+      },
+      {
+       "raw": 40,
+       "lower": 590,
+       "upper": 620
+      },
+      {
+       "raw": 41,
+       "lower": 600,
+       "upper": 630
+      },
+      {
+       "raw": 42,
+       "lower": 620,
+       "upper": 650
+      },
+      {
+       "raw": 43,
+       "lower": 630,
+       "upper": 660
+      },
+      {
+       "raw": 44,
+       "lower": 650,
+       "upper": 680
+      },
+      {
+       "raw": 45,
+       "lower": 670,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 690,
+       "upper": 720
+      },
+      {
+       "raw": 47,
+       "lower": 710,
+       "upper": 740
+      },
+      {
+       "raw": 48,
+       "lower": 730,
+       "upper": 760
+      },
+      {
+       "raw": 49,
+       "lower": 740,
+       "upper": 770
+      },
+      {
+       "raw": 50,
+       "lower": 750,
+       "upper": 780
+      },
+      {
+       "raw": 51,
+       "lower": 760,
+       "upper": 790
+      },
+      {
+       "raw": 52,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_5": {
+   "form_id": "sat_practice_test_5",
+   "practice_test_number": 5,
+   "guide_title": "Scoring Your Paper SAT Practice Test #5",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #5",
+   "document_code": "2324-WKD-1053",
+   "copyright_year": 2024,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-5-digital.pdf",
+   "pdf_sha256": "9b145060e5ecae61b02a8671971a56efa3ee6742f7121545a33084816e395306",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 6,
+       "lower": 200,
+       "upper": 230
+      },
+      {
+       "raw": 7,
+       "lower": 200,
+       "upper": 240
+      },
+      {
+       "raw": 8,
+       "lower": 200,
+       "upper": 250
+      },
+      {
+       "raw": 9,
+       "lower": 200,
+       "upper": 260
+      },
+      {
+       "raw": 10,
+       "lower": 220,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 12,
+       "lower": 240,
+       "upper": 300
+      },
+      {
+       "raw": 13,
+       "lower": 250,
+       "upper": 310
+      },
+      {
+       "raw": 14,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 15,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 16,
+       "lower": 290,
+       "upper": 350
+      },
+      {
+       "raw": 17,
+       "lower": 310,
+       "upper": 370
+      },
+      {
+       "raw": 18,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 19,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 20,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 21,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 22,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 23,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 24,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 25,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 26,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 27,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 28,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 29,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 30,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 31,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 32,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 33,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 34,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 35,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 36,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 37,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 38,
+       "lower": 500,
+       "upper": 540
+      },
+      {
+       "raw": 39,
+       "lower": 500,
+       "upper": 540
+      },
+      {
+       "raw": 40,
+       "lower": 510,
+       "upper": 550
+      },
+      {
+       "raw": 41,
+       "lower": 520,
+       "upper": 560
+      },
+      {
+       "raw": 42,
+       "lower": 530,
+       "upper": 570
+      },
+      {
+       "raw": 43,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 44,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 45,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 46,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 47,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 48,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 49,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 50,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 51,
+       "lower": 620,
+       "upper": 660
+      },
+      {
+       "raw": 52,
+       "lower": 630,
+       "upper": 670
+      },
+      {
+       "raw": 53,
+       "lower": 640,
+       "upper": 680
+      },
+      {
+       "raw": 54,
+       "lower": 650,
+       "upper": 690
+      },
+      {
+       "raw": 55,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 56,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 57,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 58,
+       "lower": 700,
+       "upper": 740
+      },
+      {
+       "raw": 59,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 60,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 61,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 62,
+       "lower": 750,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 760,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 770,
+       "upper": 790
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 240
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 260
+      },
+      {
+       "raw": 7,
+       "lower": 220,
+       "upper": 270
+      },
+      {
+       "raw": 8,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 9,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 10,
+       "lower": 290,
+       "upper": 330
+      },
+      {
+       "raw": 11,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 12,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 13,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 14,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 15,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 16,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 17,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 18,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 19,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 20,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 21,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 22,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 23,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 24,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 25,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 26,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 27,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 28,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 29,
+       "lower": 450,
+       "upper": 510
+      },
+      {
+       "raw": 30,
+       "lower": 460,
+       "upper": 520
+      },
+      {
+       "raw": 31,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 32,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 33,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 34,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 35,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 41,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 660,
+       "upper": 720
+      },
+      {
+       "raw": 47,
+       "lower": 680,
+       "upper": 740
+      },
+      {
+       "raw": 48,
+       "lower": 700,
+       "upper": 760
+      },
+      {
+       "raw": 49,
+       "lower": 720,
+       "upper": 780
+      },
+      {
+       "raw": 50,
+       "lower": 750,
+       "upper": 790
+      },
+      {
+       "raw": 51,
+       "lower": 760,
+       "upper": 800
+      },
+      {
+       "raw": 52,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 790,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_6": {
+   "form_id": "sat_practice_test_6",
+   "practice_test_number": 6,
+   "guide_title": "Scoring Your Paper SAT Practice Test #6",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #6",
+   "document_code": "2324-WKD-1054",
+   "copyright_year": 2024,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-6-digital.pdf",
+   "pdf_sha256": "6defb1339412b42ffcd18aeecad072cb889d3accd3279693ada2793ddcdf147c",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 6,
+       "lower": 200,
+       "upper": 230
+      },
+      {
+       "raw": 7,
+       "lower": 200,
+       "upper": 250
+      },
+      {
+       "raw": 8,
+       "lower": 210,
+       "upper": 270
+      },
+      {
+       "raw": 9,
+       "lower": 220,
+       "upper": 280
+      },
+      {
+       "raw": 10,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 11,
+       "lower": 240,
+       "upper": 300
+      },
+      {
+       "raw": 12,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 13,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 14,
+       "lower": 280,
+       "upper": 330
+      },
+      {
+       "raw": 15,
+       "lower": 290,
+       "upper": 350
+      },
+      {
+       "raw": 16,
+       "lower": 310,
+       "upper": 370
+      },
+      {
+       "raw": 17,
+       "lower": 320,
+       "upper": 380
+      },
+      {
+       "raw": 18,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 19,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 20,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 21,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 22,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 23,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 24,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 25,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 26,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 27,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 28,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 29,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 30,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 31,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 32,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 33,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 34,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 35,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 36,
+       "lower": 500,
+       "upper": 540
+      },
+      {
+       "raw": 37,
+       "lower": 510,
+       "upper": 550
+      },
+      {
+       "raw": 38,
+       "lower": 520,
+       "upper": 560
+      },
+      {
+       "raw": 39,
+       "lower": 530,
+       "upper": 570
+      },
+      {
+       "raw": 40,
+       "lower": 540,
+       "upper": 580
+      },
+      {
+       "raw": 41,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 42,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 43,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 44,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 45,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 46,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 47,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 48,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 49,
+       "lower": 620,
+       "upper": 660
+      },
+      {
+       "raw": 50,
+       "lower": 630,
+       "upper": 670
+      },
+      {
+       "raw": 51,
+       "lower": 640,
+       "upper": 680
+      },
+      {
+       "raw": 52,
+       "lower": 650,
+       "upper": 690
+      },
+      {
+       "raw": 53,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 54,
+       "lower": 670,
+       "upper": 710
+      },
+      {
+       "raw": 55,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 56,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 57,
+       "lower": 700,
+       "upper": 740
+      },
+      {
+       "raw": 58,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 59,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 60,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 61,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 62,
+       "lower": 750,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 760,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 770,
+       "upper": 790
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": [
+      {
+       "raw": 41,
+       "field": "lower",
+       "previous_raw_value": 540,
+       "value": 530
+      }
+     ]
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 2,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 3,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 4,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 5,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 6,
+       "lower": 200,
+       "upper": 210
+      },
+      {
+       "raw": 7,
+       "lower": 200,
+       "upper": 230
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 260
+      },
+      {
+       "raw": 9,
+       "lower": 240,
+       "upper": 320
+      },
+      {
+       "raw": 10,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 11,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 12,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 13,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 14,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 15,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 16,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 17,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 18,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 19,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 20,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 21,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 22,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 23,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 24,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 25,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 26,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 27,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 28,
+       "lower": 440,
+       "upper": 500
+      },
+      {
+       "raw": 29,
+       "lower": 450,
+       "upper": 510
+      },
+      {
+       "raw": 30,
+       "lower": 460,
+       "upper": 520
+      },
+      {
+       "raw": 31,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 32,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 33,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 34,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 35,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 660,
+       "upper": 720
+      },
+      {
+       "raw": 47,
+       "lower": 680,
+       "upper": 740
+      },
+      {
+       "raw": 48,
+       "lower": 700,
+       "upper": 760
+      },
+      {
+       "raw": 49,
+       "lower": 720,
+       "upper": 780
+      },
+      {
+       "raw": 50,
+       "lower": 750,
+       "upper": 790
+      },
+      {
+       "raw": 51,
+       "lower": 760,
+       "upper": 800
+      },
+      {
+       "raw": 52,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 790,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_7": {
+   "form_id": "sat_practice_test_7",
+   "practice_test_number": 7,
+   "guide_title": "Scoring Your Paper SAT Practice Test #7",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #7",
+   "document_code": "2425-WKD-289",
+   "copyright_year": 2025,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-7-digital.pdf",
+   "pdf_sha256": "bc8798ee38af1d96ae6506cbe0a741e730815ae9675c7857d49d0f13762336f3",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 7,
+       "lower": 210,
+       "upper": 250
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 260
+      },
+      {
+       "raw": 9,
+       "lower": 220,
+       "upper": 270
+      },
+      {
+       "raw": 10,
+       "lower": 220,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 12,
+       "lower": 230,
+       "upper": 300
+      },
+      {
+       "raw": 13,
+       "lower": 240,
+       "upper": 310
+      },
+      {
+       "raw": 14,
+       "lower": 240,
+       "upper": 320
+      },
+      {
+       "raw": 15,
+       "lower": 250,
+       "upper": 330
+      },
+      {
+       "raw": 16,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 17,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 18,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 19,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 20,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 21,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 22,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 23,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 24,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 25,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 26,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 27,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 28,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 29,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 30,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 31,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 32,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 33,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 34,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 35,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 36,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 37,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 38,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 39,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 40,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 41,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 42,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 43,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 44,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 45,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 46,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 47,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 48,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 49,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 50,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 51,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 52,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 53,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 54,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 55,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 56,
+       "lower": 670,
+       "upper": 710
+      },
+      {
+       "raw": 57,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 58,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 59,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 60,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 61,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 62,
+       "lower": 750,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 760,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 770,
+       "upper": 790
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 250
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 260
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 270
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 280
+      },
+      {
+       "raw": 7,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 8,
+       "lower": 250,
+       "upper": 300
+      },
+      {
+       "raw": 9,
+       "lower": 260,
+       "upper": 310
+      },
+      {
+       "raw": 10,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 11,
+       "lower": 300,
+       "upper": 360
+      },
+      {
+       "raw": 12,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 13,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 14,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 15,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 16,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 17,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 18,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 19,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 20,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 21,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 22,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 23,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 24,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 25,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 26,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 27,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 28,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 29,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 30,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 31,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 32,
+       "lower": 500,
+       "upper": 540
+      },
+      {
+       "raw": 33,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 34,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 35,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 650,
+       "upper": 710
+      },
+      {
+       "raw": 47,
+       "lower": 670,
+       "upper": 730
+      },
+      {
+       "raw": 48,
+       "lower": 690,
+       "upper": 750
+      },
+      {
+       "raw": 49,
+       "lower": 700,
+       "upper": 760
+      },
+      {
+       "raw": 50,
+       "lower": 720,
+       "upper": 770
+      },
+      {
+       "raw": 51,
+       "lower": 750,
+       "upper": 780
+      },
+      {
+       "raw": 52,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_8": {
+   "form_id": "sat_practice_test_8",
+   "practice_test_number": 8,
+   "guide_title": "Scoring Your Paper SAT Practice Test #8",
+   "pdf_metadata_title": "Scoring Your SAT Practice Test #8",
+   "document_code": "2425-WKD-290",
+   "copyright_year": 2025,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-8-digital.pdf",
+   "pdf_sha256": "8582d33f07624136dcfc6fe6b3f8a2e76b5b25310903262d975fbc7b3ec79bc6",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 7,
+       "lower": 220,
+       "upper": 250
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 260
+      },
+      {
+       "raw": 9,
+       "lower": 230,
+       "upper": 270
+      },
+      {
+       "raw": 10,
+       "lower": 230,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 240,
+       "upper": 290
+      },
+      {
+       "raw": 12,
+       "lower": 240,
+       "upper": 300
+      },
+      {
+       "raw": 13,
+       "lower": 250,
+       "upper": 310
+      },
+      {
+       "raw": 14,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 15,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 16,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 17,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 18,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 19,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 20,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 21,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 22,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 23,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 24,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 25,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 26,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 27,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 28,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 29,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 30,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 31,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 32,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 33,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 34,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 35,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 36,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 37,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 38,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 39,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 40,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 41,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 42,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 43,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 44,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 45,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 46,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 47,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 48,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 49,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 50,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 51,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 52,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 53,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 54,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 55,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 56,
+       "lower": 670,
+       "upper": 710
+      },
+      {
+       "raw": 57,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 58,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 59,
+       "lower": 700,
+       "upper": 740
+      },
+      {
+       "raw": 60,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 61,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 62,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 740,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 760,
+       "upper": 790
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 250
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 260
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 270
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 280
+      },
+      {
+       "raw": 7,
+       "lower": 210,
+       "upper": 290
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 300
+      },
+      {
+       "raw": 9,
+       "lower": 230,
+       "upper": 310
+      },
+      {
+       "raw": 10,
+       "lower": 260,
+       "upper": 340
+      },
+      {
+       "raw": 11,
+       "lower": 290,
+       "upper": 350
+      },
+      {
+       "raw": 12,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 13,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 14,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 15,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 16,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 17,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 18,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 19,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 20,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 21,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 22,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 23,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 24,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 25,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 26,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 27,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 28,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 29,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 30,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 31,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 32,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 33,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 34,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 35,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 36,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 660,
+       "upper": 720
+      },
+      {
+       "raw": 47,
+       "lower": 670,
+       "upper": 730
+      },
+      {
+       "raw": 48,
+       "lower": 690,
+       "upper": 750
+      },
+      {
+       "raw": 49,
+       "lower": 710,
+       "upper": 770
+      },
+      {
+       "raw": 50,
+       "lower": 740,
+       "upper": 780
+      },
+      {
+       "raw": 51,
+       "lower": 760,
+       "upper": 790
+      },
+      {
+       "raw": 52,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_9": {
+   "form_id": "sat_practice_test_9",
+   "practice_test_number": 9,
+   "guide_title": "Scoring Your Paper SAT Practice Test #9",
+   "pdf_metadata_title": "Scoring Your Paper PSAT/NMSQT Practice Test #9",
+   "document_code": "2425-WKD-291",
+   "copyright_year": 2025,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-9-digital.pdf",
+   "pdf_sha256": "928485b854d73384d7570ec4383a2581b2ad0c24fa78164049cb7931846c74fa",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 6,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 7,
+       "lower": 210,
+       "upper": 250
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 260
+      },
+      {
+       "raw": 9,
+       "lower": 220,
+       "upper": 270
+      },
+      {
+       "raw": 10,
+       "lower": 230,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 230,
+       "upper": 290
+      },
+      {
+       "raw": 12,
+       "lower": 240,
+       "upper": 300
+      },
+      {
+       "raw": 13,
+       "lower": 250,
+       "upper": 310
+      },
+      {
+       "raw": 14,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 15,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 16,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 17,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 18,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 19,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 20,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 21,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 22,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 23,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 24,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 25,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 26,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 27,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 28,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 29,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 30,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 31,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 32,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 33,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 34,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 35,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 36,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 37,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 38,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 39,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 40,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 41,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 42,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 43,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 44,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 45,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 46,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 47,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 48,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 49,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 50,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 51,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 52,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 53,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 54,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 55,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 56,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 57,
+       "lower": 670,
+       "upper": 710
+      },
+      {
+       "raw": 58,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 59,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 60,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 61,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 62,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 740,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 760,
+       "upper": 790
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 250
+      },
+      {
+       "raw": 6,
+       "lower": 220,
+       "upper": 260
+      },
+      {
+       "raw": 7,
+       "lower": 240,
+       "upper": 270
+      },
+      {
+       "raw": 8,
+       "lower": 250,
+       "upper": 280
+      },
+      {
+       "raw": 9,
+       "lower": 260,
+       "upper": 300
+      },
+      {
+       "raw": 10,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 11,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 12,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 13,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 14,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 15,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 16,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 17,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 18,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 19,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 20,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 21,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 22,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 23,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 24,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 25,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 26,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 27,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 28,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 29,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 30,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 31,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 32,
+       "lower": 500,
+       "upper": 540
+      },
+      {
+       "raw": 33,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 34,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 35,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 39,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 40,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 43,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 44,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 45,
+       "lower": 650,
+       "upper": 710
+      },
+      {
+       "raw": 46,
+       "lower": 660,
+       "upper": 720
+      },
+      {
+       "raw": 47,
+       "lower": 680,
+       "upper": 740
+      },
+      {
+       "raw": 48,
+       "lower": 690,
+       "upper": 750
+      },
+      {
+       "raw": 49,
+       "lower": 710,
+       "upper": 760
+      },
+      {
+       "raw": 50,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 51,
+       "lower": 750,
+       "upper": 780
+      },
+      {
+       "raw": 52,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_10": {
+   "form_id": "sat_practice_test_10",
+   "practice_test_number": 10,
+   "guide_title": "Scoring Your Paper SAT Practice Test #10",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #10",
+   "document_code": "2425-WKD-292",
+   "copyright_year": 2025,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-10-digital.pdf",
+   "pdf_sha256": "d33ca9d96e78888d26b4685d099e0598e56cc8122703b3f4e8e5b9d1ac3e35c2",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 6,
+       "lower": 220,
+       "upper": 240
+      },
+      {
+       "raw": 7,
+       "lower": 220,
+       "upper": 250
+      },
+      {
+       "raw": 8,
+       "lower": 230,
+       "upper": 260
+      },
+      {
+       "raw": 9,
+       "lower": 230,
+       "upper": 270
+      },
+      {
+       "raw": 10,
+       "lower": 240,
+       "upper": 280
+      },
+      {
+       "raw": 11,
+       "lower": 240,
+       "upper": 290
+      },
+      {
+       "raw": 12,
+       "lower": 250,
+       "upper": 300
+      },
+      {
+       "raw": 13,
+       "lower": 250,
+       "upper": 310
+      },
+      {
+       "raw": 14,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 15,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 16,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 17,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 18,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 19,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 20,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 21,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 22,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 23,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 24,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 25,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 26,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 27,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 28,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 29,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 30,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 31,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 32,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 33,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 34,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 35,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 36,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 37,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 38,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 39,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 40,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 41,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 42,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 43,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 44,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 45,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 46,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 47,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 48,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 49,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 50,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 51,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 52,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 53,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 54,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 55,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 56,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 57,
+       "lower": 670,
+       "upper": 710
+      },
+      {
+       "raw": 58,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 59,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 60,
+       "lower": 700,
+       "upper": 740
+      },
+      {
+       "raw": 61,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 62,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 740,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 760,
+       "upper": 780
+      },
+      {
+       "raw": 65,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 240
+      },
+      {
+       "raw": 6,
+       "lower": 220,
+       "upper": 250
+      },
+      {
+       "raw": 7,
+       "lower": 230,
+       "upper": 260
+      },
+      {
+       "raw": 8,
+       "lower": 240,
+       "upper": 300
+      },
+      {
+       "raw": 9,
+       "lower": 250,
+       "upper": 310
+      },
+      {
+       "raw": 10,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 11,
+       "lower": 280,
+       "upper": 340
+      },
+      {
+       "raw": 12,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 13,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 14,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 15,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 16,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 17,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 18,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 19,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 20,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 21,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 22,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 23,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 24,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 25,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 26,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 27,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 28,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 29,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 30,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 31,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 32,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 33,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 34,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 35,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 650,
+       "upper": 710
+      },
+      {
+       "raw": 47,
+       "lower": 670,
+       "upper": 730
+      },
+      {
+       "raw": 48,
+       "lower": 680,
+       "upper": 740
+      },
+      {
+       "raw": 49,
+       "lower": 700,
+       "upper": 760
+      },
+      {
+       "raw": 50,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 51,
+       "lower": 750,
+       "upper": 780
+      },
+      {
+       "raw": 52,
+       "lower": 770,
+       "upper": 790
+      },
+      {
+       "raw": 53,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  },
+  "sat_practice_test_11": {
+   "form_id": "sat_practice_test_11",
+   "practice_test_number": 11,
+   "guide_title": "Scoring Your Paper SAT Practice Test #11",
+   "pdf_metadata_title": "Scoring Your Paper SAT Practice Test #11",
+   "document_code": "2526-WKD-439",
+   "copyright_year": 2026,
+   "source_url": "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-11-digital.pdf",
+   "pdf_sha256": "8cf577b00d2ee8dd9d0c5bdb15b98bd2802cfdb9409ce2b51b41a59c0d92d3cd",
+   "table_page": 5,
+   "verified_at": "2026-10-22",
+   "verification_method": "pdftotext -layout and -raw of the conversion-table page; both identical",
+   "scope": "paper (nonadaptive) version of the digital SAT practice test; practice estimate, not an official SAT score",
+   "sections": {
+    "reading_writing": {
+     "raw_min": 0,
+     "raw_max": 66,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 4,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 5,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 6,
+       "lower": 220,
+       "upper": 240
+      },
+      {
+       "raw": 7,
+       "lower": 220,
+       "upper": 240
+      },
+      {
+       "raw": 8,
+       "lower": 220,
+       "upper": 250
+      },
+      {
+       "raw": 9,
+       "lower": 230,
+       "upper": 260
+      },
+      {
+       "raw": 10,
+       "lower": 230,
+       "upper": 270
+      },
+      {
+       "raw": 11,
+       "lower": 240,
+       "upper": 280
+      },
+      {
+       "raw": 12,
+       "lower": 250,
+       "upper": 290
+      },
+      {
+       "raw": 13,
+       "lower": 250,
+       "upper": 300
+      },
+      {
+       "raw": 14,
+       "lower": 260,
+       "upper": 310
+      },
+      {
+       "raw": 15,
+       "lower": 270,
+       "upper": 320
+      },
+      {
+       "raw": 16,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 17,
+       "lower": 290,
+       "upper": 330
+      },
+      {
+       "raw": 18,
+       "lower": 300,
+       "upper": 340
+      },
+      {
+       "raw": 19,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 20,
+       "lower": 320,
+       "upper": 360
+      },
+      {
+       "raw": 21,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 22,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 23,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 24,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 25,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 26,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 27,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 28,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 29,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 30,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 31,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 32,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 33,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 34,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 35,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 36,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 37,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 38,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 39,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 40,
+       "lower": 470,
+       "upper": 530
+      },
+      {
+       "raw": 41,
+       "lower": 480,
+       "upper": 540
+      },
+      {
+       "raw": 42,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 43,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 44,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 45,
+       "lower": 520,
+       "upper": 580
+      },
+      {
+       "raw": 46,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 47,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 48,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 49,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 50,
+       "lower": 580,
+       "upper": 640
+      },
+      {
+       "raw": 51,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 52,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 53,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 54,
+       "lower": 630,
+       "upper": 690
+      },
+      {
+       "raw": 55,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 56,
+       "lower": 660,
+       "upper": 700
+      },
+      {
+       "raw": 57,
+       "lower": 680,
+       "upper": 720
+      },
+      {
+       "raw": 58,
+       "lower": 690,
+       "upper": 730
+      },
+      {
+       "raw": 59,
+       "lower": 700,
+       "upper": 740
+      },
+      {
+       "raw": 60,
+       "lower": 710,
+       "upper": 750
+      },
+      {
+       "raw": 61,
+       "lower": 720,
+       "upper": 760
+      },
+      {
+       "raw": 62,
+       "lower": 730,
+       "upper": 770
+      },
+      {
+       "raw": 63,
+       "lower": 740,
+       "upper": 780
+      },
+      {
+       "raw": 64,
+       "lower": 760,
+       "upper": 780
+      },
+      {
+       "raw": 65,
+       "lower": 780,
+       "upper": 800
+      },
+      {
+       "raw": 66,
+       "lower": 800,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    },
+    "math": {
+     "raw_min": 0,
+     "raw_max": 54,
+     "entries": [
+      {
+       "raw": 0,
+       "lower": 200,
+       "upper": 200
+      },
+      {
+       "raw": 1,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 2,
+       "lower": 210,
+       "upper": 220
+      },
+      {
+       "raw": 3,
+       "lower": 210,
+       "upper": 230
+      },
+      {
+       "raw": 4,
+       "lower": 220,
+       "upper": 240
+      },
+      {
+       "raw": 5,
+       "lower": 230,
+       "upper": 250
+      },
+      {
+       "raw": 6,
+       "lower": 240,
+       "upper": 270
+      },
+      {
+       "raw": 7,
+       "lower": 250,
+       "upper": 290
+      },
+      {
+       "raw": 8,
+       "lower": 260,
+       "upper": 320
+      },
+      {
+       "raw": 9,
+       "lower": 270,
+       "upper": 330
+      },
+      {
+       "raw": 10,
+       "lower": 290,
+       "upper": 350
+      },
+      {
+       "raw": 11,
+       "lower": 310,
+       "upper": 350
+      },
+      {
+       "raw": 12,
+       "lower": 330,
+       "upper": 370
+      },
+      {
+       "raw": 13,
+       "lower": 340,
+       "upper": 380
+      },
+      {
+       "raw": 14,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 15,
+       "lower": 350,
+       "upper": 390
+      },
+      {
+       "raw": 16,
+       "lower": 360,
+       "upper": 400
+      },
+      {
+       "raw": 17,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 18,
+       "lower": 370,
+       "upper": 410
+      },
+      {
+       "raw": 19,
+       "lower": 380,
+       "upper": 420
+      },
+      {
+       "raw": 20,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 21,
+       "lower": 390,
+       "upper": 430
+      },
+      {
+       "raw": 22,
+       "lower": 400,
+       "upper": 440
+      },
+      {
+       "raw": 23,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 24,
+       "lower": 410,
+       "upper": 450
+      },
+      {
+       "raw": 25,
+       "lower": 420,
+       "upper": 460
+      },
+      {
+       "raw": 26,
+       "lower": 430,
+       "upper": 470
+      },
+      {
+       "raw": 27,
+       "lower": 440,
+       "upper": 480
+      },
+      {
+       "raw": 28,
+       "lower": 450,
+       "upper": 490
+      },
+      {
+       "raw": 29,
+       "lower": 460,
+       "upper": 500
+      },
+      {
+       "raw": 30,
+       "lower": 470,
+       "upper": 510
+      },
+      {
+       "raw": 31,
+       "lower": 480,
+       "upper": 520
+      },
+      {
+       "raw": 32,
+       "lower": 490,
+       "upper": 530
+      },
+      {
+       "raw": 33,
+       "lower": 490,
+       "upper": 550
+      },
+      {
+       "raw": 34,
+       "lower": 500,
+       "upper": 560
+      },
+      {
+       "raw": 35,
+       "lower": 510,
+       "upper": 570
+      },
+      {
+       "raw": 36,
+       "lower": 530,
+       "upper": 590
+      },
+      {
+       "raw": 37,
+       "lower": 540,
+       "upper": 600
+      },
+      {
+       "raw": 38,
+       "lower": 550,
+       "upper": 610
+      },
+      {
+       "raw": 39,
+       "lower": 560,
+       "upper": 620
+      },
+      {
+       "raw": 40,
+       "lower": 570,
+       "upper": 630
+      },
+      {
+       "raw": 41,
+       "lower": 590,
+       "upper": 650
+      },
+      {
+       "raw": 42,
+       "lower": 600,
+       "upper": 660
+      },
+      {
+       "raw": 43,
+       "lower": 610,
+       "upper": 670
+      },
+      {
+       "raw": 44,
+       "lower": 620,
+       "upper": 680
+      },
+      {
+       "raw": 45,
+       "lower": 640,
+       "upper": 700
+      },
+      {
+       "raw": 46,
+       "lower": 650,
+       "upper": 710
+      },
+      {
+       "raw": 47,
+       "lower": 660,
+       "upper": 720
+      },
+      {
+       "raw": 48,
+       "lower": 680,
+       "upper": 740
+      },
+      {
+       "raw": 49,
+       "lower": 700,
+       "upper": 760
+      },
+      {
+       "raw": 50,
+       "lower": 710,
+       "upper": 770
+      },
+      {
+       "raw": 51,
+       "lower": 730,
+       "upper": 780
+      },
+      {
+       "raw": 52,
+       "lower": 750,
+       "upper": 800
+      },
+      {
+       "raw": 53,
+       "lower": 770,
+       "upper": 800
+      },
+      {
+       "raw": 54,
+       "lower": 790,
+       "upper": 800
+      }
+     ],
+     "source_anomalies": []
+    }
+   }
+  }
+ }
+}

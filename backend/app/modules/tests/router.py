@@ -19,6 +19,7 @@ from app.modules.tests.dependencies import (
     get_routing_threshold_rule_service,
     get_test_service,
 )
+from app.modules.results.official_scoring import source_anomaly_notes
 from app.modules.tests.schemas import (
     ConversionTableCreateRequest,
     ConversionTableOut,
@@ -422,8 +423,17 @@ def list_conversion_tables(
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
     rows = service.list_tables(section_id)
-    out = [ConversionTableOut.model_validate(t).model_copy(update={"is_current": current}) for t, current in rows]
+    out = [_table_out(t, current) for t, current in rows]
     return success_response(out, "Konversiya jadvallari.")
+
+
+def _table_out(table, is_current: bool) -> ConversionTableOut:
+    """Task 8 — adds the documented source anomalies of an official table."""
+    component = table.section.score_component if getattr(table, "section", None) is not None else None
+    return ConversionTableOut.model_validate(table).model_copy(update={
+        "is_current": is_current,
+        "source_anomalies": source_anomaly_notes(table.test_form, component) if table.conversion_type == "official_practice_test" else [],
+    })
 
 
 @router.post(
@@ -443,7 +453,7 @@ def publish_conversion_table(
     user: User = Depends(require_roles("Admin", "Super Admin")),
 ):
     table = service.publish_table(section_id, data, actor_id=user.id)
-    return success_response(ConversionTableOut.model_validate(table).model_copy(update={"is_current": True}), "Jadval e'lon qilindi.")
+    return success_response(_table_out(table, True), "Jadval e'lon qilindi.")
 
 
 @router.put(

@@ -334,3 +334,5 @@ class ScoreConversionTable(Base, UUIDPrimaryKeyMixin, TimestampMixin, AuditMixin
     source_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
     source_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source_verified_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Task 8 — read-only navigation (which component the table belongs to).
+    section: Mapped["ExamSection"] = relationship("ExamSection", lazy="select", viewonly=True)

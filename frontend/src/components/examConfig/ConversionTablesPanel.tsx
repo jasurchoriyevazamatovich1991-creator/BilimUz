@@ -6,10 +6,13 @@
  * and answers 422 with a specific message (shown as a toast).
  *
  * Task 7 — every table states its provenance. "Rasmiy amaliy test" is
- * offered only for SAT: the admin picks the exact College Board practice
- * test and types its lower/upper values from that test's scoring guide
- * (the backend fills the official source link from its registry). IELTS
- * and GRE tables can only be estimates or unverified.
+ * offered only for SAT. IELTS and GRE tables can only be estimates or
+ * unverified.
+ *
+ * Task 8 — for an official SAT practice test the admin only picks the form:
+ * the exact lower/upper values come from the verified College Board dataset
+ * on the server (nothing is typed by hand). Documented source anomalies
+ * (e.g. Practice Test 6, R&W raw 41) are listed as warnings.
  */
 import { useState, useId, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,8 +59,13 @@ export function ConversionTablesPanel({ sectionId, component, variants }: Conver
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (isOfficial && !testForm) {
-      setError("Rasmiy jadval uchun amaliy testni tanlang");
+    if (isOfficial) {
+      if (!testForm) {
+        setError("Rasmiy jadval uchun amaliy testni tanlang");
+        return;
+      }
+      setError(null);
+      publish.mutate({ method: "range", conversion_type: "official_practice_test", test_form: testForm });
       return;
     }
     const parsed = effectiveMethod === "range" ? parseRangeTableText(text) : parseTableText(text);
@@ -67,13 +75,10 @@ export function ConversionTablesPanel({ sectionId, component, variants }: Conver
     }
     setError(null);
     const body: ConversionTableCreateRequest = { method: effectiveMethod, entries: parsed.entries };
-    if (variant && !isOfficial) body.routing_variant = variant;
+    if (variant) body.routing_variant = variant;
     if (ctype !== "unverified") body.conversion_type = ctype;
-    if (isOfficial) body.test_form = testForm;
-    if (!isOfficial) {
-      if (sourceTitle.trim()) body.source_title = sourceTitle.trim();
-      if (sourceUrl.trim()) body.source_url = sourceUrl.trim();
-    }
+    if (sourceTitle.trim()) body.source_title = sourceTitle.trim();
+    if (sourceUrl.trim()) body.source_url = sourceUrl.trim();
     if (verifiedAt) body.source_verified_at = verifiedAt;
     publish.mutate(body, { onSuccess: () => setText("") });
   }
@@ -122,7 +127,11 @@ export function ConversionTablesPanel({ sectionId, component, variants }: Conver
                   </>
                 ) : t.source_title ? ` · ${t.source_title}` : ""}
                 {t.source_verified_at ? ` · tekshirilgan: ${t.source_verified_at}` : ""}
+                {t.source_version ? ` · ${t.source_version}` : ""}
               </span>
+              {(t.source_anomalies ?? []).map((note) => (
+                <span key={note} role="note" className="block text-xs text-amber-700" data-testid="table-anomaly">⚠ {note}</span>
+              ))}
             </li>
           ))}
         </ul>
@@ -187,9 +196,11 @@ export function ConversionTablesPanel({ sectionId, component, variants }: Conver
           ) : null}
         </div>
         {isOfficial ? (
-          <p className="text-xs text-foreground/60">
-            Qiymatlarni tanlangan testning rasmiy scoring guide'idagi "Raw Score Conversion Table"dan aynan ko'chiring.
-            Manba havolasi avtomatik qo'yiladi. Natija talabaga "amaliy test bo'yicha taxminiy oraliq — rasmiy SAT natijasi emas" deb ko'rsatiladi.
+          <p className="text-xs text-foreground/60" data-testid="official-import-note">
+            Qiymatlar kiritilmaydi: tanlangan testning rasmiy College Board scoring guide'idagi jadval (R&W 0–66, Math 0–54,
+            pastki–yuqori oraliq) tekshirilgan manbadan aynan olinadi va manba havolasi qo'yiladi. Bo'limda shu formaning
+            savollar soni (R&W 66, Math 54, har biri 1 ball) bo'lishi kerak; adaptiv bo'limlarga qo'llanmaydi. Natija talabaga
+            "amaliy test bo'yicha taxminiy oraliq — rasmiy SAT natijasi emas" deb ko'rsatiladi.
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -205,26 +216,32 @@ export function ConversionTablesPanel({ sectionId, component, variants }: Conver
             </div>
           </div>
         )}
-        <div>
-          <label htmlFor={`${id}-verified`} className="mb-1 block text-xs font-medium text-foreground/70">Manba tekshirilgan sana (ixtiyoriy)</label>
-          <input id={`${id}-verified`} type="date" value={verifiedAt} onChange={(e) => setVerifiedAt(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label htmlFor={`${id}-rows`} className="mb-1 block text-xs font-medium text-foreground/70">
-            {effectiveMethod === "range" ? 'Qatorlar: har qatorda "xom ball, pastki, yuqori"' : 'Qatorlar: har qatorda "xom ball, shkala balli"'}
-          </label>
-          <textarea
-            id={`${id}-rows`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={6}
-            placeholder={effectiveMethod === "range" ? "0, 200, 200\n1, 200, 210" : "0, 200\n1, 210\n2, 230"}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm"
-          />
-        </div>
+        {!isOfficial ? (
+          <>
+            <div>
+              <label htmlFor={`${id}-verified`} className="mb-1 block text-xs font-medium text-foreground/70">Manba tekshirilgan sana (ixtiyoriy)</label>
+              <input id={`${id}-verified`} type="date" value={verifiedAt} onChange={(e) => setVerifiedAt(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label htmlFor={`${id}-rows`} className="mb-1 block text-xs font-medium text-foreground/70">
+                {effectiveMethod === "range" ? 'Qatorlar: har qatorda "xom ball, pastki, yuqori"' : 'Qatorlar: har qatorda "xom ball, shkala balli"'}
+              </label>
+              <textarea
+                id={`${id}-rows`}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={6}
+                placeholder={effectiveMethod === "range" ? "0, 200, 200\n1, 200, 210" : "0, 200\n1, 210\n2, 230"}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm"
+              />
+            </div>
+          </>
+        ) : null}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={publish.isPending}>{publish.isPending ? "..." : "Yangi versiyani e'lon qilish"}</Button>
+        <Button type="submit" disabled={publish.isPending}>
+          {publish.isPending ? "..." : isOfficial ? "Rasmiy jadvalni import qilish" : "Yangi versiyani e'lon qilish"}
+        </Button>
       </form>
     </div>
   );

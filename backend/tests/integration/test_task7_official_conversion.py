@@ -9,13 +9,11 @@ numbers.
 """
 import uuid
 
-from app.modules.results.models import Result, ResultSection
 from tests.integration.test_task4_scaled_scoring import (
     API, Ctx, _by_component, _questions, _section, _set_profile, _take, _test,
 )
 
 IELTS_URL = "https://www.ielts.org/take-a-test/your-results/ielts-scoring-in-detail"
-SAT4_GUIDE = "https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-4-digital.pdf"
 
 
 def _profile(ctx, test, profile, **extra):
@@ -24,11 +22,6 @@ def _profile(ctx, test, profile, **extra):
 
 def _table(ctx, section_id, body):
     return ctx.client.post(f"{API}/tests/exam-sections/{section_id}/conversion-tables", json=body, headers=ctx.ah)
-
-
-def _range_rows(n, start, width):
-    """Synthetic monotonic range table 0..n (NOT official data)."""
-    return [{"raw": i, "lower": start + 20 * i, "upper": start + 20 * i + width} for i in range(n + 1)]
 
 
 def _ielts(ctx, module="academic", listening=40, reading=40, manual=True):
@@ -157,90 +150,9 @@ def test_admin_table_takes_precedence_and_is_labelled_unverified(client, pg_sess
 
 
 # --- SAT -----------------------------------------------------------------------------------
-
-def _sat(ctx, n=3):
-    test = _test(ctx.db, status="published")
-    ctx.db.commit()
-    assert _set_profile(ctx, test, "sat").status_code == 200
-    rw = _section(ctx, test, "Reading and Writing", 0, "sat_reading_writing")
-    math = _section(ctx, test, "Math", 1, "sat_math")
-    qs = {"rw": _questions(ctx.db, test.id, uuid.UUID(rw["id"]), n), "m": _questions(ctx.db, test.id, uuid.UUID(math["id"]), n)}
-    ctx.db.commit()
-    return test, rw, math, qs
-
-
-def _official(rows, form="sat_practice_test_4", **extra):
-    return {"method": "range", "conversion_type": "official_practice_test", "test_form": form, "entries": rows, **extra}
-
-
-def test_sat_practice_test_ranges_and_total(client, pg_session):
-    ctx = Ctx(client, pg_session)
-    test, rw, math, qs = _sat(ctx)
-    r = _table(ctx, rw["id"], _official(_range_rows(3, 200, 20), source_url="https://evil.example/fake"))
-    assert r.status_code == 201, r.json()
-    data = r.json()["data"]
-    # The source comes from the registry, never from the request.
-    assert (data["conversion_type"], data["test_form"], data["source_url"]) == ("official_practice_test", "sat_practice_test_4", SAT4_GUIDE)
-    assert data["entries"][1] == {"raw": "1", "lower": "220", "upper": "240"}
-    assert _table(ctx, math["id"], _official(_range_rows(3, 300, 0))).status_code == 201
-
-    detail = _take(ctx, test, {**_correct(qs["rw"], 2), **_correct(qs["m"], 1)})
-    sec = _by_component(detail)
-    RW, M = sec["sat_reading_writing"], sec["sat_math"]
-    assert (RW["scaled_score"], RW["scaled_score_lower"], RW["scaled_score_upper"]) == (None, 240.0, 260.0)
-    assert (M["scaled_score"], M["scaled_score_lower"], M["scaled_score_upper"]) == (320.0, 320.0, 320.0)   # lower == upper
-    for s in (RW, M):
-        assert s["score_basis"] == "official_practice_test"
-        assert s["source"]["test_form"] == "sat_practice_test_4" and "nonadaptive" in s["source"]["test_form_label"]
-        assert s["source"]["url"] == SAT4_GUIDE
-    assert (detail["overall_score_lower"], detail["overall_score_upper"], detail["overall_scaled_score"]) == (560.0, 580.0, None)
-    assert (detail["overall_status"], detail["overall_basis"]) == ("scaled", "official_practice_test")
-
-
-def test_sat_official_table_validation_and_form_isolation(client, pg_session):
-    ctx = Ctx(client, pg_session)
-    test, rw, math, qs = _sat(ctx)
-    good = _range_rows(3, 200, 20)
-    cases = [
-        _official(good, form=None),                                    # form required
-        _official(good, form="sat_practice_test_99"),                  # unknown form
-        _official(good, form="sat_practice_test_4", method="exact"),   # guides give ranges
-        _official([{"raw": 0, "lower": 200, "upper": 210}, {"raw": 2, "lower": 220, "upper": 230}]),   # gap
-        _official([{"raw": 0, "lower": 230, "upper": 220}]),           # lower > upper
-        _official([{"raw": 0, "lower": 205, "upper": 210}]),           # off the 10-point step
-        _official([{"raw": 0, "lower": 300, "upper": 310}, {"raw": 1, "lower": 290, "upper": 320}]),  # not monotonic
-        {"method": "range", "conversion_type": "official_guess", "entries": good},
-        {"method": "exact", "conversion_type": "estimate", "test_form": "sat_practice_test_4",
-         "entries": [{"raw": 0, "scaled": 200}]},                      # form only for official tables
-    ]
-    for body in cases:
-        assert _table(ctx, rw["id"], body).status_code == 422, body
-    assert _table(ctx, rw["id"], _official(good)).status_code == 201
-    # A different practice test's table can't be mixed into the same test.
-    clash = _table(ctx, math["id"], _official(good, form="sat_practice_test_5"))
-    assert clash.status_code == 409
-    assert _table(ctx, math["id"], _official(good, form="sat_practice_test_4")).status_code == 201
-
-
-def test_sat_official_table_refuses_routing_variant(client, pg_session):
-    ctx = Ctx(client, pg_session)
-    test, rw, math, qs = _sat(ctx)
-    from app.modules.tests.models import ExamModule
-    pg_session.add(ExamModule(section_id=uuid.UUID(rw["id"]), name="M2", order_number=1, routing_variant="hard"))
-    pg_session.commit()
-    body = _official(_range_rows(3, 200, 20), routing_variant="hard")
-    assert _table(ctx, rw["id"], body).status_code == 422
-
-
-def test_sat_unverified_table_mixed_with_official_gives_unverified_total(client, pg_session):
-    ctx = Ctx(client, pg_session)
-    test, rw, math, qs = _sat(ctx)
-    assert _table(ctx, rw["id"], _official(_range_rows(3, 200, 20))).status_code == 201
-    assert _table(ctx, math["id"], {"method": "exact", "entries": [{"raw": i, "scaled": 200 + 100 * i} for i in range(4)]}).status_code == 201
-    detail = _take(ctx, test, {**_correct(qs["rw"], 3), **_correct(qs["m"], 3)})
-    assert _by_component(detail)["sat_math"]["score_basis"] == "unverified_table"
-    assert (detail["overall_score_lower"], detail["overall_score_upper"], detail["overall_basis"]) == (760.0, 780.0, "unverified_table")
-
+# Task 8: official SAT practice-test tables now come only from the verified
+# dataset (Practice Tests 4–11, R&W 0–66, Math 0–54); their tests live in
+# test_task8_sat_practice_tables.py with real-size sections.
 
 # --- GRE -----------------------------------------------------------------------------------
 
@@ -270,32 +182,7 @@ def test_gre_has_no_official_conversion_or_composite(client, pg_session):
 
 # --- stability -----------------------------------------------------------------------------
 
-def test_finalized_results_never_change_when_tables_or_sources_change(client, pg_session):
-    ctx = Ctx(client, pg_session)
-    test, rw, math, qs = _sat(ctx)
-    assert _table(ctx, rw["id"], _official(_range_rows(3, 200, 20))).status_code == 201
-    assert _table(ctx, math["id"], _official(_range_rows(3, 300, 0))).status_code == 201
-    first = _take(ctx, test, {**_correct(qs["rw"], 1), **_correct(qs["m"], 1)})
-
-    # A new version of the RW table (still the same form) affects new results only.
-    assert _table(ctx, rw["id"], _official(_range_rows(3, 400, 20))).status_code == 201
-    second = _take(ctx, test, {**_correct(qs["rw"], 1), **_correct(qs["m"], 1)})
-    again = ctx.client.get(f"{API}/results/{first['id']}", headers=ctx.sh).json()["data"]
-    assert again == first
-    assert _by_component(second)["sat_reading_writing"]["scaled_score_lower"] == 420.0
-    assert _by_component(second)["sat_reading_writing"]["conversion_table_version"] == 2
-
-    # A result created before Task 7 (no provenance stored) is shown as is —
-    # no basis or source is retro-fitted onto it.
-    row = pg_session.query(ResultSection).filter(ResultSection.result_id == uuid.UUID(first["id"]),
-                                                 ResultSection.score_component == "sat_math").one()
-    row.score_basis = row.scaled_score_lower = row.scaled_score_upper = None
-    res = pg_session.get(Result, uuid.UUID(first["id"]))
-    res.overall_basis = None
-    pg_session.commit()
-    legacy = ctx.client.get(f"{API}/results/{first['id']}", headers=ctx.sh).json()["data"]
-    m = _by_component(legacy)["sat_math"]
-    assert (m["scaled_score"], m["score_basis"], m["source"], legacy["overall_basis"]) == (320.0, None, None, None)
+# (Historical-stability test for SAT practice tables: see test_task8_sat_practice_tables.py.)
 
 
 def test_plain_and_ordinary_tests_have_no_provenance(client, pg_session):

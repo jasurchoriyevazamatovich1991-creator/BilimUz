@@ -16,11 +16,13 @@ What is (and is not) here, and why:
   the Task 5 rubric workflow.
 * Digital SAT — College Board publishes a scoring guide per paper
   (nonadaptive) practice test whose conversion table gives a lower/upper
-  range per section. The tables themselves are NOT bundled here: they could
-  not be transcribed reliably from the PDFs in this environment, and must be
-  entered by an admin from the exact guide (ScoreConversionTable with
-  conversion_type='official_practice_test' + test_form). Only the form
-  registry (identifiers + guide URLs) lives here.
+  range per section. Task 8: the exact tables of Practice Tests 4–11 are
+  bundled in data/sat_paper_practice_tables.json, extracted
+  deterministically from the official PDFs by
+  scripts/extract_sat_practice_tables.py (two pdftotext modes, identical).
+  An admin still has to publish a form's table onto a section explicitly
+  (ScoreConversionTable, conversion_type='official_practice_test'); the
+  values always come from this file, never from the request.
 * GRE — ETS converts raw to scaled scores through equating, accounting for
   section-level adaptation; ETS publishes no raw-to-scaled table. No
   official conversion is supported; admin tables for GRE can only be
@@ -30,8 +32,10 @@ Entries are immutable once released: if a source changes, add a new key
 (e.g. "...@2027-01-01") rather than editing an existing one, so a stored
 ResultSection.score_source_key keeps meaning exactly what it meant.
 """
+import json
 from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 
 # --- score basis (result_sections.score_basis / results.overall_basis) ---
 BASIS_OFFICIAL_RULE = "official_rule"                       # an official scoring rule applied (IELTS overall rounding)
@@ -123,20 +127,65 @@ class PracticeForm:
     label: str
     scoring_guide_url: str
     source_key: str
+    # Task 8 — from the verified dataset.
+    guide_title: str = ""
+    document_code: str = ""
+    copyright_year: int | None = None
+    verified_at: str = ""
+    pdf_sha256: str = ""
 
 
-def _sat_form(n: int) -> PracticeForm:
+# --- Task 8: verified SAT paper practice-test tables -----------------------
+SAT_DATASET_PATH = Path(__file__).with_name("data") / "sat_paper_practice_tables.json"
+# score component -> dataset section key, with the raw range these linear
+# practice forms use (R&W: 2 x 0–33, Math: 2 x 0–27).
+SAT_COMPONENT_SECTIONS = {"sat_reading_writing": ("reading_writing", 66), "sat_math": ("math", 54)}
+
+with SAT_DATASET_PATH.open(encoding="utf-8") as _fh:
+    SAT_DATASET: dict = json.load(_fh)
+
+
+def _sat_form(entry: dict) -> PracticeForm:
+    n = entry["practice_test_number"]
     return PracticeForm(
-        form_id=f"sat_practice_test_{n}", exam="sat",
+        form_id=entry["form_id"], exam="sat",
         label=f"SAT Practice Test {n} (paper, nonadaptive)",
-        scoring_guide_url=f"https://satsuite.collegeboard.org/media/pdf/scoring-sat-practice-test-{n}-digital.pdf",
+        scoring_guide_url=entry["source_url"],
         source_key="collegeboard_sat_paper_practice@2026-10-21",
+        guide_title=entry["guide_title"], document_code=entry["document_code"],
+        copyright_year=entry["copyright_year"], verified_at=entry["verified_at"], pdf_sha256=entry["pdf_sha256"],
     )
 
 
-# Only forms whose scoring guide was located on the official page. No
-# conversion data — admins enter it from the guide itself.
-PRACTICE_FORMS: dict[str, PracticeForm] = {f.form_id: f for f in (_sat_form(n) for n in range(4, 12))}
+# Exactly the forms present in the verified dataset (Practice Tests 4–11).
+PRACTICE_FORMS: dict[str, PracticeForm] = {fid: _sat_form(e) for fid, e in SAT_DATASET["forms"].items()}
+
+
+def official_practice_table(form_id: str, component: str) -> tuple[list[dict], frozenset] | None:
+    """The verified (entries, allowed_source_anomalies) of one form's section,
+    or None. entries: [{"raw", "lower", "upper"}] exactly as published.
+    allowed_source_anomalies: {(raw, field, previous_raw_value, value)} —
+    the documented, verified non-monotonic rows of THIS form/section only."""
+    form = SAT_DATASET["forms"].get(form_id)
+    mapping = SAT_COMPONENT_SECTIONS.get(component)
+    if form is None or mapping is None:
+        return None
+    section = form["sections"][mapping[0]]
+    anomalies = frozenset((a["raw"], a["field"], a["previous_raw_value"], a["value"]) for a in section["source_anomalies"])
+    return [dict(e) for e in section["entries"]], anomalies
+
+
+def source_anomaly_notes(form_id: str | None, component: str | None) -> list[str]:
+    """Human-readable warnings for documented source anomalies (admin UI/audit)."""
+    found = official_practice_table(form_id or "", component or "")
+    if not found:
+        return []
+    form = SAT_DATASET["forms"][form_id]
+    return [
+        (f"{form['guide_title']} ({form['document_code']}): raw {raw} {field} = {value}, raw {raw - 1} da {previous} — "
+         f"rasmiy jadvalda kamayish bor; manbadagidek saqlangan")
+        for raw, field, previous, value in sorted(found[1])
+    ]
 
 # Which exams may have an "official_practice_test" table at all.
 OFFICIAL_TABLE_PROFILES = ("sat",)

@@ -451,6 +451,14 @@ class ResultService:
         raw = round(raw_score, 2)
         if table is not None:
             basis = osr.TABLE_TYPE_TO_BASIS.get(getattr(table, "conversion_type", None) or osr.TABLE_UNVERIFIED, osr.BASIS_UNVERIFIED)
+            if basis == osr.BASIS_OFFICIAL_PRACTICE_TEST:
+                # Task 8 — an official practice-test table is only meaningful
+                # for the same number of one-mark items it was published for
+                # (its highest raw score); otherwise the lookup would succeed
+                # on a different scale and mislabel the result.
+                table_max = max(_frac(e["raw"]) for e in table.entries)
+                if raw_max is None or raw_max != table_max:
+                    return _Scaled(None, None, osr.STATUS_RAW_SCALE_MISMATCH, table=table)
             if table.method == ss.METHOD_RANGE:
                 lower, upper, status = ss.convert_raw_range(table.entries, raw)
             else:

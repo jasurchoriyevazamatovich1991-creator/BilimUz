@@ -40,3 +40,11 @@ describe("score basis wording", () => {
     expect(SAT_PRACTICE_FORMS.map((f) => f.id)).toEqual([4, 5, 6, 7, 8, 9, 10, 11].map((n) => `sat_practice_test_${n}`));
   });
 });
+
+describe("Task 8 — scale mismatch wording", () => {
+  it("explains the mismatch for both IELTS and SAT practice tables", async () => {
+    const { SCALED_STATUS_LABELS } = await import("./scaledScoring");
+    expect(SCALED_STATUS_LABELS.raw_scale_mismatch).toMatch(/IELTS: 40 ta bir ballik/);
+    expect(SCALED_STATUS_LABELS.raw_scale_mismatch).toMatch(/SAT: jadvaldagi eng katta xom ball/);
+  });
+});

@@ -61,7 +61,8 @@ describe("ConversionTablesPanel — provenance", () => {
     expect(screen.getByText(/0→200–200 … 54→790–800/)).toBeInTheDocument();
   });
 
-  it("publishes an official SAT practice-test range table for a chosen form", async () => {
+  // Task 8 — official tables are imported from the verified dataset: no values are typed.
+  it("imports an official SAT practice-test table for a chosen form without typed values", async () => {
     vi.mocked(scoringApi.listTables).mockResolvedValue([]);
     vi.mocked(scoringApi.publishTable).mockResolvedValue(OFFICIAL);
     wrap(<ConversionTablesPanel sectionId="s1" component="sat_math" variants={["hard"]} />);
@@ -70,15 +71,26 @@ describe("ConversionTablesPanel — provenance", () => {
     expect(screen.queryByLabelText("Usul")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Routing variant")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Manba havolasi/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Qatorlar/), { target: { value: "0, 200, 200\n1, 200, 210" } });
-    fireEvent.click(screen.getByRole("button", { name: "Yangi versiyani e'lon qilish" }));
+    expect(screen.queryByLabelText(/Qatorlar/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("official-import-note")).toHaveTextContent("R&W 0–66, Math 0–54");
+    const submit = screen.getByRole("button", { name: "Rasmiy jadvalni import qilish" });
+    fireEvent.click(submit);
     expect(await screen.findByRole("alert")).toHaveTextContent("amaliy testni tanlang");
+    expect(scoringApi.publishTable).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Amaliy test"), { target: { value: "sat_practice_test_4" } });
-    fireEvent.click(screen.getByRole("button", { name: "Yangi versiyani e'lon qilish" }));
+    fireEvent.click(submit);
     await waitFor(() => expect(scoringApi.publishTable).toHaveBeenCalledWith("s1", {
       method: "range", conversion_type: "official_practice_test", test_form: "sat_practice_test_4",
-      entries: [{ raw: "0", lower: "200", upper: "200" }, { raw: "1", lower: "200", upper: "210" }],
     }));
+  });
+
+  it("shows documented source anomalies as warnings", async () => {
+    const note = "Scoring Your Paper SAT Practice Test #6 (2324-WKD-1054): raw 41 lower = 530, raw 40 da 540 — rasmiy jadvalda kamayish bor; manbadagidek saqlangan";
+    vi.mocked(scoringApi.listTables).mockResolvedValue([{ ...OFFICIAL, test_form: "sat_practice_test_6", source_anomalies: [note],
+      source_version: "2324-WKD-1054 (© 2024 College Board)" }]);
+    wrap(<ConversionTablesPanel sectionId="s1" component="sat_reading_writing" variants={[]} />);
+    expect(await screen.findByTestId("table-anomaly")).toHaveTextContent(`⚠ ${note}`);
+    expect(screen.getByTestId("table-provenance")).toHaveTextContent("2324-WKD-1054 (© 2024 College Board)");
   });
 
   it("does not offer official tables for IELTS or GRE; estimates carry a source", async () => {

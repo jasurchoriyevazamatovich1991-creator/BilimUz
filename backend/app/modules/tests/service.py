@@ -6,6 +6,7 @@ and status-transition rules described in
 docs/Sprint6_TestEngine_Architecture.md Section 11.
 """
 import uuid
+from datetime import date
 
 from app.core.audit import log_action
 from app.modules.grades.repository import GradeRepository
@@ -42,6 +43,7 @@ from app.modules.tests.repository import (
 )
 from app.modules.tests.schemas import (
     ConversionTableCreateRequest,
+    ConversionTableEntryIn,
     ExamModuleCreateRequest,
     ExamModuleUpdateRequest,
     ExamSectionCreateRequest,
@@ -68,8 +70,9 @@ from app.modules.results.official_scoring import (
     IELTS_MODULES,
     OFFICIAL_TABLE_PROFILES,
     PRACTICE_FORMS,
-    SOURCES,
     TABLE_OFFICIAL_PRACTICE_TEST,
+    official_practice_table,
+    source_anomaly_notes,
 )
 from app.modules.uploads.constants import UPLOAD_STATUS_PENDING
 from app.modules.uploads.repository import UploadRepository
@@ -665,6 +668,12 @@ class ExamScoringService:
             raise InvalidScoringConfigurationException("Rasmiy SAT amaliy test jadvali 'range' (lower/upper) usulida kiritiladi")
         if data.routing_variant is not None:
             raise InvalidScoringConfigurationException("Rasmiy amaliy test jadvali butun bo'lim uchun — routing_variant qo'yilmaydi")
+        # Task 8 — the guides score the paper (nonadaptive) form; a section
+        # whose modules route students adaptively is a different exam.
+        if any(m.routing_variant for m in self.module_repo.list_for_section(section.id)):
+            raise InvalidScoringConfigurationException(
+                "Rasmiy jadval paper (nonadaptive) amaliy test uchun — adaptiv (routing variantli) bo'limga qo'llanmaydi"
+            )
         for other in self.section_repo.list_for_test(test.id):
             for variant in {None} | {m.routing_variant for m in self.module_repo.list_for_section(other.id) if m.routing_variant}:
                 current = self.table_repo.get_current(other.id, variant)
@@ -672,11 +681,12 @@ class ExamScoringService:
                     raise ScoringConfigurationConflictException(
                         f"Bu testda boshqa amaliy test ({current.test_form}) jadvali bor — turli formalar aralashtirilmaydi"
                     )
-        source = SOURCES[form.source_key]
+        # Task 8 — provenance comes entirely from the verified dataset.
         return {
             "conversion_type": ctype, "test_form": form.form_id,
-            "source_url": form.scoring_guide_url, "source_title": f"Scoring guide — {form.label}",
-            "source_version": data.source_version or source.version, "source_verified_at": data.source_verified_at,
+            "source_url": form.scoring_guide_url, "source_title": f"{form.guide_title} — {form.label}",
+            "source_version": f"{form.document_code} (© {form.copyright_year} College Board)",
+            "source_verified_at": date.fromisoformat(form.verified_at),
         }
 
     def publish_table(self, section_id: uuid.UUID, data: ConversionTableCreateRequest, actor_id: uuid.UUID) -> ScoreConversionTable:
@@ -696,6 +706,25 @@ class ExamScoringService:
                     f"routing_variant='{data.routing_variant}' bu bo'limdagi hech bir modulda yo'q"
                 )
         provenance = self._provenance(test, section, data)
+        anomalies: frozenset = frozenset()
+        if provenance["conversion_type"] == TABLE_OFFICIAL_PRACTICE_TEST:
+            # Task 8 — the values are the verified College Board table for
+            # this form and section; a request may omit them, and anything it
+            # does send must match exactly (never a hand-typed variant).
+            official = official_practice_table(provenance["test_form"], section.score_component)
+            if official is None:
+                raise InvalidScoringConfigurationException("Bu forma/bo'lim uchun tekshirilgan rasmiy jadval yo'q")
+            verified_entries, anomalies = official
+            if data.entries:
+                sent = [{"raw": int(e.raw), "lower": int(e.lower), "upper": int(e.upper)}
+                        if e.lower is not None and e.upper is not None and e.raw == int(e.raw) else None for e in data.entries]
+                if sent != verified_entries:
+                    raise InvalidScoringConfigurationException(
+                        "Yuborilgan qiymatlar rasmiy scoring guide jadvaliga mos emas — qiymatlarni yubormang, ular manbadan olinadi"
+                    )
+            data = data.model_copy(update={"entries": [ConversionTableEntryIn(**e) for e in verified_entries]})
+        elif not data.entries:
+            raise InvalidScoringConfigurationException("Jadvalda kamida bitta qator bo'lishi kerak")
         if data.method == METHOD_RANGE:
             raw_entries = [{"raw": e.raw, "lower": e.lower, "upper": e.upper} for e in data.entries]
             if any(e.lower is None or e.upper is None for e in data.entries):
@@ -705,9 +734,18 @@ class ExamScoringService:
                 raise InvalidScoringConfigurationException("Har bir qatorda raw va scaled bo'lishi kerak")
             raw_entries = [{"raw": e.raw, "scaled": e.scaled} for e in data.entries]
         try:
-            entries = validate_conversion_table(section.score_component, data.method, raw_entries)
+            entries = validate_conversion_table(section.score_component, data.method, raw_entries, anomalies)
         except InvalidConversionTable as exc:
             raise InvalidScoringConfigurationException(str(exc))
+
+        # Task 8 — no duplicate versions: re-publishing exactly the current
+        # table (same data and provenance) would only add an ambiguous copy.
+        current = self.table_repo.get_current(section.id, data.routing_variant)
+        if current is not None and (
+            current.method == data.method and current.entries == entries
+            and current.conversion_type == provenance["conversion_type"] and current.test_form == provenance["test_form"]
+        ):
+            raise ScoringConfigurationConflictException(f"Bu jadval joriy {current.version}-versiya bilan bir xil — yangi versiya yaratilmadi")
 
         table = ScoreConversionTable(
             section_id=section.id, routing_variant=data.routing_variant,
@@ -718,6 +756,8 @@ class ExamScoringService:
         log_action(self.table_repo.db, action="score_conversion_table.published", user_id=actor_id,
                    entity_type="exam_section", entity_id=section.id,
                    metadata={"table_id": str(table.id), "version": table.version, "routing_variant": data.routing_variant,
-                             "conversion_type": provenance["conversion_type"], "test_form": provenance["test_form"]})
+                             "conversion_type": provenance["conversion_type"], "test_form": provenance["test_form"],
+                             # Task 8 — documented source anomalies kept as published.
+                             "source_anomalies": source_anomaly_notes(provenance["test_form"], section.score_component)})
         self.table_repo.commit()
         return table

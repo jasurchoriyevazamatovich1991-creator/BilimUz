@@ -72,6 +72,8 @@ export interface ConversionTableOut {
   source_title?: string | null;
   source_version?: string | null;
   source_verified_at?: string | null;
+  /** Task 8 — documented anomalies of the official source (shown as warnings). */
+  source_anomalies?: string[];
 }
 
 export type ConversionMethod = "exact" | "linear" | "range";
@@ -89,7 +91,8 @@ export interface ConversionEntry {
 export interface ConversionTableCreateRequest {
   routing_variant?: string;
   method: ConversionMethod;
-  entries: ConversionEntry[];
+  /** Omitted for official practice-test tables (Task 8: the server uses the verified source). */
+  entries?: ConversionEntry[];
   conversion_type?: ConversionType;
   test_form?: string;
   source_url?: string;

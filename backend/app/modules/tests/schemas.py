@@ -369,7 +369,9 @@ class ConversionTableCreateRequest(BaseModel):
     may carry a free-form source description."""
     routing_variant: str | None = Field(default=None, min_length=1, max_length=50)
     method: str = "exact"
-    entries: list[ConversionTableEntryIn] = Field(min_length=1, max_length=500)
+    # Required for every type except 'official_practice_test', whose values
+    # always come from the verified dataset (Task 8; if sent they must match).
+    entries: list[ConversionTableEntryIn] = Field(default_factory=list, max_length=500)
     conversion_type: str = "unverified"
     test_form: str | None = Field(default=None, max_length=60)
     source_url: str | None = Field(default=None, max_length=500)
@@ -396,6 +398,8 @@ class ConversionTableOut(BaseModel):
     source_title: str | None = None
     source_version: str | None = None
     source_verified_at: date | None = None
+    # Task 8 — documented anomalies of the official source (warnings).
+    source_anomalies: list[str] = []
     # True for the highest version of its (section, routing_variant) —
     # the one new results are scored with.
     is_current: bool = False

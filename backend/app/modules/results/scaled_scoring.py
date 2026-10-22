@@ -106,7 +106,8 @@ def _fmt(value: Fraction) -> str:
     return str(value.numerator) if value.denominator == 1 else format(float(value), "g")
 
 
-def validate_conversion_table(component: str, method: str, entries: list[dict]) -> list[dict]:
+def validate_conversion_table(component: str, method: str, entries: list[dict],
+                              allowed_source_anomalies: frozenset = frozenset()) -> list[dict]:
     """Validates a table for one score component and returns the canonical
     entries to store: [{"raw": "12", "scaled": "650"}, ...] sorted by raw,
     values as exact decimal strings. Raises InvalidConversionTable."""
@@ -123,7 +124,7 @@ def validate_conversion_table(component: str, method: str, entries: list[dict]) 
         raise InvalidConversionTable(f"Jadvalda ko'pi bilan {MAX_TABLE_ENTRIES} ta qator bo'lishi mumkin")
 
     if method == METHOD_RANGE:
-        return _validate_range_table(spec, entries)
+        return _validate_range_table(spec, entries, allowed_source_anomalies)
 
     pairs: list[tuple[Fraction, Fraction]] = []
     for i, entry in enumerate(entries, start=1):
@@ -176,9 +177,16 @@ def _check_scaled(spec: ComponentSpec, value: Fraction, what: str) -> None:
         raise InvalidConversionTable(f"{what} {_fmt(spec.step)} qadamli bo'lishi kerak")
 
 
-def _validate_range_table(spec: ComponentSpec, entries: list[dict]) -> list[dict]:
+def _validate_range_table(spec: ComponentSpec, entries: list[dict], allowed_source_anomalies: frozenset = frozenset()) -> list[dict]:
     """Task 7 — [{"raw", "lower", "upper"}]: every integer raw score from 0
-    to the maximum, lower <= upper, both non-decreasing in raw."""
+    to the maximum, lower <= upper, both non-decreasing in raw.
+
+    Task 8 — allowed_source_anomalies: {(raw, field, previous_raw_value,
+    value)} for a verified official table whose published values decrease
+    at one row (SAT Practice Test 6, R&W raw 41: lower 540 -> 530). Only an
+    exact match of all four is exempt; every other rule still applies and
+    any other decrease is still rejected. Callers pass it only for the
+    registry's own data, never from a request."""
     rows: list[tuple[Fraction, Fraction, Fraction]] = []
     for i, entry in enumerate(entries, start=1):
         if not isinstance(entry, dict) or not {"raw", "lower", "upper"} <= set(entry):
@@ -205,8 +213,9 @@ def _validate_range_table(spec: ComponentSpec, entries: list[dict]) -> list[dict
             + ", ".join(str(m) for m in missing[:20])
         )
     for (raw_a, lo_a, up_a), (raw_b, lo_b, up_b) in zip(rows, rows[1:]):
-        if lo_b < lo_a or up_b < up_a:
-            raise InvalidConversionTable(f"Jadval monoton emas: raw {_fmt(raw_a)} va {_fmt(raw_b)}")
+        for field, prev, cur in (("lower", lo_a, lo_b), ("upper", up_a, up_b)):
+            if cur < prev and (int(raw_b), field, int(prev), int(cur)) not in allowed_source_anomalies:
+                raise InvalidConversionTable(f"Jadval monoton emas: raw {_fmt(raw_a)} va {_fmt(raw_b)}")
     return [{"raw": _decimal_text(r), "lower": _decimal_text(lo), "upper": _decimal_text(up)} for r, lo, up in rows]
 
 

@@ -47,7 +47,9 @@ export const SCALED_STATUS_LABELS: Record<string, string> = {
   no_score_component: "Shkala balli qo'llanilmaydi",
   // Task 7
   below_documented_range: "Rasmiy manbada bu xom ball uchun ko'rsatkich yo'q — band hisoblanmadi",
-  raw_scale_mismatch: "Taxminiy band faqat 40 ta bir ballik savol uchun hisoblanadi",
+  // Task 8 — also used when an official SAT practice-test table was made
+  // for a different number of one-mark items than this section has.
+  raw_scale_mismatch: "Savollar soni yoki ballari manba shkalasiga mos emas — ball hisoblanmadi (IELTS: 40 ta bir ballik savol; SAT: jadvaldagi eng katta xom ball)",
   ielts_module_unknown: "IELTS moduli (Academic/General Training) belgilanmagan — Reading bandi hisoblanmadi",
 };
 
