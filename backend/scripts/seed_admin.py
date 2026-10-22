@@ -23,7 +23,7 @@ confirming the target environment):
 
     SUPERADMIN_EMAIL=admin@example.com \
     SUPERADMIN_PASSWORD=YOUR_STRONG_PASSWORD \
-    python scripts/seed_admin.py
+    python -m scripts.seed_admin
 
 Optional:
     SUPERADMIN_FIRST_NAME (default: "Super")
